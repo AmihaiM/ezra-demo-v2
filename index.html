@@ -1,4 +1,3 @@
-<!-- v3 -->
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -407,7 +406,7 @@ fetch("/api/teachers")
 // ══ Teacher selection ═══════════════════════════════════════════════════════
 var TEACHER_EMOJIS = {ben: "👨‍🏫", sara: "👩‍🏫"};
 
-window.updateTeacherCards = function updateTeacherCards(data) {
+function updateTeacherCards(data) {
   // Update existing static cards with real data from API
   Object.keys(data).forEach(function(tid){
     var t = data[tid];
@@ -420,7 +419,7 @@ window.updateTeacherCards = function updateTeacherCards(data) {
   });
 }
 
-window.selectTeacher = function selectTeacher(tid) {
+function selectTeacher(tid) {
   currentTeacher = tid;
   var t = teacherData[tid] || {};
   var color = t.color || "#4318D1";
@@ -442,12 +441,12 @@ window.selectTeacher = function selectTeacher(tid) {
   setTimeout(function(){ document.getElementById("login-name").focus(); }, 200);
 }
 
-window.cancelLogin = function cancelLogin() {
+function cancelLogin() {
   document.getElementById("login-overlay").classList.remove("visible");
   currentTeacher = null;
 }
 
-window.submitLogin = function submitLogin() {
+function submitLogin() {
   var name = document.getElementById("login-name").value.trim();
   var pass = document.getElementById("login-pass").value;
   if (!name) { document.getElementById("login-name").focus(); return; }
@@ -481,7 +480,7 @@ document.getElementById("login-pass").addEventListener("keydown", function(e){
 });
 
 // ══ Start app ══════════════════════════════════════════════════════════════
-window.startApp = function startApp() {
+function startApp() {
   var t = teacherData[currentTeacher] || {};
   var color = t.color || "#4318D1";
   var colorLight = t.color_light || "#e8f0fe";
@@ -575,7 +574,7 @@ function loadQuestion() {
 }
 
 // ══ Play sentence ══════════════════════════════════════════════════════════
-window.playSentence = function playSentence() {
+function playSentence() {
   if (!currentQ) return;
   speechSynthesis.cancel();
   var u = new SpeechSynthesisUtterance(currentQ.en);
@@ -588,12 +587,12 @@ window.playSentence = function playSentence() {
   speechSynthesis.speak(u);
 }
 
-window.revealEnglish = function revealEnglish() {
+function revealEnglish() {
   var el = document.getElementById("english-ref");
   el.style.opacity = el.style.opacity === "1" ? "0" : "1";
 }
 
-window.skipSentence = function skipSentence() {
+function skipSentence() {
   if (waiting || processing) return;
   waiting = true;
   fetch("/api/skip", {
@@ -680,7 +679,7 @@ var MSG_SKIP    = ["ננסה בפעם הבאה 🤝","נמשיך קדימה 💙
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
 // ══ Speech recognition ══════════════════════════════════════════════════════
-window.startRecognition = function startRecognition() {
+function startRecognition() {
   if (waiting || processing) return;
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
