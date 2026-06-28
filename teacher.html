@@ -340,7 +340,7 @@ function buildLoginTabs(data) {
   }
 }
 
-document.getElementById("login-btn").addEventListener("click", doLogin);
+document.getElementById("login-btn").addEventListener("click", function(){ doLogin(); });
 document.getElementById("tpass").addEventListener("keydown", function(e){
   if (e.key === "Enter") doLogin();
 });
@@ -602,4 +602,4 @@ function logout() {
   teacherPassword = ""; activeExName = null; activeExCsvUrl = null; allExercises = [];
   document.getElementById("dashboard").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
-  document.getElementById
+  docume
