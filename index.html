@@ -419,7 +419,7 @@ function updateTeacherCards(data) {
   });
 }
 
-function selectTeacher(tid) {
+window.selectTeacher = function(tid) {
   currentTeacher = tid;
   var t = teacherData[tid] || {};
   var color = t.color || "#4318D1";
@@ -1123,4 +1123,6 @@ function launchConfetti() {
 }
 
 // ══ Reset session ════════════════════════════════════════════════════════════
-function resetSession(
+function resetSession() {
+  location.reload();
+}
