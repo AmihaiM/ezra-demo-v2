@@ -251,16 +251,15 @@ header{
   <div class="select-title">EZRA</div>
   <div class="select-sub">בחר את המורה שלך</div>
   <div class="teacher-cards" id="teacher-cards">
-    <!-- static fallback cards — JS will update colors/names from API -->
-    <div class="teacher-card" id="tc-ben" data-tid="ben">
+    <div class="teacher-card" id="tc-ben" onclick="selectTeacher('ben')">
       <div class="tc-avatar" style="background:#e8f0fe;border-color:#1a56db">&#x1F468;&#x200D;&#x1F3EB;</div>
-      <div class="tc-name">בן</div>
-      <div class="tc-role" style="color:rgba(255,255,255,.6)">מורה</div>
+      <div class="tc-name" id="tc-ben-name">&#x05D1;&#x05DF;</div>
+      <div class="tc-role" style="color:rgba(255,255,255,.6)">&#x05DE;&#x05D5;&#x05E8;&#x05D4;</div>
     </div>
-    <div class="teacher-card" id="tc-sara" data-tid="sara">
+    <div class="teacher-card" id="tc-sara" onclick="selectTeacher('sara')">
       <div class="tc-avatar" style="background:#fce8f3;border-color:#be185d">&#x1F469;&#x200D;&#x1F3EB;</div>
-      <div class="tc-name">שרה</div>
-      <div class="tc-role" style="color:rgba(255,255,255,.6)">מורה</div>
+      <div class="tc-name" id="tc-sara-name">&#x05E9;&#x05E8;&#x05D4;</div>
+      <div class="tc-role" style="color:rgba(255,255,255,.6)">&#x05DE;&#x05D5;&#x05E8;&#x05D4;</div>
     </div>
   </div>
 </div>
@@ -283,8 +282,8 @@ header{
       placeholder="סיסמא (ניתן להשמיט אם אין)"
       autocomplete="current-password">
     <div class="login-error" id="login-error">שם או סיסמא שגויים — נסה שוב.</div>
-    <button class="login-btn" id="login-submit-btn">התחל תרגול ←</button>
-    <button class="login-cancel" id="login-cancel-btn">חזורה</button>
+    <button class="login-btn" onclick="submitLogin()">&#x05D4;&#x05EA;&#x05D7;&#x05DC; &#x05EA;&#x05E8;&#x05D2;&#x05D5;&#x05DC; &#x2190;</button>
+    <button class="login-cancel" onclick="cancelLogin()">&#x05D7;&#x05D6;&#x05D5;&#x05E8;&#x05D4;</button>
   </div>
 </div>
 
@@ -395,29 +394,19 @@ var practiceResults= [];
 var questionMap    = {};     // en -> he
 
 // ══ Boot ═══════════════════════════════════════════════════════════════════
-// Wire up static card clicks immediately (cards are in HTML, always visible)
-document.querySelectorAll(".teacher-card[data-tid]").forEach(function(card){
-  card.addEventListener("click", function(){ selectTeacher(card.getAttribute("data-tid")); });
-});
-// Wire up login buttons
-document.getElementById("login-submit-btn").addEventListener("click", submitLogin);
-document.getElementById("login-cancel-btn").addEventListener("click", cancelLogin);
-
-// Fetch teacher data and update cards with real colors/names
-(function init() {
-  fetch("/api/teachers")
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      teacherData = data;
-      updateTeacherCards(data);
-    })
-    .catch(function(e){ console.warn("Could not load teachers:", e); });
-})();
+// Fetch teacher data and update cards with real colors/names from API
+fetch("/api/teachers")
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    teacherData = data;
+    updateTeacherCards(data);
+  })
+  .catch(function(e){ console.warn("Could not load teacher data:", e); });
 
 // ══ Teacher selection ═══════════════════════════════════════════════════════
 var TEACHER_EMOJIS = {ben: "👨‍🏫", sara: "👩‍🏫"};
 
-function updateTeacherCards(data) {
+window.updateTeacherCards = function updateTeacherCards(data) {
   // Update existing static cards with real data from API
   Object.keys(data).forEach(function(tid){
     var t = data[tid];
@@ -430,7 +419,7 @@ function updateTeacherCards(data) {
   });
 }
 
-function selectTeacher(tid) {
+window.selectTeacher = function selectTeacher(tid) {
   currentTeacher = tid;
   var t = teacherData[tid] || {};
   var color = t.color || "#4318D1";
@@ -452,12 +441,12 @@ function selectTeacher(tid) {
   setTimeout(function(){ document.getElementById("login-name").focus(); }, 200);
 }
 
-function cancelLogin() {
+window.cancelLogin = function cancelLogin() {
   document.getElementById("login-overlay").classList.remove("visible");
   currentTeacher = null;
 }
 
-function submitLogin() {
+window.submitLogin = function submitLogin() {
   var name = document.getElementById("login-name").value.trim();
   var pass = document.getElementById("login-pass").value;
   if (!name) { document.getElementById("login-name").focus(); return; }
@@ -491,7 +480,7 @@ document.getElementById("login-pass").addEventListener("keydown", function(e){
 });
 
 // ══ Start app ══════════════════════════════════════════════════════════════
-function startApp() {
+window.startApp = function startApp() {
   var t = teacherData[currentTeacher] || {};
   var color = t.color || "#4318D1";
   var colorLight = t.color_light || "#e8f0fe";
@@ -585,7 +574,7 @@ function loadQuestion() {
 }
 
 // ══ Play sentence ══════════════════════════════════════════════════════════
-function playSentence() {
+window.playSentence = function playSentence() {
   if (!currentQ) return;
   speechSynthesis.cancel();
   var u = new SpeechSynthesisUtterance(currentQ.en);
@@ -598,12 +587,12 @@ function playSentence() {
   speechSynthesis.speak(u);
 }
 
-function revealEnglish() {
+window.revealEnglish = function revealEnglish() {
   var el = document.getElementById("english-ref");
   el.style.opacity = el.style.opacity === "1" ? "0" : "1";
 }
 
-function skipSentence() {
+window.skipSentence = function skipSentence() {
   if (waiting || processing) return;
   waiting = true;
   fetch("/api/skip", {
@@ -690,7 +679,7 @@ var MSG_SKIP    = ["ננסה בפעם הבאה 🤝","נמשיך קדימה 💙
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
 // ══ Speech recognition ══════════════════════════════════════════════════════
-function startRecognition() {
+window.startRecognition = function startRecognition() {
   if (waiting || processing) return;
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
@@ -1129,4 +1118,9 @@ function launchConfetti() {
     }
     ticks++;
     if (alive && ticks < 220) requestAnimationFrame(draw);
-    else { canvas.style.display = "none"; ctx
+    else { canvas.style.display = "none"; ctx.clearRect(0,0,canvas.width,canvas.height); }
+  })();
+}
+
+// ══ Reset session ════════════════════════════════════════════════════════════
+function resetSession(

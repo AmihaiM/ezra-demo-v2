@@ -345,7 +345,7 @@ document.getElementById("tpass").addEventListener("keydown", function(e){
   if (e.key === "Enter") doLogin();
 });
 
-function doLogin() {
+window.doLogin = function doLogin() {
   var pass = document.getElementById("tpass").value;
   document.getElementById("login-err").style.display = "none";
   fetch("/api/teacher-login", {
@@ -379,7 +379,7 @@ function doLogin() {
 }
 
 // ── Section switching ──────────────────────────────────────────────────────
-function showSection(sec) {
+window.showSection = function showSection(sec) {
   ["live","exercise","settings","results"].forEach(function(s){
     document.getElementById("sec-"+s).style.display = s===sec ? "block" : "none";
   });
@@ -396,7 +396,7 @@ function startLivePolling() {
   liveInterval = setInterval(loadLive, 10000);
 }
 
-function loadLive() {
+window.loadLive = function loadLive() {
   fetch("/api/teacher-students", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -442,7 +442,7 @@ function renderStudents(students) {
 }
 
 // ── Exercise catalog ───────────────────────────────────────────────────────
-function loadCatalog(forceReload) {
+window.loadCatalog = function loadCatalog(forceReload) {
   document.getElementById("ex-list-body").innerHTML =
     '<div class="loading-text">🔄 טוען תרגילים...</div>';
   document.getElementById("ex-count").textContent = "";
@@ -505,7 +505,7 @@ function renderExercises(list) {
   document.getElementById("ex-list-body").innerHTML = html;
 }
 
-function selectExercise(name, csvUrl) {
+window.selectExercise = function selectExercise(name, csvUrl) {
   fetch("/api/set-exercise", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -530,7 +530,7 @@ function selectExercise(name, csvUrl) {
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
-function saveSettings() {
+window.saveSettings = function saveSettings() {
   fetch("/api/teacher-settings", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -553,7 +553,7 @@ function saveSettings() {
 }
 
 // ── Results ────────────────────────────────────────────────────────────────
-function loadResults() {
+window.loadResults = function loadResults() {
   document.getElementById("results-body").innerHTML = '<div class="loading-text">טוען...</div>';
   document.getElementById("results-count").textContent = "";
   fetch("/api/teacher-results", {
