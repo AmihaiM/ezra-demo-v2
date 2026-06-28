@@ -251,7 +251,17 @@ header{
   <div class="select-title">EZRA</div>
   <div class="select-sub">בחר את המורה שלך</div>
   <div class="teacher-cards" id="teacher-cards">
-    <!-- filled by JS -->
+    <!-- static fallback cards — JS will update colors/names from API -->
+    <div class="teacher-card" id="tc-ben" data-tid="ben">
+      <div class="tc-avatar" style="background:#e8f0fe;border-color:#1a56db">&#x1F468;&#x200D;&#x1F3EB;</div>
+      <div class="tc-name">בן</div>
+      <div class="tc-role" style="color:rgba(255,255,255,.6)">מורה</div>
+    </div>
+    <div class="teacher-card" id="tc-sara" data-tid="sara">
+      <div class="tc-avatar" style="background:#fce8f3;border-color:#be185d">&#x1F469;&#x200D;&#x1F3EB;</div>
+      <div class="tc-name">שרה</div>
+      <div class="tc-role" style="color:rgba(255,255,255,.6)">מורה</div>
+    </div>
   </div>
 </div>
 
@@ -273,8 +283,8 @@ header{
       placeholder="סיסמא (ניתן להשמיט אם אין)"
       autocomplete="current-password">
     <div class="login-error" id="login-error">שם או סיסמא שגויים — נסה שוב.</div>
-    <button class="login-btn" onclick="submitLogin()">התחל תרגול ←</button>
-    <button class="login-cancel" onclick="cancelLogin()">חזורה</button>
+    <button class="login-btn" id="login-submit-btn">התחל תרגול ←</button>
+    <button class="login-cancel" id="login-cancel-btn">חזורה</button>
   </div>
 </div>
 
@@ -385,39 +395,38 @@ var practiceResults= [];
 var questionMap    = {};     // en -> he
 
 // ══ Boot ═══════════════════════════════════════════════════════════════════
+// Wire up static card clicks immediately (cards are in HTML, always visible)
+document.querySelectorAll(".teacher-card[data-tid]").forEach(function(card){
+  card.addEventListener("click", function(){ selectTeacher(card.getAttribute("data-tid")); });
+});
+// Wire up login buttons
+document.getElementById("login-submit-btn").addEventListener("click", submitLogin);
+document.getElementById("login-cancel-btn").addEventListener("click", cancelLogin);
+
+// Fetch teacher data and update cards with real colors/names
 (function init() {
   fetch("/api/teachers")
     .then(function(r){ return r.json(); })
     .then(function(data){
       teacherData = data;
-      buildTeacherCards(data);
+      updateTeacherCards(data);
     })
-    .catch(function(){ buildTeacherCards({}); });
+    .catch(function(e){ console.warn("Could not load teachers:", e); });
 })();
 
 // ══ Teacher selection ═══════════════════════════════════════════════════════
 var TEACHER_EMOJIS = {ben: "👨‍🏫", sara: "👩‍🏫"};
 
-function buildTeacherCards(data) {
-  var container = document.getElementById("teacher-cards");
-  container.innerHTML = "";
-
-  var ids = Object.keys(data);
-  if (!ids.length) { ids = ["ben", "sara"]; }
-
-  ids.forEach(function(tid){
-    var t = data[tid] || {name: tid === "ben" ? "בנ" : "שרה", color:"#4318D1", color_light:"#e8f0fe"};
-    var card = document.createElement("div");
-    card.className = "teacher-card";
-    card.setAttribute("data-tid", tid);
-    card.innerHTML =
-      '<div class="tc-avatar" style="background:' + t.color_light + ';border-color:' + t.color + '">' +
-        (TEACHER_EMOJIS[tid] || "👨‍🏫") +
-      '</div>' +
-      '<div class="tc-name" style="color:#fff">' + t.name + '</div>' +
-      '<div class="tc-role" style="color:rgba(255,255,255,.6)">מורה</div>';
-    card.onclick = function(){ selectTeacher(tid); };
-    container.appendChild(card);
+function updateTeacherCards(data) {
+  // Update existing static cards with real data from API
+  Object.keys(data).forEach(function(tid){
+    var t = data[tid];
+    var card = document.getElementById("tc-" + tid);
+    if (!card) return;
+    var avatar = card.querySelector(".tc-avatar");
+    var nameEl = card.querySelector(".tc-name");
+    if (avatar) { avatar.style.background = t.color_light; avatar.style.borderColor = t.color; }
+    if (nameEl) nameEl.textContent = t.name;
   });
 }
 
@@ -1120,8 +1129,4 @@ function launchConfetti() {
     }
     ticks++;
     if (alive && ticks < 220) requestAnimationFrame(draw);
-    else { canvas.style.display = "none"; ctx.clearRect(0,0,canvas.width,canvas.height); }
-  })();
-}
-
-// ══ Reset session 
+    else { canvas.style.display = "none"; ctx

@@ -147,7 +147,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;
     <div class="teacher-tabs" id="teacher-tabs"></div>
     <div class="err" id="login-err">סיסמה שגויה — נסה שוב.</div>
     <input class="field" id="tpass" type="password" placeholder="סיסמת מורה">
-    <button class="btn-primary" onclick="doLogin()">כניסה ←</button>
+    <button class="btn-primary" id="login-btn">כניסה ←</button>
   </div>
 </div>
 
@@ -290,7 +290,7 @@ header{display:flex;align-items:center;gap:14px;padding:14px 20px;
 </div><!-- /#dashboard -->
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
+// ── State (global) ─────────────────────────────────────────────────────────
 var currentTeacher = "ben";
 var teacherPassword = "";
 var teacherData = {};
@@ -340,6 +340,7 @@ function buildLoginTabs(data) {
   }
 }
 
+document.getElementById("login-btn").addEventListener("click", doLogin);
 document.getElementById("tpass").addEventListener("keydown", function(e){
   if (e.key === "Enter") doLogin();
 });
@@ -428,4 +429,177 @@ function renderStudents(students) {
         '<div style="font-size:12px;color:#888;margin-bottom:8px">' +
           'משפט ' + s.index + ' מתוך ' + s.total +
         '</div>' +
-        '<div class="sc-progress"><div class="s
+        '<div class="sc-progress"><div class="sc-progress-fill" style="width:'+pct+'%"></div></div>' +
+        '<div class="sc-stats">' +
+          '<span>✓ ' + s.passed + ' עברו</span>' +
+          '<span>📊 ' + s.avg_score + '%</span>' +
+        '</div>' +
+        '<span class="sc-phase phase-'+phase+'">' + phaseLabel + '</span>' +
+      '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ── Exercise catalog ───────────────────────────────────────────────────────
+function loadCatalog(forceReload) {
+  document.getElementById("ex-list-body").innerHTML =
+    '<div class="loading-text">🔄 טוען תרגילים...</div>';
+  document.getElementById("ex-count").textContent = "";
+
+  fetch("/api/catalog", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({teacher_id:currentTeacher, password:teacherPassword, reload:!!forceReload})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    allExercises = d.exercises || [];
+    filteredExercises = allExercises;
+    renderExercises(allExercises);
+  })
+  .catch(function(){
+    document.getElementById("ex-list-body").innerHTML =
+      '<div class="loading-text" style="color:#ef5350">שגיאה בטעינת הקטלוג</div>';
+  });
+}
+
+function filterExercises() {
+  var q = document.getElementById("ex-search").value.toLowerCase();
+  filteredExercises = q
+    ? allExercises.filter(function(e){ return e.name.toLowerCase().includes(q); })
+    : allExercises;
+  renderExercises(filteredExercises);
+}
+
+function renderExercises(list) {
+  var count = document.getElementById("ex-count");
+  count.textContent = list.length + " תרגילים" + (list.length < allExercises.length ? " (מסונן)" : "");
+
+  if (!list.length) {
+    document.getElementById("ex-list-body").innerHTML =
+      '<div class="loading-text">לא נמצאו תרגילים</div>';
+    return;
+  }
+
+  // Update active banner
+  if (activeExName) {
+    document.getElementById("active-ex-banner").style.display = "block";
+    document.getElementById("active-ex-label").textContent = activeExName;
+  }
+
+  var html = '<div class="ex-list">';
+  list.forEach(function(ex){
+    var isActive = ex.csv_url === activeExCsvUrl;
+    html +=
+      '<div class="ex-item' + (isActive ? " active-ex" : "") + '">' +
+        '<div class="ex-name">' + ex.name + '</div>' +
+        (isActive ? '<span class="active-badge">✓ פעיל</span>' : "") +
+        '<button class="ex-select-btn' + (isActive ? " selected" : "") + '" ' +
+          'onclick="selectExercise(' + JSON.stringify(ex.name) + ',' + JSON.stringify(ex.csv_url) + ')">' +
+          (isActive ? "✓ נבחר" : "בחר") +
+        '</button>' +
+      '</div>';
+  });
+  html += '</div>';
+  document.getElementById("ex-list-body").innerHTML = html;
+}
+
+function selectExercise(name, csvUrl) {
+  fetch("/api/set-exercise", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({teacher_id:currentTeacher, password:teacherPassword, name:name, csv_url:csvUrl})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) {
+      activeExName   = name;
+      activeExCsvUrl = csvUrl;
+      document.getElementById("live-exercise-name").textContent = name;
+      document.getElementById("active-ex-banner").style.display = "block";
+      document.getElementById("active-ex-label").textContent = name;
+      renderExercises(filteredExercises);
+      // Flash confirmation
+      var btn = event.target;
+      var orig = btn.textContent;
+      btn.textContent = "✓ נטען " + d.count + " משפטים";
+      setTimeout(function(){ btn.textContent = "✓ נבחר"; }, 3000);
+    }
+  });
+}
+
+// ── Settings ───────────────────────────────────────────────────────────────
+function saveSettings() {
+  fetch("/api/teacher-settings", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      teacher_id:   currentTeacher,
+      password:     teacherPassword,
+      threshold:    parseInt(document.getElementById("threshold-range").value),
+      max_attempts: parseInt(document.getElementById("attempts-range").value)
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) {
+      var c = document.getElementById("save-confirm");
+      c.style.display = "block";
+      setTimeout(function(){ c.style.display = "none"; }, 3000);
+      loadLive(); // refresh live panel with new settings
+    }
+  });
+}
+
+// ── Results ────────────────────────────────────────────────────────────────
+function loadResults() {
+  document.getElementById("results-body").innerHTML = '<div class="loading-text">טוען...</div>';
+  document.getElementById("results-count").textContent = "";
+  fetch("/api/teacher-results", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({teacher_id:currentTeacher, password:teacherPassword})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var rows = d.rows || [];
+    document.getElementById("results-count").textContent = rows.length + " רשומות";
+    if (!rows.length) {
+      document.getElementById("results-body").innerHTML = '<div class="loading-text">אין תוצאות עדיין</div>';
+      return;
+    }
+    var headers = Object.keys(rows[0]);
+    var html = '<div class="table-wrap"><table class="results-table"><thead><tr>';
+    headers.forEach(function(h){ html += '<th>'+h+'</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.slice().reverse().forEach(function(row){
+      html += '<tr>';
+      headers.forEach(function(h){
+        var val = row[h] || "";
+        var isPass = h.includes("עבר") || h.toLowerCase() === "passed";
+        if (isPass) {
+          var cls = (val === "כן" || val.toLowerCase() === "true") ? "badge-pass" : "badge-fail";
+          html += '<td><span class="badge '+cls+'">'+val+'</span></td>';
+        } else {
+          html += '<td>'+val+'</td>';
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById("results-body").innerHTML = html;
+  })
+  .catch(function(){
+    document.getElementById("results-body").innerHTML =
+      '<div class="loading-text" style="color:#ef5350">שגיאה בטעינת תוצאות</div>';
+  });
+}
+
+// ── Logout ─────────────────────────────────────────────────────────────────
+function logout() {
+  if (liveInterval) clearInterval(liveInterval);
+  teacherPassword = ""; activeExName = null; activeExCsvUrl = null; allExercises = [];
+  document.getElementById("dashboard").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById
