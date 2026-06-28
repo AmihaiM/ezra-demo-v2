@@ -8,50 +8,32 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f4ff;min-height:100vh;direction:rtl}
 
-/* ── Login ─────────────────────────────────────────────────────────────── */
-#login-screen{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:100vh;padding:24px;background:linear-gradient(135deg,#1a1033,#4318D1);
-}
-.login-card{
-  background:#fff;border-radius:24px;padding:36px 32px;width:100%;max-width:400px;
-  box-shadow:0 24px 60px rgba(0,0,0,.3);
-}
+/* Login */
+#login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:24px;background:linear-gradient(135deg,#1a1033,#4318D1)}
+.login-card{background:#fff;border-radius:24px;padding:36px 32px;width:100%;max-width:400px;
+  box-shadow:0 24px 60px rgba(0,0,0,.3)}
 .login-logo{text-align:center;font-size:48px;margin-bottom:8px}
 .login-title{text-align:center;font-size:26px;font-weight:900;color:#1a1033;margin-bottom:4px}
 .login-sub{text-align:center;font-size:14px;color:#888;margin-bottom:28px}
 .teacher-tabs{display:flex;gap:8px;margin-bottom:20px}
-.tab-btn{
-  flex:1;padding:12px 8px;border:2px solid #e0d9ff;border-radius:12px;
+.tab-btn{flex:1;padding:12px 8px;border:2px solid #e0d9ff;border-radius:12px;
   background:#fff;cursor:pointer;font-size:14px;font-weight:700;color:#4318D1;
-  font-family:inherit;transition:.2s;
-}
+  font-family:inherit;transition:.2s}
 .tab-btn.active{border-color:var(--tc,#4318D1);background:var(--tc,#4318D1);color:#fff}
-.field{
-  width:100%;padding:12px 14px;border:2px solid #e0d9ff;border-radius:12px;
-  font-size:15px;margin-bottom:12px;outline:none;font-family:inherit;
-  direction:rtl;transition:.2s;
-}
+.field{width:100%;padding:12px 14px;border:2px solid #e0d9ff;border-radius:12px;
+  font-size:15px;margin-bottom:12px;outline:none;font-family:inherit;direction:rtl;transition:.2s}
 .field:focus{border-color:var(--tc,#4318D1)}
-.btn-primary{
-  width:100%;padding:13px;border:none;border-radius:12px;font-size:15px;
-  font-weight:700;color:#fff;cursor:pointer;background:var(--tc,#4318D1);
-  font-family:inherit;transition:.2s;
-}
+.btn-primary{width:100%;padding:13px;border:none;border-radius:12px;font-size:15px;
+  font-weight:700;color:#fff;cursor:pointer;background:var(--tc,#4318D1);font-family:inherit;transition:.2s}
 .btn-primary:hover{opacity:.88}
-.err{
-  display:none;background:#ffebee;border:2px solid #ef5350;border-radius:10px;
-  padding:9px 13px;font-size:13px;color:#c62828;margin-bottom:10px;
-}
+.err{display:none;background:#ffebee;border:2px solid #ef5350;border-radius:10px;
+  padding:9px 13px;font-size:13px;color:#c62828;margin-bottom:10px}
 
-/* ── Dashboard ─────────────────────────────────────────────────────────── */
+/* Dashboard */
 #dashboard{display:none}
-
-header{
-  display:flex;align-items:center;gap:14px;padding:14px 20px;
-  background:var(--tc,#4318D1);color:#fff;
-  box-shadow:0 2px 12px rgba(0,0,0,.15);
-}
+header{display:flex;align-items:center;gap:14px;padding:14px 20px;
+  background:var(--tc,#4318D1);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,.15)}
 .h-logo{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.2);
   display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px}
 .h-title{font-size:18px;font-weight:800}
@@ -61,114 +43,115 @@ header{
   font-family:inherit;font-weight:600}
 .h-logout:hover{background:rgba(255,255,255,.15)}
 
-.page{max-width:800px;margin:0 auto;padding:20px}
+.page{max-width:860px;margin:0 auto;padding:20px}
 
-/* Tabs */
 .section-tabs{display:flex;gap:0;margin-bottom:24px;background:#fff;
   border-radius:16px;padding:6px;box-shadow:0 2px 12px rgba(67,24,209,.08)}
-.stab{
-  flex:1;padding:10px;border:none;background:none;font-size:14px;font-weight:700;
-  color:#888;cursor:pointer;border-radius:12px;font-family:inherit;transition:.2s;
-}
+.stab{flex:1;padding:10px;border:none;background:none;font-size:14px;font-weight:700;
+  color:#888;cursor:pointer;border-radius:12px;font-family:inherit;transition:.2s}
 .stab.active{background:var(--tc,#4318D1);color:#fff}
 
-/* Settings card */
 .card{background:#fff;border-radius:20px;padding:24px;margin-bottom:20px;
   box-shadow:0 4px 20px rgba(67,24,209,.08)}
 .card-title{font-size:16px;font-weight:800;color:#1a1033;margin-bottom:20px;
-  padding-bottom:12px;border-bottom:2px solid #f0eeff}
+  padding-bottom:12px;border-bottom:2px solid #f0eeff;display:flex;align-items:center;gap:8px}
 
-.setting-row{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
-.setting-label{font-size:14px;font-weight:600;color:#555;min-width:160px}
+/* Settings */
+.setting-row{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.setting-label{font-size:14px;font-weight:600;color:#555;min-width:170px;padding-top:4px}
+.setting-hint{font-size:12px;color:#aaa;margin-top:3px;display:block}
 .setting-ctrl{display:flex;align-items:center;gap:10px}
-.range-input{
-  width:200px;accent-color:var(--tc,#4318D1);cursor:pointer;
-}
-.range-val{
-  font-size:18px;font-weight:800;color:var(--tc,#4318D1);min-width:50px;
-}
-.setting-hint{font-size:12px;color:#aaa;margin-top:2px;display:block}
-.save-btn{
-  padding:10px 24px;border:none;border-radius:12px;background:var(--tc,#4318D1);
-  color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;
-}
+.range-input{width:180px;accent-color:var(--tc,#4318D1);cursor:pointer}
+.range-val{font-size:20px;font-weight:800;color:var(--tc,#4318D1);min-width:44px}
+.save-btn{padding:10px 24px;border:none;border-radius:12px;background:var(--tc,#4318D1);
+  color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
 .save-btn:hover{opacity:.88}
-.save-confirm{
-  display:none;font-size:13px;color:#4CAF50;font-weight:600;margin-top:8px;
+.save-confirm{display:none;font-size:13px;color:#4CAF50;font-weight:600;margin-top:10px}
+
+/* Exercise browser */
+.ex-search-wrap{position:relative;margin-bottom:14px}
+.ex-search{width:100%;padding:11px 14px 11px 40px;border:2px solid #e0d9ff;
+  border-radius:12px;font-size:14px;outline:none;font-family:inherit;direction:rtl}
+.ex-search:focus{border-color:var(--tc,#4318D1)}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  font-size:16px;pointer-events:none}
+.ex-count{font-size:12px;color:#888;margin-bottom:10px}
+.ex-list{max-height:420px;overflow-y:auto;border:2px solid #e0d9ff;border-radius:14px}
+.ex-item{display:flex;align-items:center;gap:12px;padding:12px 16px;
+  border-bottom:1px solid #f0eeff;cursor:pointer;transition:.15s}
+.ex-item:last-child{border-bottom:none}
+.ex-item:hover{background:#f8f7ff}
+.ex-item.active-ex{background:var(--tc-light,#e8f0fe);border-right:4px solid var(--tc,#4318D1)}
+.ex-name{flex:1;font-size:13px;font-weight:600;color:#1a1033;line-height:1.4}
+.ex-select-btn{padding:6px 14px;border:none;border-radius:8px;
+  background:var(--tc,#4318D1);color:#fff;font-size:12px;font-weight:700;
+  cursor:pointer;font-family:inherit;white-space:nowrap}
+.ex-select-btn:hover{opacity:.88}
+.ex-select-btn.selected{background:#4CAF50}
+.active-badge{
+  background:var(--tc,#4318D1);color:#fff;font-size:11px;font-weight:700;
+  padding:2px 8px;border-radius:20px;white-space:nowrap
 }
+.loading-text{padding:24px;text-align:center;color:#888;font-size:14px}
+
+/* Live students */
+.live-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.live-badge{display:inline-flex;align-items:center;gap:6px;
+  background:#e8f5e9;color:#2e7d32;font-size:12px;font-weight:700;
+  padding:4px 12px;border-radius:20px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#4CAF50;
+  animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.refresh-btn{padding:7px 16px;border:none;border-radius:10px;background:#ede7ff;
+  color:var(--tc,#4318D1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit}
+.refresh-btn:hover{background:#ddd6fe}
+.auto-label{font-size:12px;color:#888}
+
+.student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.student-card{background:#f8f7ff;border-radius:14px;padding:14px 16px;border:2px solid #e0d9ff}
+.sc-name{font-size:15px;font-weight:800;color:#1a1033;margin-bottom:6px}
+.sc-ex{font-size:11px;color:#888;margin-bottom:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sc-progress{height:6px;background:#e0d9ff;border-radius:20px;margin-bottom:6px;overflow:hidden}
+.sc-progress-fill{height:100%;border-radius:20px;background:var(--tc,#4318D1);transition:width .4s}
+.sc-stats{display:flex;gap:8px;font-size:12px;color:#555}
+.sc-phase{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;
+  border-radius:20px;margin-top:6px}
+.phase-normal{background:#e0d9ff;color:#4318D1}
+.phase-cloze{background:#ede9fe;color:#7c3aed}
+.phase-mastery{background:#fef3c7;color:#92400e}
+.phase-done{background:#e8f5e9;color:#2e7d32}
+.no-students{padding:40px;text-align:center;color:#888;font-size:14px}
 
 /* Results */
 .results-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
-.refresh-btn{
-  padding:8px 18px;border:none;border-radius:10px;background:#ede7ff;
-  color:var(--tc,#4318D1);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;
-}
-.refresh-btn:hover{background:#ddd6fe}
 .results-count{font-size:13px;color:#888}
-
+.table-wrap{overflow-x:auto;border-radius:14px;border:2px solid #e0d9ff}
 .results-table{width:100%;border-collapse:collapse;font-size:13px}
-.results-table th{
-  text-align:right;padding:10px 12px;background:#f8f7ff;
-  border-bottom:2px solid #e0d9ff;font-weight:700;color:#555;
-}
-.results-table td{
-  padding:10px 12px;border-bottom:1px solid #f0eeff;color:#1a1033;
-}
+.results-table th{text-align:right;padding:10px 12px;background:#f8f7ff;
+  border-bottom:2px solid #e0d9ff;font-weight:700;color:#555}
+.results-table td{padding:10px 12px;border-bottom:1px solid #f0eeff;color:#1a1033}
 .results-table tr:hover td{background:#f8f7ff}
-.badge{
-  display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;
-}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
 .badge-pass{background:#e8f5e9;color:#2e7d32}
 .badge-fail{background:#ffebee;color:#c62828}
-
-/* Sentences panel */
-.reload-hint{font-size:13px;color:#888;margin-bottom:16px}
-.stat-boxes{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
-.stat-box{
-  background:#f8f7ff;border-radius:14px;padding:16px 20px;min-width:120px;
-  border:2px solid #e0d9ff;
-}
-.stat-val{font-size:28px;font-weight:800;color:var(--tc,#4318D1)}
-.stat-lbl{font-size:11px;color:#888;font-weight:600;margin-top:2px;text-transform:uppercase}
-
-.link-btn{
-  display:inline-flex;align-items:center;gap:6px;padding:9px 18px;
-  border:2px solid var(--tc,#4318D1);border-radius:12px;color:var(--tc,#4318D1);
-  font-weight:700;font-size:13px;text-decoration:none;transition:.2s;
-}
-.link-btn:hover{background:var(--tc,#4318D1);color:#fff}
-
-/* Loading */
-.loading{
-  display:flex;align-items:center;justify-content:center;padding:48px;
-  font-size:15px;color:#888;
-}
-
-/* Scroll table */
-.table-wrap{overflow-x:auto;border-radius:14px;border:2px solid #e0d9ff}
 </style>
 </head>
 <body>
 
-<!-- ═══ Login ════════════════════════════════════════════════════════════════ -->
+<!-- Login -->
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo">🏫</div>
     <div class="login-title">EZRA — לוח מורה</div>
     <div class="login-sub">בחר מורה והזן סיסמה</div>
-
-    <div class="teacher-tabs" id="teacher-tabs">
-      <!-- filled by JS -->
-    </div>
-
+    <div class="teacher-tabs" id="teacher-tabs"></div>
     <div class="err" id="login-err">סיסמה שגויה — נסה שוב.</div>
-    <input class="field" id="tpass" type="password" placeholder="סיסמת מורה"
-      autocomplete="current-password">
-    <button class="btn-primary" onclick="doTeacherLogin()">כניסה ←</button>
+    <input class="field" id="tpass" type="password" placeholder="סיסמת מורה">
+    <button class="btn-primary" onclick="doLogin()">כניסה ←</button>
   </div>
 </div>
 
-<!-- ═══ Dashboard ════════════════════════════════════════════════════════════ -->
+<!-- Dashboard -->
 <div id="dashboard">
   <header>
     <div class="h-logo">E</div>
@@ -180,94 +163,125 @@ header{
   </header>
 
   <div class="page">
+
+    <!-- Section tabs -->
     <div class="section-tabs">
-      <button class="stab active" onclick="showSection('settings')">⚙️ הגדרות</button>
-      <button class="stab" onclick="showSection('sentences')">📚 חומר לימוד</button>
+      <button class="stab active" onclick="showSection('live')">👥 תלמידים חיים</button>
+      <button class="stab" onclick="showSection('exercise')">📚 בחר תרגיל</button>
+      <button class="stab" onclick="showSection('settings')">⚙️ הגדרות</button>
       <button class="stab" onclick="showSection('results')">📊 תוצאות</button>
     </div>
 
-    <!-- Settings -->
-    <div id="sec-settings">
+    <!-- ═══ Live students ════════════════════════════════════════════════════ -->
+    <div id="sec-live">
+      <div class="card">
+        <div class="live-header">
+          <div class="card-title" style="margin-bottom:0;border:none;padding:0">
+            👥 תלמידים פעילים עכשיו
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="live-badge"><span class="live-dot"></span>עדכון חי</span>
+            <button class="refresh-btn" onclick="loadLive()">🔄 רענן</button>
+          </div>
+        </div>
+
+        <div style="font-size:12px;color:#888;margin:8px 0 16px">
+          תרגיל פעיל: <strong id="live-exercise-name">לא נבחר</strong>
+          &nbsp;|&nbsp; ציון מינימלי: <strong id="live-threshold">—</strong>%
+          &nbsp;|&nbsp; מקסימום ניסיונות: <strong id="live-max-attempts">—</strong>
+        </div>
+
+        <div id="live-body">
+          <div class="no-students">אין תלמידים פעילים כרגע</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Exercise browser ═════════════════════════════════════════════════ -->
+    <div id="sec-exercise" style="display:none">
+      <div class="card">
+        <div class="card-title">📚 בחר תרגיל לכיתה</div>
+
+        <div id="active-ex-banner" style="display:none;background:var(--tc-light,#e8f0fe);
+          border-radius:12px;padding:12px 16px;margin-bottom:16px;
+          border:2px solid var(--tc,#4318D1);font-size:14px;font-weight:600;color:#1a1033">
+          ✓ תרגיל נוכחי: <span id="active-ex-label"></span>
+        </div>
+
+        <div class="ex-search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="ex-search" id="ex-search" type="text"
+            placeholder="חפש לפי שם תרגיל או שם תלמיד..."
+            oninput="filterExercises()">
+        </div>
+        <div class="ex-count" id="ex-count"></div>
+
+        <div id="ex-list-body">
+          <div class="loading-text">🔄 טוען תרגילים מהגוגל שיט...</div>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <button class="save-btn" onclick="loadCatalog(true)">🔄 רענן קטלוג</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Settings ═════════════════════════════════════════════════════════ -->
+    <div id="sec-settings" style="display:none">
       <div class="card">
         <div class="card-title">⚙️ הגדרות כיתה</div>
 
         <div class="setting-row">
           <div>
             <div class="setting-label">ציון מינימלי לעבור</div>
-            <span class="setting-hint">טווח: 80–100, ברירת מחדל: 85</span>
+            <span class="setting-hint">טווח: 80–100 | ברירת מחדל: 85</span>
           </div>
           <div class="setting-ctrl">
             <input type="range" class="range-input" id="threshold-range"
               min="80" max="100" step="1" value="85"
               oninput="document.getElementById('threshold-val').textContent=this.value">
-            <div class="range-val" id="threshold-val">85</div>
-            <div>%</div>
+            <div class="range-val" id="threshold-val">85</div><div>%</div>
           </div>
         </div>
 
         <div class="setting-row">
           <div>
             <div class="setting-label">מקסימום ניסיונות למשפט</div>
-            <span class="setting-hint">טווח: 4–7, ברירת מחדל: 5</span>
+            <span class="setting-hint">טווח: 4–7 | ברירת מחדל: 5</span>
           </div>
           <div class="setting-ctrl">
             <input type="range" class="range-input" id="attempts-range"
               min="4" max="7" step="1" value="5"
               oninput="document.getElementById('attempts-val').textContent=this.value">
-            <div class="range-val" id="attempts-val">5</div>
-            <div>ניסיונות</div>
+            <div class="range-val" id="attempts-val">5</div><div>ניסיונות</div>
           </div>
         </div>
 
         <button class="save-btn" onclick="saveSettings()">שמור הגדרות</button>
-        <div class="save-confirm" id="save-confirm">✓ ההגדרות נשמרו בהצלחה</div>
+        <div class="save-confirm" id="save-confirm">✓ ההגדרות נשמרו</div>
       </div>
 
       <div class="card" style="background:#fffbf0;border:2px solid #FFE082">
-        <div class="card-title" style="border-bottom-color:#FFE082">⚠️ חשוב לדעת</div>
-        <p style="font-size:13px;color:#555;line-height:1.7">
-          הגדרות אלו פעילות מיד לכל תלמידים חדשים.<br>
-          שינוי הציון המינימלי לא משפיע על תלמידים שכבר בתוך סשן פעיל.<br>
-          הגדרות מאופסות בכל פעם שהשרת מתחיל מחדש. בגרסה מלאה יישמרו ב-DB.
+        <div class="card-title" style="border-color:#FFE082">ℹ️ הערה</div>
+        <p style="font-size:13px;color:#555;line-height:1.8">
+          ההגדרות תקפות מיידית לכל סשן חדש.<br>
+          <strong>חשוב:</strong> אם השרת מתאפס (Render מאפס כל ~15 דקות של חוסר פעילות),
+          ההגדרות חוזרות לברירות המחדל.<br>
+          לשמירה קבועה — שנה את ערכי משתני הסביבה <code>BEN_THRESHOLD</code> ו-<code>BEN_MAX_ATTEMPTS</code> ב-Render.
         </p>
       </div>
     </div>
 
-    <!-- Sentences -->
-    <div id="sec-sentences" style="display:none">
-      <div class="card">
-        <div class="card-title">📚 חומר לימוד — משפטים מהגוגל שיט</div>
-        <p class="reload-hint">המשפטים נטענים מהגוגל שיט שלך ונשמרים במטמון לשעה אחת.</p>
-
-        <div class="stat-boxes">
-          <div class="stat-box">
-            <div class="stat-val" id="sent-count">—</div>
-            <div class="stat-lbl">משפטים</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-val" id="sent-cached">—</div>
-            <div class="stat-lbl">סטטוס מטמון</div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="save-btn" onclick="reloadSentences()">🔄 טען מחדש מהשיט</button>
-          <a class="link-btn" id="sheet-link" href="#" target="_blank">📄 פתח שיט המשפטים</a>
-        </div>
-        <div class="save-confirm" id="reload-confirm">✓ המשפטים נטענו מחדש בהצלחה</div>
-      </div>
-    </div>
-
-    <!-- Results -->
+    <!-- ═══ Results ═══════════════════════════════════════════════════════════ -->
     <div id="sec-results" style="display:none">
       <div class="card">
         <div class="card-title">📊 תוצאות תלמידים</div>
         <div class="results-toolbar">
-          <button class="refresh-btn" onclick="loadResults()">🔄 רענן</button>
+          <button class="refresh-btn" onclick="loadResults()">🔄 טען תוצאות</button>
           <span class="results-count" id="results-count"></span>
         </div>
         <div id="results-body">
-          <div class="loading">לחץ "רענן" לטעינת תוצאות</div>
+          <div class="loading-text">לחץ "טען תוצאות" לרענון</div>
         </div>
       </div>
     </div>
@@ -279,89 +293,82 @@ header{
 // ── State ──────────────────────────────────────────────────────────────────
 var currentTeacher = "ben";
 var teacherPassword = "";
-var TEACHER_EMOJIS = {ben:"👨‍🏫", sara:"👩‍🏫"};
 var teacherData = {};
+var allExercises = [];
+var filteredExercises = [];
+var activeExName = null;
+var activeExCsvUrl = null;
+var liveInterval = null;
+
+var TEACHER_EMOJIS = {ben:"👨‍🏫", sara:"👩‍🏫"};
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 fetch("/api/teachers")
   .then(function(r){ return r.json(); })
   .then(function(data){
     teacherData = data;
-    buildTabs(data);
+    buildLoginTabs(data);
   })
-  .catch(function(){ buildTabs({ben:{name:"בן",color:"#1a56db"}, sara:{name:"שרה",color:"#be185d"}}); });
+  .catch(function(){ buildLoginTabs({ben:{name:"בן",color:"#1a56db"},sara:{name:"שרה",color:"#be185d"}}); });
 
-function buildTabs(data) {
+function buildLoginTabs(data) {
   var container = document.getElementById("teacher-tabs");
   container.innerHTML = "";
   var ids = Object.keys(data);
   if (!ids.length) ids = ["ben","sara"];
-
   ids.forEach(function(tid, i){
     var t = data[tid] || {};
-    var name = t.name || tid;
-    var emoji = TEACHER_EMOJIS[tid] || "👨‍🏫";
     var btn = document.createElement("button");
     btn.className = "tab-btn" + (i === 0 ? " active" : "");
-    btn.setAttribute("data-tid", tid);
-    btn.textContent = emoji + " " + name;
+    btn.textContent = (TEACHER_EMOJIS[tid]||"👨‍🏫") + " " + (t.name||tid);
     btn.onclick = function(){
       document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
       btn.classList.add("active");
       currentTeacher = tid;
       var color = (data[tid]||{}).color || "#4318D1";
+      var cl    = (data[tid]||{}).color_light || "#e8f0fe";
       document.documentElement.style.setProperty("--tc", color);
+      document.documentElement.style.setProperty("--tc-light", cl);
     };
     container.appendChild(btn);
   });
-
-  // Set default teacher
   if (ids.length) {
     currentTeacher = ids[0];
-    var color = (data[ids[0]]||{}).color || "#4318D1";
-    document.documentElement.style.setProperty("--tc", color);
+    var t = data[ids[0]] || {};
+    document.documentElement.style.setProperty("--tc", t.color || "#4318D1");
+    document.documentElement.style.setProperty("--tc-light", t.color_light || "#e8f0fe");
   }
 }
 
 document.getElementById("tpass").addEventListener("keydown", function(e){
-  if (e.key === "Enter") doTeacherLogin();
+  if (e.key === "Enter") doLogin();
 });
 
-function doTeacherLogin() {
+function doLogin() {
   var pass = document.getElementById("tpass").value;
   document.getElementById("login-err").style.display = "none";
-
   fetch("/api/teacher-login", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({teacher_id: currentTeacher, password: pass})
   })
-  .then(function(r){
-    if (r.ok) return r.json();
-    throw new Error("auth");
-  })
+  .then(function(r){ if (r.ok) return r.json(); throw new Error(); })
   .then(function(d){
     teacherPassword = pass;
     var t = d.teacher;
-    document.documentElement.style.setProperty("--tc", t.color || "#4318D1");
+    document.documentElement.style.setProperty("--tc", t.color||"#4318D1");
+    document.documentElement.style.setProperty("--tc-light", t.color_light||"#e8f0fe");
     document.getElementById("h-teacher-label").textContent =
       (TEACHER_EMOJIS[currentTeacher]||"") + " מורה " + t.name;
-
-    // Init settings sliders
     document.getElementById("threshold-range").value = t.threshold || 85;
     document.getElementById("threshold-val").textContent = t.threshold || 85;
     document.getElementById("attempts-range").value = t.max_attempts || 5;
     document.getElementById("attempts-val").textContent = t.max_attempts || 5;
 
-    // Update sheet link
-    var sheetId = ((teacherData[currentTeacher]||{}).sentences_sheet_id) ||
-                  "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk";
-    document.getElementById("sheet-link").href =
-      "https://docs.google.com/spreadsheets/d/" + sheetId;
-
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("dashboard").style.display = "block";
-    loadSentenceStats();
+    startLivePolling();
+    loadLive();
   })
   .catch(function(){
     document.getElementById("login-err").style.display = "block";
@@ -370,136 +377,55 @@ function doTeacherLogin() {
   });
 }
 
-// ── Section tabs ───────────────────────────────────────────────────────────
+// ── Section switching ──────────────────────────────────────────────────────
 function showSection(sec) {
-  ["settings","sentences","results"].forEach(function(s){
-    document.getElementById("sec-" + s).style.display = s === sec ? "block" : "none";
+  ["live","exercise","settings","results"].forEach(function(s){
+    document.getElementById("sec-"+s).style.display = s===sec ? "block" : "none";
   });
-  document.querySelectorAll(".stab").forEach(function(b, i){
-    b.classList.toggle("active", i === ["settings","sentences","results"].indexOf(sec));
+  document.querySelectorAll(".stab").forEach(function(b,i){
+    b.classList.toggle("active", i === ["live","exercise","settings","results"].indexOf(sec));
   });
+  if (sec === "exercise" && !allExercises.length) loadCatalog(false);
   if (sec === "results") loadResults();
-  if (sec === "sentences") loadSentenceStats();
 }
 
-// ── Settings ───────────────────────────────────────────────────────────────
-function saveSettings() {
-  var threshold    = parseInt(document.getElementById("threshold-range").value);
-  var max_attempts = parseInt(document.getElementById("attempts-range").value);
+// ── Live students ──────────────────────────────────────────────────────────
+function startLivePolling() {
+  if (liveInterval) clearInterval(liveInterval);
+  liveInterval = setInterval(loadLive, 10000);
+}
 
-  fetch("/api/teacher-settings", {
+function loadLive() {
+  fetch("/api/teacher-students", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({
-      teacher_id: currentTeacher,
-      password:   teacherPassword,
-      threshold:  threshold,
-      max_attempts: max_attempts
-    })
+    body: JSON.stringify({teacher_id:currentTeacher, password:teacherPassword})
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
-    if (d.ok) {
-      var c = document.getElementById("save-confirm");
-      c.style.display = "block";
-      setTimeout(function(){ c.style.display = "none"; }, 3000);
-    }
-  })
-  .catch(function(){ alert("שגיאה בשמירה"); });
-}
-
-// ── Sentence stats ─────────────────────────────────────────────────────────
-function loadSentenceStats() {
-  document.getElementById("sent-count").textContent = "...";
-  document.getElementById("sent-cached").textContent = "...";
-  fetch("/api/reload-sentences", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({teacher_id: currentTeacher, password: teacherPassword})
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    document.getElementById("sent-count").textContent = d.count || "—";
-    document.getElementById("sent-cached").textContent = "מטמון חי";
-  })
-  .catch(function(){
-    document.getElementById("sent-count").textContent = "—";
-    document.getElementById("sent-cached").textContent = "שגיאה";
+    if (!d.ok) return;
+    document.getElementById("live-exercise-name").textContent = d.exercise || "לא נבחר";
+    document.getElementById("live-threshold").textContent = d.threshold || "—";
+    document.getElementById("live-max-attempts").textContent = d.max_attempts || "—";
+    renderStudents(d.students || []);
   });
 }
 
-function reloadSentences() {
-  var c = document.getElementById("reload-confirm");
-  c.style.display = "none";
-  document.getElementById("sent-count").textContent = "...";
-  fetch("/api/reload-sentences", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({teacher_id: currentTeacher, password: teacherPassword})
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    document.getElementById("sent-count").textContent = d.count || "—";
-    c.style.display = "block";
-    setTimeout(function(){ c.style.display = "none"; }, 3000);
-  });
-}
-
-// ── Results ────────────────────────────────────────────────────────────────
-function loadResults() {
-  document.getElementById("results-body").innerHTML =
-    '<div class="loading">טוען תוצאות...</div>';
-  document.getElementById("results-count").textContent = "";
-
-  fetch("/api/teacher-results", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({teacher_id: currentTeacher, password: teacherPassword})
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    var rows = d.rows || [];
-    document.getElementById("results-count").textContent = rows.length + " תוצאות";
-    if (!rows.length) {
-      document.getElementById("results-body").innerHTML =
-        '<div class="loading">אין תוצאות עדיין</div>';
-      return;
-    }
-
-    var headers = Object.keys(rows[0]);
-    var html = '<div class="table-wrap"><table class="results-table"><thead><tr>';
-    headers.forEach(function(h){ html += '<th>' + h + '</th>'; });
-    html += '</tr></thead><tbody>';
-
-    rows.slice().reverse().forEach(function(row){
-      html += '<tr>';
-      headers.forEach(function(h){
-        var val = row[h] || "";
-        if (h.toLowerCase().includes("עבר") || h.toLowerCase() === "passed") {
-          var cls = (val === "כן" || val === "true" || val === "TRUE") ? "badge-pass" : "badge-fail";
-          html += '<td><span class="badge ' + cls + '">' + val + '</span></td>';
-        } else {
-          html += '<td>' + val + '</td>';
-        }
-      });
-      html += '</tr>';
-    });
-    html += '</tbody></table></div>';
-    document.getElementById("results-body").innerHTML = html;
-  })
-  .catch(function(){
-    document.getElementById("results-body").innerHTML =
-      '<div class="loading" style="color:#ef5350">שגיאה בטעינת תוצאות</div>';
-  });
-}
-
-// ── Logout ─────────────────────────────────────────────────────────────────
-function logout() {
-  teacherPassword = "";
-  document.getElementById("dashboard").style.display = "none";
-  document.getElementById("login-screen").style.display = "flex";
-  document.getElementById("tpass").value = "";
-}
-</script>
-</body>
-</html>
+function renderStudents(students) {
+  var el = document.getElementById("live-body");
+  if (!students.length) {
+    el.innerHTML = '<div class="no-students">אין תלמידים פעילים כרגע 👋</div>';
+    return;
+  }
+  var html = '<div class="student-grid">';
+  students.forEach(function(s){
+    var pct = s.total ? Math.round((s.index/s.total)*100) : 0;
+    var phase = s.done ? "done" : s.phase;
+    var phaseLabel = {normal:"תרגול רגיל", cloze:"מילה חסרה", mastery:"שליטה", done:"סיים"}[phase] || phase;
+    html +=
+      '<div class="student-card">' +
+        '<div class="sc-name">👤 ' + s.name + '</div>' +
+        '<div style="font-size:12px;color:#888;margin-bottom:8px">' +
+          'משפט ' + s.index + ' מתוך ' + s.total +
+        '</div>' +
+        '<div class="sc-progress"><div class="s

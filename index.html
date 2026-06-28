@@ -487,6 +487,7 @@ function startApp() {
   var color = t.color || "#4318D1";
   var colorLight = t.color_light || "#e8f0fe";
   var emoji = TEACHER_EMOJIS[currentTeacher] || "👨‍🏫";
+  currentVoiceGender = t.voice_gender || "female";
 
   document.documentElement.style.setProperty("--tc", color);
   document.documentElement.style.setProperty("--tc-light", colorLight);
@@ -503,12 +504,24 @@ function startApp() {
 }
 
 // ══ Voice ══════════════════════════════════════════════════════════════════
+var currentVoiceGender = "female"; // default; updated when teacher is chosen
+
 function getVoice() {
   var voices = speechSynthesis.getVoices().filter(function(v){
     return v.lang.startsWith("en");
   });
   if (!voices.length) return null;
-  return voices[0];
+
+  var wantFemale = (currentVoiceGender !== "male");
+  // Try to match gender by common voice-name keywords
+  var femaleKw = ["female","woman","zira","samantha","victoria","karen","moira","tessa","fiona","veena","kate"];
+  var maleKw   = ["male","man","david","mark","daniel","alex","fred","lee","rishi","thomas"];
+  var keywords  = wantFemale ? femaleKw : maleKw;
+  var matched = voices.filter(function(v){
+    var n = v.name.toLowerCase();
+    return keywords.some(function(k){ return n.indexOf(k) !== -1; });
+  });
+  return matched.length ? matched[0] : voices[0];
 }
 if (speechSynthesis.onvoiceschanged !== undefined) {
   speechSynthesis.onvoiceschanged = function(){ speechSynthesis.getVoices(); };
@@ -1111,19 +1124,4 @@ function launchConfetti() {
   })();
 }
 
-// ══ Reset session ════════════════════════════════════════════════════════════
-function resetSession() {
-  fetch("/api/reset", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({student: studentId, teacher_id: currentTeacher})
-  }).then(function(){
-    examMode = false; examIndex = 0; examResults = []; practiceResults = []; questionMap = {};
-    document.getElementById("main-card").style.display = "block";
-    document.getElementById("done-card").style.display = "none";
-    loadQuestion();
-  });
-}
-</script>
-</body>
-</html>
+// ══ Reset session 

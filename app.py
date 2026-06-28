@@ -18,6 +18,7 @@ TEACHERS = {
         "name": "בן",
         "color": "#1a56db",
         "color_light": "#e8f0fe",
+        "voice_gender": "male",
         "sentences_sheet_id": os.environ.get(
             "BEN_SENTENCES_SHEET",
             "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk"),
@@ -34,6 +35,7 @@ TEACHERS = {
         "name": "שרה",
         "color": "#be185d",
         "color_light": "#fce8f3",
+        "voice_gender": "female",
         "sentences_sheet_id": os.environ.get(
             "SARA_SENTENCES_SHEET",
             "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk"),
@@ -56,9 +58,18 @@ def t_max_attempts(tid):
     return _teacher_runtime.get(tid, {}).get(
         "max_attempts", TEACHERS[tid]["default_max_attempts"])
 
-# ── Sentence loading from Google Sheets ──────────────────────────────────
-_sentences_cache = {}   # sheet_id -> (timestamp, [sentences])
+def t_exercise(tid):
+    """Return (exercise_name, csv_url) for teacher's currently selected exercise."""
+    return _teacher_runtime.get(tid, {}).get("exercise", (None, None))
+
+# ── Sentence catalog + loading ────────────────────────────────────────────
+_sentences_cache = {}   # csv_url -> (timestamp, [sentences])
 CACHE_TTL = 3600        # 1 hour
+
+# Catalog sheet ID (the master list of exercises)
+CATALOG_SHEET_ID = os.environ.get(
+    "CATALOG_SHEET_ID",
+    "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk")
 
 FALLBACK_SENTENCES = [
     {"he": "אני אוהב ללמוד אנגלית", "en": "I love learning English"},
@@ -68,48 +79,108 @@ FALLBACK_SENTENCES = [
     {"he": "אני מתרגל כל יום", "en": "I practice every day"},
 ]
 
-def load_sentences(sheet_id):
+def load_sentences_from_csv_url(csv_url):
+    """
+    Load sentences from a published CSV URL.
+    Format: column A = English, column B = Hebrew (NO header row).
+    """
+    csv_url = csv_url.strip()
     now = time.time()
-    cached = _sentences_cache.get(sheet_id)
+    cached = _sentences_cache.get(csv_url)
     if cached and now - cached[0] < CACHE_TTL:
         return cached[1]
 
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(csv_url, timeout=15)
         r.raise_for_status()
-        reader = csv.DictReader(io.StringIO(r.text))
-        rows = list(reader)
-
-        if not rows:
-            raise ValueError("empty sheet")
-
-        orig_keys = list(rows[0].keys())
-
-        # Auto-detect Hebrew / English columns
-        he_key = next(
-            (k for k in orig_keys if k.strip().lower() in
-             ["he", "hebrew", "עברית", "heb"]),
-            orig_keys[0] if orig_keys else None)
-        en_key = next(
-            (k for k in orig_keys if k.strip().lower() in
-             ["en", "english", "אנגלית", "eng"]),
-            orig_keys[1] if len(orig_keys) > 1 else None)
-
+        reader = csv.reader(io.StringIO(r.text))
         sentences = []
-        for row in rows:
-            he = (row.get(he_key) or "").strip()
-            en = (row.get(en_key) or "").strip()
-            if he and en and len(en.split()) >= 3:
-                sentences.append({"he": he, "en": en})
+        for row in reader:
+            if len(row) < 2:
+                continue
+            en = row[0].strip()
+            he = row[1].strip()
+            # Skip empty rows or rows that look like headers
+            if not en or not he:
+                continue
+            if en.lower() in ("english", "en", "sentence"):
+                continue
+            if len(en.split()) < 2:
+                continue
+            sentences.append({"en": en, "he": he})
 
         if sentences:
-            _sentences_cache[sheet_id] = (now, sentences)
+            _sentences_cache[csv_url] = (now, sentences)
             return sentences
 
     except Exception as e:
-        print(f"[sheets] load error for {sheet_id}: {e}")
+        print(f"[sheets] load_sentences error: {e}")
 
+    return FALLBACK_SENTENCES
+
+def load_catalog(lang_filter="en"):
+    """
+    Load exercise catalog from the master sheet.
+    Returns list of {name, url, csv_url} dicts filtered by lang.
+    """
+    cache_key = f"catalog_{lang_filter}"
+    now = time.time()
+    cached = _sentences_cache.get(cache_key)
+    if cached and now - cached[0] < CACHE_TTL:
+        return cached[1]
+
+    sheet_url = (
+        f"https://docs.google.com/spreadsheets/d/{CATALOG_SHEET_ID}"
+        f"/gviz/tq?tqx=out:csv&sheet=Sheet1"
+    )
+    try:
+        r = requests.get(sheet_url, timeout=15)
+        r.raise_for_status()
+        reader = csv.reader(io.StringIO(r.text))
+        exercises = []
+        for row in reader:
+            if len(row) < 3:
+                continue
+            name    = row[0].strip().strip('"')
+            app_url = row[2].strip().strip('"')
+            if not app_url or "ezra" not in app_url:
+                continue
+            # Extract lang and link params
+            import urllib.parse as urlparse
+            try:
+                parsed = urlparse.urlparse(app_url)
+                params = urlparse.parse_qs(parsed.query)
+                lang     = params.get("lang", [""])[0]
+                csv_link = params.get("link", [""])[0].strip()
+            except Exception:
+                continue
+
+            if lang_filter and lang != lang_filter:
+                continue
+            if not csv_link:
+                continue
+            if not name:
+                continue
+
+            exercises.append({
+                "name":    name,
+                "url":     app_url,
+                "csv_url": csv_link,
+                "lang":    lang,
+            })
+
+        _sentences_cache[cache_key] = (now, exercises)
+        return exercises
+
+    except Exception as e:
+        print(f"[catalog] load error: {e}")
+        return []
+
+def get_teacher_sentences(tid):
+    """Get sentences for a teacher based on their selected exercise."""
+    _, csv_url = t_exercise(tid)
+    if csv_url:
+        return load_sentences_from_csv_url(csv_url)
     return FALLBACK_SENTENCES
 
 # ── Student sessions ──────────────────────────────────────────────────────
@@ -297,7 +368,7 @@ def word_level(spoken, correct):
 MASTERY_TARGET = 3
 
 def new_session(student_id, teacher_id):
-    sentences = load_sentences(TEACHERS[teacher_id]["sentences_sheet_id"])
+    sentences = list(get_teacher_sentences(teacher_id))
     random.shuffle(sentences)
     _sessions[student_id] = {
         "teacher_id":           teacher_id,
@@ -337,6 +408,7 @@ def api_teachers():
             "name":         t["name"],
             "color":        t["color"],
             "color_light":  t["color_light"],
+            "voice_gender": t.get("voice_gender", "female"),
             "threshold":    t_threshold(tid),
             "max_attempts": t_max_attempts(tid),
         }
@@ -684,58 +756,4 @@ def reload_sentences():
     password = data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
         return jsonify({"ok": False}), 401
-    sheet_id = TEACHERS[tid]["sentences_sheet_id"]
-    _sentences_cache.pop(sheet_id, None)
-    sentences = load_sentences(sheet_id)
-    return jsonify({"ok": True, "count": len(sentences)})
-
-# ── Google Sheets result writing ────────────────────────────────────────
-def _write_result(teacher_id, student_id, q, score, passed):
-    """Write result row to teacher's Google Sheets tab via gspread (if configured)."""
-    creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
-    if not creds_json:
-        return   # No credentials configured — skip silently
-
-    try:
-        import gspread
-        from google.oauth2.service_account import Credentials
-
-        creds_dict = json.loads(creds_json)
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ]
-        creds  = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-        gc     = gspread.authorize(creds)
-        tid    = teacher_id
-        sheet_id = TEACHERS[tid]["results_sheet_id"]
-        tab      = TEACHERS[tid]["results_tab"]
-        sh  = gc.open_by_key(sheet_id)
-
-        # Get or create tab
-        try:
-            ws = sh.worksheet(tab)
-        except gspread.WorksheetNotFound:
-            ws = sh.add_worksheet(title=tab, rows=1000, cols=10)
-            ws.append_row(
-                ["תאריך", "תלמיד",
-                 "משפט עברית",
-                 "משפט אנגלית",
-                 "ציון", "עבר"]
-            )
-
-        ws.append_row([
-            time.strftime("%Y-%m-%d %H:%M:%S"),
-            student_id.split("_")[1] if "_" in student_id else student_id,
-            q.get("he", ""),
-            q.get("en", ""),
-            str(score),
-            "כן" if passed else "לא",
-        ])
-    except Exception as e:
-        print(f"[sheets] write error: {e}")
-
-# ── Run ────────────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    _, csv_url
