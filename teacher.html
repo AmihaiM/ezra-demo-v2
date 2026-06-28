@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EZRA — לוח מורה</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f4ff;min-height:100vh;direction:rtl}
+
+/* ── Login ─────────────────────────────────────────────────────────────── */
+#login-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:24px;background:linear-gradient(135deg,#1a1033,#4318D1);
+}
+.login-card{
+  background:#fff;border-radius:24px;padding:36px 32px;width:100%;max-width:400px;
+  box-shadow:0 24px 60px rgba(0,0,0,.3);
+}
+.login-logo{text-align:center;font-size:48px;margin-bottom:8px}
+.login-title{text-align:center;font-size:26px;font-weight:900;color:#1a1033;margin-bottom:4px}
+.login-sub{text-align:center;font-size:14px;color:#888;margin-bottom:28px}
+.teacher-tabs{display:flex;gap:8px;margin-bottom:20px}
+.tab-btn{
+  flex:1;padding:12px 8px;border:2px solid #e0d9ff;border-radius:12px;
+  background:#fff;cursor:pointer;font-size:14px;font-weight:700;color:#4318D1;
+  font-family:inherit;transition:.2s;
+}
+.tab-btn.active{border-color:var(--tc,#4318D1);background:var(--tc,#4318D1);color:#fff}
+.field{
+  width:100%;padding:12px 14px;border:2px solid #e0d9ff;border-radius:12px;
+  font-size:15px;margin-bottom:12px;outline:none;font-family:inherit;
+  direction:rtl;transition:.2s;
+}
+.field:focus{border-color:var(--tc,#4318D1)}
+.btn-primary{
+  width:100%;padding:13px;border:none;border-radius:12px;font-size:15px;
+  font-weight:700;color:#fff;cursor:pointer;background:var(--tc,#4318D1);
+  font-family:inherit;transition:.2s;
+}
+.btn-primary:hover{opacity:.88}
+.err{
+  display:none;background:#ffebee;border:2px solid #ef5350;border-radius:10px;
+  padding:9px 13px;font-size:13px;color:#c62828;margin-bottom:10px;
+}
+
+/* ── Dashboard ─────────────────────────────────────────────────────────── */
+#dashboard{display:none}
+
+header{
+  display:flex;align-items:center;gap:14px;padding:14px 20px;
+  background:var(--tc,#4318D1);color:#fff;
+  box-shadow:0 2px 12px rgba(0,0,0,.15);
+}
+.h-logo{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px}
+.h-title{font-size:18px;font-weight:800}
+.h-sub{font-size:12px;opacity:.75}
+.h-logout{margin-right:auto;border:2px solid rgba(255,255,255,.4);background:none;
+  color:#fff;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;
+  font-family:inherit;font-weight:600}
+.h-logout:hover{background:rgba(255,255,255,.15)}
+
+.page{max-width:800px;margin:0 auto;padding:20px}
+
+/* Tabs */
+.section-tabs{display:flex;gap:0;margin-bottom:24px;background:#fff;
+  border-radius:16px;padding:6px;box-shadow:0 2px 12px rgba(67,24,209,.08)}
+.stab{
+  flex:1;padding:10px;border:none;background:none;font-size:14px;font-weight:700;
+  color:#888;cursor:pointer;border-radius:12px;font-family:inherit;transition:.2s;
+}
+.stab.active{background:var(--tc,#4318D1);color:#fff}
+
+/* Settings card */
+.card{background:#fff;border-radius:20px;padding:24px;margin-bottom:20px;
+  box-shadow:0 4px 20px rgba(67,24,209,.08)}
+.card-title{font-size:16px;font-weight:800;color:#1a1033;margin-bottom:20px;
+  padding-bottom:12px;border-bottom:2px solid #f0eeff}
+
+.setting-row{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.setting-label{font-size:14px;font-weight:600;color:#555;min-width:160px}
+.setting-ctrl{display:flex;align-items:center;gap:10px}
+.range-input{
+  width:200px;accent-color:var(--tc,#4318D1);cursor:pointer;
+}
+.range-val{
+  font-size:18px;font-weight:800;color:var(--tc,#4318D1);min-width:50px;
+}
+.setting-hint{font-size:12px;color:#aaa;margin-top:2px;display:block}
+.save-btn{
+  padding:10px 24px;border:none;border-radius:12px;background:var(--tc,#4318D1);
+  color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;
+}
+.save-btn:hover{opacity:.88}
+.save-confirm{
+  display:none;font-size:13px;color:#4CAF50;font-weight:600;margin-top:8px;
+}
+
+/* Results */
+.results-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.refresh-btn{
+  padding:8px 18px;border:none;border-radius:10px;background:#ede7ff;
+  color:var(--tc,#4318D1);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;
+}
+.refresh-btn:hover{background:#ddd6fe}
+.results-count{font-size:13px;color:#888}
+
+.results-table{width:100%;border-collapse:collapse;font-size:13px}
+.results-table th{
+  text-align:right;padding:10px 12px;background:#f8f7ff;
+  border-bottom:2px solid #e0d9ff;font-weight:700;color:#555;
+}
+.results-table td{
+  padding:10px 12px;border-bottom:1px solid #f0eeff;color:#1a1033;
+}
+.results-table tr:hover td{background:#f8f7ff}
+.badge{
+  display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;
+}
+.badge-pass{background:#e8f5e9;color:#2e7d32}
+.badge-fail{background:#ffebee;color:#c62828}
+
+/* Sentences panel */
+.reload-hint{font-size:13px;color:#888;margin-bottom:16px}
+.stat-boxes{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.stat-box{
+  background:#f8f7ff;border-radius:14px;padding:16px 20px;min-width:120px;
+  border:2px solid #e0d9ff;
+}
+.stat-val{font-size:28px;font-weight:800;color:var(--tc,#4318D1)}
+.stat-lbl{font-size:11px;color:#888;font-weight:600;margin-top:2px;text-transform:uppercase}
+
+.link-btn{
+  display:inline-flex;align-items:center;gap:6px;padding:9px 18px;
+  border:2px solid var(--tc,#4318D1);border-radius:12px;color:var(--tc,#4318D1);
+  font-weight:700;font-size:13px;text-decoration:none;transition:.2s;
+}
+.link-btn:hover{background:var(--tc,#4318D1);color:#fff}
+
+/* Loading */
+.loading{
+  display:flex;align-items:center;justify-content:center;padding:48px;
+  font-size:15px;color:#888;
+}
+
+/* Scroll table */
+.table-wrap{overflow-x:auto;border-radius:14px;border:2px solid #e0d9ff}
+</style>
+</head>
+<body>
+
+<!-- ═══ Login ════════════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🏫</div>
+    <div class="login-title">EZRA — לוח מורה</div>
+    <div class="login-sub">בחר מורה והזן סיסמה</div>
+
+    <div class="teacher-tabs" id="teacher-tabs">
+      <!-- filled by JS -->
+    </div>
+
+    <div class="err" id="login-err">סיסמה שגויה — נסה שוב.</div>
+    <input class="field" id="tpass" type="password" placeholder="סיסמת מורה"
+      autocomplete="current-password">
+    <button class="btn-primary" onclick="doTeacherLogin()">כניסה ←</button>
+  </div>
+</div>
+
+<!-- ═══ Dashboard ════════════════════════════════════════════════════════════ -->
+<div id="dashboard">
+  <header>
+    <div class="h-logo">E</div>
+    <div>
+      <div class="h-title">EZRA — לוח מורה</div>
+      <div class="h-sub" id="h-teacher-label"></div>
+    </div>
+    <button class="h-logout" onclick="logout()">יציאה</button>
+  </header>
+
+  <div class="page">
+    <div class="section-tabs">
+      <button class="stab active" onclick="showSection('settings')">⚙️ הגדרות</button>
+      <button class="stab" onclick="showSection('sentences')">📚 חומר לימוד</button>
+      <button class="stab" onclick="showSection('results')">📊 תוצאות</button>
+    </div>
+
+    <!-- Settings -->
+    <div id="sec-settings">
+      <div class="card">
+        <div class="card-title">⚙️ הגדרות כיתה</div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">ציון מינימלי לעבור</div>
+            <span class="setting-hint">טווח: 80–100, ברירת מחדל: 85</span>
+          </div>
+          <div class="setting-ctrl">
+            <input type="range" class="range-input" id="threshold-range"
+              min="80" max="100" step="1" value="85"
+              oninput="document.getElementById('threshold-val').textContent=this.value">
+            <div class="range-val" id="threshold-val">85</div>
+            <div>%</div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">מקסימום ניסיונות למשפט</div>
+            <span class="setting-hint">טווח: 4–7, ברירת מחדל: 5</span>
+          </div>
+          <div class="setting-ctrl">
+            <input type="range" class="range-input" id="attempts-range"
+              min="4" max="7" step="1" value="5"
+              oninput="document.getElementById('attempts-val').textContent=this.value">
+            <div class="range-val" id="attempts-val">5</div>
+            <div>ניסיונות</div>
+          </div>
+        </div>
+
+        <button class="save-btn" onclick="saveSettings()">שמור הגדרות</button>
+        <div class="save-confirm" id="save-confirm">✓ ההגדרות נשמרו בהצלחה</div>
+      </div>
+
+      <div class="card" style="background:#fffbf0;border:2px solid #FFE082">
+        <div class="card-title" style="border-bottom-color:#FFE082">⚠️ חשוב לדעת</div>
+        <p style="font-size:13px;color:#555;line-height:1.7">
+          הגדרות אלו פעילות מיד לכל תלמידים חדשים.<br>
+          שינוי הציון המינימלי לא משפיע על תלמידים שכבר בתוך סשן פעיל.<br>
+          הגדרות מאופסות בכל פעם שהשרת מתחיל מחדש. בגרסה מלאה יישמרו ב-DB.
+        </p>
+      </div>
+    </div>
+
+    <!-- Sentences -->
+    <div id="sec-sentences" style="display:none">
+      <div class="card">
+        <div class="card-title">📚 חומר לימוד — משפטים מהגוגל שיט</div>
+        <p class="reload-hint">המשפטים נטענים מהגוגל שיט שלך ונשמרים במטמון לשעה אחת.</p>
+
+        <div class="stat-boxes">
+          <div class="stat-box">
+            <div class="stat-val" id="sent-count">—</div>
+            <div class="stat-lbl">משפטים</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="sent-cached">—</div>
+            <div class="stat-lbl">סטטוס מטמון</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="save-btn" onclick="reloadSentences()">🔄 טען מחדש מהשיט</button>
+          <a class="link-btn" id="sheet-link" href="#" target="_blank">📄 פתח שיט המשפטים</a>
+        </div>
+        <div class="save-confirm" id="reload-confirm">✓ המשפטים נטענו מחדש בהצלחה</div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="sec-results" style="display:none">
+      <div class="card">
+        <div class="card-title">📊 תוצאות תלמידים</div>
+        <div class="results-toolbar">
+          <button class="refresh-btn" onclick="loadResults()">🔄 רענן</button>
+          <span class="results-count" id="results-count"></span>
+        </div>
+        <div id="results-body">
+          <div class="loading">לחץ "רענן" לטעינת תוצאות</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.page -->
+</div><!-- /#dashboard -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+var currentTeacher = "ben";
+var teacherPassword = "";
+var TEACHER_EMOJIS = {ben:"👨‍🏫", sara:"👩‍🏫"};
+var teacherData = {};
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+fetch("/api/teachers")
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    teacherData = data;
+    buildTabs(data);
+  })
+  .catch(function(){ buildTabs({ben:{name:"בן",color:"#1a56db"}, sara:{name:"שרה",color:"#be185d"}}); });
+
+function buildTabs(data) {
+  var container = document.getElementById("teacher-tabs");
+  container.innerHTML = "";
+  var ids = Object.keys(data);
+  if (!ids.length) ids = ["ben","sara"];
+
+  ids.forEach(function(tid, i){
+    var t = data[tid] || {};
+    var name = t.name || tid;
+    var emoji = TEACHER_EMOJIS[tid] || "👨‍🏫";
+    var btn = document.createElement("button");
+    btn.className = "tab-btn" + (i === 0 ? " active" : "");
+    btn.setAttribute("data-tid", tid);
+    btn.textContent = emoji + " " + name;
+    btn.onclick = function(){
+      document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      currentTeacher = tid;
+      var color = (data[tid]||{}).color || "#4318D1";
+      document.documentElement.style.setProperty("--tc", color);
+    };
+    container.appendChild(btn);
+  });
+
+  // Set default teacher
+  if (ids.length) {
+    currentTeacher = ids[0];
+    var color = (data[ids[0]]||{}).color || "#4318D1";
+    document.documentElement.style.setProperty("--tc", color);
+  }
+}
+
+document.getElementById("tpass").addEventListener("keydown", function(e){
+  if (e.key === "Enter") doTeacherLogin();
+});
+
+function doTeacherLogin() {
+  var pass = document.getElementById("tpass").value;
+  document.getElementById("login-err").style.display = "none";
+
+  fetch("/api/teacher-login", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({teacher_id: currentTeacher, password: pass})
+  })
+  .then(function(r){
+    if (r.ok) return r.json();
+    throw new Error("auth");
+  })
+  .then(function(d){
+    teacherPassword = pass;
+    var t = d.teacher;
+    document.documentElement.style.setProperty("--tc", t.color || "#4318D1");
+    document.getElementById("h-teacher-label").textContent =
+      (TEACHER_EMOJIS[currentTeacher]||"") + " מורה " + t.name;
+
+    // Init settings sliders
+    document.getElementById("threshold-range").value = t.threshold || 85;
+    document.getElementById("threshold-val").textContent = t.threshold || 85;
+    document.getElementById("attempts-range").value = t.max_attempts || 5;
+    document.getElementById("attempts-val").textContent = t.max_attempts || 5;
+
+    // Update sheet link
+    var sheetId = ((teacherData[currentTeacher]||{}).sentences_sheet_id) ||
+                  "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk";
+    document.getElementById("sheet-link").href =
+      "https://docs.google.com/spreadsheets/d/" + sheetId;
+
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+    loadSentenceStats();
+  })
+  .catch(function(){
+    document.getElementById("login-err").style.display = "block";
+    document.getElementById("tpass").value = "";
+    document.getElementById("tpass").focus();
+  });
+}
+
+// ── Section tabs ───────────────────────────────────────────────────────────
+function showSection(sec) {
+  ["settings","sentences","results"].forEach(function(s){
+    document.getElementById("sec-" + s).style.display = s === sec ? "block" : "none";
+  });
+  document.querySelectorAll(".stab").forEach(function(b, i){
+    b.classList.toggle("active", i === ["settings","sentences","results"].indexOf(sec));
+  });
+  if (sec === "results") loadResults();
+  if (sec === "sentences") loadSentenceStats();
+}
+
+// ── Settings ───────────────────────────────────────────────────────────────
+function saveSettings() {
+  var threshold    = parseInt(document.getElementById("threshold-range").value);
+  var max_attempts = parseInt(document.getElementById("attempts-range").value);
+
+  fetch("/api/teacher-settings", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      teacher_id: currentTeacher,
+      password:   teacherPassword,
+      threshold:  threshold,
+      max_attempts: max_attempts
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) {
+      var c = document.getElementById("save-confirm");
+      c.style.display = "block";
+      setTimeout(function(){ c.style.display = "none"; }, 3000);
+    }
+  })
+  .catch(function(){ alert("שגיאה בשמירה"); });
+}
+
+// ── Sentence stats ─────────────────────────────────────────────────────────
+function loadSentenceStats() {
+  document.getElementById("sent-count").textContent = "...";
+  document.getElementById("sent-cached").textContent = "...";
+  fetch("/api/reload-sentences", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({teacher_id: currentTeacher, password: teacherPassword})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    document.getElementById("sent-count").textContent = d.count || "—";
+    document.getElementById("sent-cached").textContent = "מטמון חי";
+  })
+  .catch(function(){
+    document.getElementById("sent-count").textContent = "—";
+    document.getElementById("sent-cached").textContent = "שגיאה";
+  });
+}
+
+function reloadSentences() {
+  var c = document.getElementById("reload-confirm");
+  c.style.display = "none";
+  document.getElementById("sent-count").textContent = "...";
+  fetch("/api/reload-sentences", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({teacher_id: currentTeacher, password: teacherPassword})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    document.getElementById("sent-count").textContent = d.count || "—";
+    c.style.display = "block";
+    setTimeout(function(){ c.style.display = "none"; }, 3000);
+  });
+}
+
+// ── Results ────────────────────────────────────────────────────────────────
+function loadResults() {
+  document.getElementById("results-body").innerHTML =
+    '<div class="loading">טוען תוצאות...</div>';
+  document.getElementById("results-count").textContent = "";
+
+  fetch("/api/teacher-results", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({teacher_id: currentTeacher, password: teacherPassword})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var rows = d.rows || [];
+    document.getElementById("results-count").textContent = rows.length + " תוצאות";
+    if (!rows.length) {
+      document.getElementById("results-body").innerHTML =
+        '<div class="loading">אין תוצאות עדיין</div>';
+      return;
+    }
+
+    var headers = Object.keys(rows[0]);
+    var html = '<div class="table-wrap"><table class="results-table"><thead><tr>';
+    headers.forEach(function(h){ html += '<th>' + h + '</th>'; });
+    html += '</tr></thead><tbody>';
+
+    rows.slice().reverse().forEach(function(row){
+      html += '<tr>';
+      headers.forEach(function(h){
+        var val = row[h] || "";
+        if (h.toLowerCase().includes("עבר") || h.toLowerCase() === "passed") {
+          var cls = (val === "כן" || val === "true" || val === "TRUE") ? "badge-pass" : "badge-fail";
+          html += '<td><span class="badge ' + cls + '">' + val + '</span></td>';
+        } else {
+          html += '<td>' + val + '</td>';
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById("results-body").innerHTML = html;
+  })
+  .catch(function(){
+    document.getElementById("results-body").innerHTML =
+      '<div class="loading" style="color:#ef5350">שגיאה בטעינת תוצאות</div>';
+  });
+}
+
+// ── Logout ─────────────────────────────────────────────────────────────────
+function logout() {
+  teacherPassword = "";
+  document.getElementById("dashboard").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("tpass").value = "";
+}
+</script>
+</body>
+</html>
