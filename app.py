@@ -367,11 +367,12 @@ def word_level(spoken, correct):
 # ── Session helpers ────────────────────────────────────────────────────────
 MASTERY_TARGET = 3
 
-def new_session(student_id, teacher_id):
+def new_session(student_id, teacher_id, student_name=""):
     sentences = list(get_teacher_sentences(teacher_id))
     random.shuffle(sentences)
     _sessions[student_id] = {
         "teacher_id":           teacher_id,
+        "student_name":         student_name,
         "queue":                sentences,
         "index":                0,
         "attempts":             0,
@@ -430,7 +431,7 @@ def verify_student():
         return jsonify({"ok": False}), 401
 
     student_id = f"{teacher_id}_{name}_{int(time.time())}"
-    new_session(student_id, teacher_id)
+    new_session(student_id, teacher_id, student_name=name)
     return jsonify({"ok": True, "student_id": student_id})
 
 @app.route("/api/question", methods=["GET"])
@@ -749,6 +750,64 @@ def teacher_results():
     except Exception as e:
         return jsonify({"ok": True, "rows": [], "note": str(e)})
 
+
+@app.route("/api/teacher-students", methods=["POST"])
+def teacher_students():
+    data     = request.get_json(force=True)
+    tid      = data.get("teacher_id", "")
+    password = data.get("password", "")
+    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+        return jsonify({"ok": False}), 401
+
+    ex_name, _ = t_exercise(tid)
+    students = []
+    for sid, sess in _sessions.items():
+        if sess.get("teacher_id") != tid:
+            continue
+        total = len(sess["queue"])
+        students.append({
+            "name":    sess.get("student_name") or sid,
+            "index":   sess["index"],
+            "total":   total,
+            "phase":   sess["phase"],
+            "done":    sess["done"],
+        })
+
+    return jsonify({
+        "ok":           True,
+        "exercise":     ex_name or "",
+        "threshold":    t_threshold(tid),
+        "max_attempts": t_max_attempts(tid),
+        "students":     students,
+    })
+
+@app.route("/api/catalog", methods=["POST"])
+def api_catalog():
+    data     = request.get_json(force=True)
+    tid      = data.get("teacher_id", "")
+    password = data.get("password", "")
+    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+        return jsonify({"ok": False}), 401
+
+    exercises = load_catalog(lang_filter="en")
+    return jsonify({"ok": True, "exercises": exercises})
+
+@app.route("/api/set-exercise", methods=["POST"])
+def set_exercise():
+    data     = request.get_json(force=True)
+    tid      = data.get("teacher_id", "")
+    password = data.get("password", "")
+    name     = data.get("name", "")
+    csv_url  = data.get("csv_url", "")
+    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+        return jsonify({"ok": False}), 401
+    if not csv_url:
+        return jsonify({"ok": False, "error": "missing csv_url"}), 400
+
+    _teacher_runtime.setdefault(tid, {})["exercise"] = (name, csv_url)
+    _sentences_cache.pop(csv_url, None)
+    return jsonify({"ok": True, "name": name})
+
 @app.route("/api/reload-sentences", methods=["POST"])
 def reload_sentences():
     data     = request.get_json(force=True)
@@ -756,4 +815,10 @@ def reload_sentences():
     password = data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
         return jsonify({"ok": False}), 401
-    _, csv_url
+    _, csv_url = t_exercise(tid)
+    if csv_url:
+        _sentences_cache.pop(csv_url, None)
+    return jsonify({"ok": True})
+
+if __name__ == "__main__":
+    app.run(debug=False)
