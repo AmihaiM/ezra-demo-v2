@@ -1,824 +1,513 @@
-"""
-EZRA Demo v2 — Multi-teacher Flask backend
-"""
-import os, json, time, re, csv, io, random
-from flask import Flask, request, jsonify, Response
+import os, json, time, re, csv, io
 from difflib import SequenceMatcher
+from flask import Flask, request, jsonify, Response
 import requests
 
 app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CACHE_TTL = 3600
+STATE_FILE = os.path.join(BASE_DIR, "teacher_state.json")
 
-# ── Runtime teacher settings (updated via dashboard, reset on restart) ──────
-_teacher_runtime = {}   # teacher_id -> {threshold, max_attempts}
-
-# ── Teacher configurations ────────────────────────────────────────────────
 TEACHERS = {
     "ben": {
-        "name": "בן",
-        "color": "#1a56db",
-        "color_light": "#e8f0fe",
-        "voice_gender": "male",
-        "sentences_sheet_id": os.environ.get(
-            "BEN_SENTENCES_SHEET",
-            "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk"),
-        "results_sheet_id": os.environ.get(
-            "BEN_RESULTS_SHEET",
-            "17a-y_-nL9L85Kl7zL1F1ovTGbQy7q5NlBX24C-a_6JU"),
-        "results_tab": "Ben",
-        "student_password": os.environ.get("BEN_STUDENT_PASSWORD", ""),
-        "teacher_password": os.environ.get("BEN_TEACHER_PASSWORD", "ben2026"),
-        "default_threshold": int(os.environ.get("BEN_THRESHOLD", "85")),
-        "default_max_attempts": int(os.environ.get("BEN_MAX_ATTEMPTS", "5")),
+        "name": "בן", "color": "#1a56db", "color_light": "#e8f0fe", "voice_gender": "male",
+        "results_tab": "Ben", "student_password": os.getenv("BEN_STUDENT_PASSWORD", "class2026"),
+        "teacher_password": os.getenv("BEN_TEACHER_PASSWORD", "ben2026"),
+        "default_threshold": int(os.getenv("BEN_THRESHOLD", "85")),
+        "default_max_attempts": int(os.getenv("BEN_MAX_ATTEMPTS", "5")),
     },
     "sara": {
-        "name": "שרה",
-        "color": "#be185d",
-        "color_light": "#fce8f3",
-        "voice_gender": "female",
-        "sentences_sheet_id": os.environ.get(
-            "SARA_SENTENCES_SHEET",
-            "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk"),
-        "results_sheet_id": os.environ.get(
-            "SARA_RESULTS_SHEET",
-            "17a-y_-nL9L85Kl7zL1F1ovTGbQy7q5NlBX24C-a_6JU"),
-        "results_tab": "Sara",
-        "student_password": os.environ.get("SARA_STUDENT_PASSWORD", ""),
-        "teacher_password": os.environ.get("SARA_TEACHER_PASSWORD", "sara2026"),
-        "default_threshold": int(os.environ.get("SARA_THRESHOLD", "85")),
-        "default_max_attempts": int(os.environ.get("SARA_MAX_ATTEMPTS", "5")),
+        "name": "שרה", "color": "#be185d", "color_light": "#fce8f3", "voice_gender": "female",
+        "results_tab": "Sara", "student_password": os.getenv("SARA_STUDENT_PASSWORD", "class2026"),
+        "teacher_password": os.getenv("SARA_TEACHER_PASSWORD", "sara2026"),
+        "default_threshold": int(os.getenv("SARA_THRESHOLD", "85")),
+        "default_max_attempts": int(os.getenv("SARA_MAX_ATTEMPTS", "5")),
     },
 }
+CATALOG_SHEET_ID = os.getenv("CATALOG_SHEET_ID", "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk")
+RESULTS_SHEET_ID = os.getenv("RESULTS_SHEET_ID", "17a-y_-nL9L85Kl7zL1F1ovTGbQy7q5NlBX24C-a_6JU")
 
-def t_threshold(tid):
-    return _teacher_runtime.get(tid, {}).get(
-        "threshold", TEACHERS[tid]["default_threshold"])
-
-def t_max_attempts(tid):
-    return _teacher_runtime.get(tid, {}).get(
-        "max_attempts", TEACHERS[tid]["default_max_attempts"])
-
-def t_exercise(tid):
-    """Return (exercise_name, csv_url) for teacher's currently selected exercise."""
-    return _teacher_runtime.get(tid, {}).get("exercise", (None, None))
-
-# ── Sentence catalog + loading ────────────────────────────────────────────
-_sentences_cache = {}   # csv_url -> (timestamp, [sentences])
-CACHE_TTL = 3600        # 1 hour
-
-# Catalog sheet ID (the master list of exercises)
-CATALOG_SHEET_ID = os.environ.get(
-    "CATALOG_SHEET_ID",
-    "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk")
+_cache = {}
+_sessions = {}
+_pending_results = []
 
 FALLBACK_SENTENCES = [
-    {"he": "אני אוהב ללמוד אנגלית", "en": "I love learning English"},
-    {"he": "היום יום יפה", "en": "Today is a beautiful day"},
-    {"he": "אני רוצה לדבר אנגלית בשטף", "en": "I want to speak English fluently"},
-    {"he": "המורה עוזרת לי להתקדם", "en": "The teacher helps me improve"},
-    {"he": "אני מתרגל כל יום", "en": "I practice every day"},
+    {"en": "I love learning English", "he": "אני אוהב ללמוד אנגלית"},
+    {"en": "Today is a beautiful day", "he": "היום יום יפה"},
+    {"en": "I want to speak English fluently", "he": "אני רוצה לדבר אנגלית בשטף"},
 ]
 
-def load_sentences_from_csv_url(csv_url):
-    """
-    Load sentences from a published CSV URL.
-    Format: column A = English, column B = Hebrew (NO header row).
-    """
-    csv_url = csv_url.strip()
-    now = time.time()
-    cached = _sentences_cache.get(csv_url)
-    if cached and now - cached[0] < CACHE_TTL:
-        return cached[1]
+COMMON_VERBS = set("""
+am is are was were have has had do does did go went come came get got make made know think
+say said see saw take took want use find give tell work call need feel try leave put keep run
+start began begin write read speak listen play help learn study live move walk talk meet ask answer
+understand remember forget love like enjoy visit travel drive fly sit stand eat drink buy sell
+""".split())
 
+def _default_teacher_state():
+    return {
+        tid: {
+            "threshold": t["default_threshold"],
+            "max_attempts": t["default_max_attempts"],
+            "exercise_name": "תרגול דמו",
+            "csv_url": "",
+        } for tid, t in TEACHERS.items()
+    }
+
+def load_state():
+    state = _default_teacher_state()
     try:
-        r = requests.get(csv_url, timeout=15)
-        r.raise_for_status()
-        reader = csv.reader(io.StringIO(r.text))
-        sentences = []
-        for row in reader:
-            if len(row) < 2:
-                continue
-            en = row[0].strip()
-            he = row[1].strip()
-            # Skip empty rows or rows that look like headers
-            if not en or not he:
-                continue
-            if en.lower() in ("english", "en", "sentence"):
-                continue
-            if len(en.split()) < 2:
-                continue
-            sentences.append({"en": en, "he": he})
-
-        if sentences:
-            _sentences_cache[csv_url] = (now, sentences)
-            return sentences
-
+        if os.path.exists(STATE_FILE):
+            with open(STATE_FILE, encoding="utf-8") as f:
+                saved = json.load(f)
+            for tid in state:
+                if tid in saved:
+                    state[tid].update(saved[tid])
     except Exception as e:
-        print(f"[sheets] load_sentences error: {e}")
+        print("STATE LOAD FAILED", e)
+    for tid in state:
+        state[tid]["threshold"] = max(80, min(100, int(state[tid].get("threshold", 85))))
+        state[tid]["max_attempts"] = max(4, min(7, int(state[tid].get("max_attempts", 5))))
+    return state
 
-    return FALLBACK_SENTENCES
+def save_state():
+    try:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(_teacher_state, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("STATE SAVE FAILED", e)
+
+_teacher_state = load_state()
+
+def fix_mojibake(value):
+    """Repair common Google-Sheets CSV mojibake such as ×œ×§×•×— or â€“."""
+    if value is None:
+        return ""
+    s = str(value)
+    # If UTF-8 bytes were wrongly decoded as latin-1/cp1252, re-decode them.
+    if any(marker in s for marker in ("×", "â", "Ã", "Â")):
+        for enc in ("latin1", "cp1252"):
+            try:
+                repaired = s.encode(enc).decode("utf-8")
+                # Keep the repair only if it actually reduced mojibake markers.
+                if sum(repaired.count(m) for m in ("×", "â", "Ã", "Â")) < sum(s.count(m) for m in ("×", "â", "Ã", "Â")):
+                    return repaired
+            except Exception:
+                pass
+    return s
+
+def safe_fetch(url, timeout=10):
+    try:
+        r = requests.get(url, timeout=timeout)
+        r.raise_for_status()
+        # Do not trust requests' guessed encoding for Google CSV. Decode bytes as UTF-8.
+        return r.content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            return r.content.decode("cp1252")
+        except Exception:
+            return r.text
+    except Exception as e:
+        print("FETCH FAILED", url, e)
+        return None
+
+def teacher_public(tid):
+    t, s = TEACHERS[tid], _teacher_state[tid]
+    return {
+        "id": tid, "name": t["name"], "color": t["color"], "color_light": t["color_light"],
+        "voice_gender": t["voice_gender"], "threshold": s["threshold"], "max_attempts": s["max_attempts"],
+        "exercise_name": s.get("exercise_name", "תרגול דמו")
+    }
 
 def load_catalog(lang_filter="en"):
-    """
-    Load exercise catalog from the master sheet.
-    Returns list of {name, url, csv_url} dicts filtered by lang.
-    """
-    cache_key = f"catalog_{lang_filter}"
-    now = time.time()
-    cached = _sentences_cache.get(cache_key)
-    if cached and now - cached[0] < CACHE_TTL:
-        return cached[1]
-
-    sheet_url = (
-        f"https://docs.google.com/spreadsheets/d/{CATALOG_SHEET_ID}"
-        f"/gviz/tq?tqx=out:csv&sheet=Sheet1"
-    )
-    try:
-        r = requests.get(sheet_url, timeout=15)
-        r.raise_for_status()
-        reader = csv.reader(io.StringIO(r.text))
-        exercises = []
-        for row in reader:
-            if len(row) < 3:
-                continue
-            name    = row[0].strip().strip('"')
-            app_url = row[2].strip().strip('"')
-            if not app_url or "ezra" not in app_url:
-                continue
-            # Extract lang and link params
-            import urllib.parse as urlparse
-            try:
-                parsed = urlparse.urlparse(app_url)
-                params = urlparse.parse_qs(parsed.query)
-                lang     = params.get("lang", [""])[0]
-                csv_link = params.get("link", [""])[0].strip()
-            except Exception:
-                continue
-
-            if lang_filter and lang != lang_filter:
-                continue
-            if not csv_link:
-                continue
-            if not name:
-                continue
-
-            exercises.append({
-                "name":    name,
-                "url":     app_url,
-                "csv_url": csv_link,
-                "lang":    lang,
-            })
-
-        _sentences_cache[cache_key] = (now, exercises)
-        return exercises
-
-    except Exception as e:
-        print(f"[catalog] load error: {e}")
+    key = f"catalog:{lang_filter}"
+    if key in _cache and time.time() - _cache[key][0] < CACHE_TTL:
+        return _cache[key][1]
+    url = f"https://docs.google.com/spreadsheets/d/{CATALOG_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1"
+    text = safe_fetch(url)
+    if not text:
         return []
+    out = []
+    for row in csv.reader(io.StringIO(text)):
+        if len(row) < 3:
+            continue
+        name = fix_mojibake((row[0] or "").strip().strip('"'))
+        app_url = fix_mojibake((row[2] or "").strip().strip('"'))
+        if "link=" not in app_url:
+            continue
+        from urllib.parse import urlparse, parse_qs
+        params = parse_qs(urlparse(app_url).query)
+        lang = params.get("lang", [""])[0]
+        csv_url = params.get("link", [""])[0]
+        if lang_filter and lang != lang_filter:
+            continue
+        if name and csv_url:
+            out.append({"name": name, "url": app_url, "csv_url": csv_url, "lang": lang})
+    _cache[key] = (time.time(), out)
+    return out
 
-def get_teacher_sentences(tid):
-    """Get sentences for a teacher based on their selected exercise."""
-    _, csv_url = t_exercise(tid)
-    if csv_url:
-        return load_sentences_from_csv_url(csv_url)
-    return FALLBACK_SENTENCES
+def load_sentences_from_csv(csv_url):
+    if not csv_url:
+        return FALLBACK_SENTENCES[:]
+    key = "sentences:" + csv_url
+    if key in _cache and time.time() - _cache[key][0] < CACHE_TTL:
+        return [dict(x) for x in _cache[key][1]]
+    text = safe_fetch(csv_url)
+    if not text:
+        return FALLBACK_SENTENCES[:]
+    sentences = []
+    for row in csv.reader(io.StringIO(text)):
+        if len(row) < 2:
+            continue
+        a, b = fix_mojibake(row[0].strip()), fix_mojibake(row[1].strip())
+        if not a or not b or a.lower() in ("english", "en", "sentence"):
+            continue
+        if re.search(r"[א-ת]", a) and re.search(r"[A-Za-z]", b):
+            he, en = a, b
+        else:
+            en, he = a, b
+        if len(en.split()) >= 2:
+            sentences.append({"en": en, "he": he})
+    if not sentences:
+        sentences = FALLBACK_SENTENCES[:]
+    _cache[key] = (time.time(), sentences)
+    return [dict(x) for x in sentences]
 
-# ── Student sessions ──────────────────────────────────────────────────────
-# key: student_id
-# value: {teacher_id, queue, index, attempts, mastery_consecutive,
-#         mastery_target, cloze_word, cloze_attempts, results, done}
-_sessions = {}
+def normalize(text):
+    return re.sub(r"[^a-z0-9\s]", "", (text or "").lower()).strip()
 
-MASTERY_PHASES = [("normal", 0), ("cloze", 0), ("mastery", 3)]
+def similarity(spoken, correct):
+    a, b = normalize(spoken), normalize(correct)
+    if not a or not b:
+        return 0
+    return int(SequenceMatcher(None, a, b).ratio() * 100)
 
-COMMON_VERBS = {
-    "be","is","are","was","were","been","being",
-    "have","has","had","having",
-    "do","does","did","done","doing",
-    "go","goes","went","gone","going",
-    "say","says","said","saying",
-    "get","gets","got","gotten","getting",
-    "make","makes","made","making",
-    "know","knows","knew","known","knowing",
-    "think","thinks","thought","thinking",
-    "take","takes","took","taken","taking",
-    "see","sees","saw","seen","seeing",
-    "come","comes","came","coming",
-    "want","wants","wanted","wanting",
-    "look","looks","looked","looking",
-    "use","uses","used","using",
-    "find","finds","found","finding",
-    "give","gives","gave","given","giving",
-    "tell","tells","told","telling",
-    "work","works","worked","working",
-    "call","calls","called","calling",
-    "try","tries","tried","trying",
-    "ask","asks","asked","asking",
-    "need","needs","needed","needing",
-    "feel","feels","felt","feeling",
-    "become","becomes","became","becoming",
-    "leave","leaves","left","leaving",
-    "put","puts","putting",
-    "mean","means","meant","meaning",
-    "keep","keeps","kept","keeping",
-    "let","lets","letting",
-    "begin","begins","began","begun","beginning",
-    "show","shows","showed","shown","showing",
-    "hear","hears","heard","hearing",
-    "play","plays","played","playing",
-    "run","runs","ran","running",
-    "move","moves","moved","moving",
-    "live","lives","lived","living",
-    "believe","believes","believed","believing",
-    "hold","holds","held","holding",
-    "bring","brings","brought","bringing",
-    "happen","happens","happened","happening",
-    "write","writes","wrote","written","writing",
-    "provide","provides","provided","providing",
-    "sit","sits","sat","sitting",
-    "stand","stands","stood","standing",
-    "lose","loses","lost","losing",
-    "pay","pays","paid","paying",
-    "meet","meets","met","meeting",
-    "include","includes","included","including",
-    "continue","continues","continued","continuing",
-    "set","sets","setting",
-    "learn","learns","learned","learning",
-    "change","changes","changed","changing",
-    "lead","leads","led","leading",
-    "understand","understands","understood","understanding",
-    "watch","watches","watched","watching",
-    "follow","follows","followed","following",
-    "stop","stops","stopped","stopping",
-    "speak","speaks","spoke","spoken","speaking",
-    "read","reads","reading",
-    "spend","spends","spent","spending",
-    "grow","grows","grew","grown","growing",
-    "open","opens","opened","opening",
-    "walk","walks","walked","walking",
-    "win","wins","won","winning",
-    "offer","offers","offered","offering",
-    "remember","remembers","remembered","remembering",
-    "love","loves","loved","loving",
-    "consider","considers","considered","considering",
-    "appear","appears","appeared","appearing",
-    "buy","buys","bought","buying",
-    "wait","waits","waited","waiting",
-    "serve","serves","served","serving",
-    "die","dies","died","dying",
-    "send","sends","sent","sending",
-    "expect","expects","expected","expecting",
-    "build","builds","built","building",
-    "stay","stays","stayed","staying",
-    "fall","falls","fell","fallen","falling",
-    "cut","cuts","cutting",
-    "reach","reaches","reached","reaching",
-    "kill","kills","killed","killing",
-    "remain","remains","remained","remaining",
-    "suggest","suggests","suggested","suggesting",
-    "raise","raises","raised","raising",
-    "pass","passes","passed","passing",
-    "sell","sells","sold","selling",
-    "require","requires","required","requiring",
-    "report","reports","reported","reporting",
-    "decide","decides","decided","deciding",
-    "pull","pulls","pulled","pulling",
-    "help","helps","helped","helping",
-    "start","starts","started","starting",
-    "study","studies","studied","studying",
-    "eat","eats","ate","eaten","eating",
-    "drink","drinks","drank","drunk","drinking",
-    "sleep","sleeps","slept","sleeping",
-    "drive","drives","drove","driven","driving",
-    "swim","swims","swam","swum","swimming",
-    "fly","flies","flew","flown","flying",
-    "sing","sings","sang","sung","singing",
-    "dance","dances","danced","dancing",
-    "smile","smiles","smiled","smiling",
-    "laugh","laughs","laughed","laughing",
-    "cry","cries","cried","crying",
-    "travel","travels","traveled","traveling",
-    "visit","visits","visited","visiting",
-    "enjoy","enjoys","enjoyed","enjoying",
-    "choose","chooses","chose","chosen","choosing",
-    "create","creates","created","creating",
-    "share","shares","shared","sharing",
-}
+def word_level(spoken, correct):
+    sp, co = normalize(spoken).split(), normalize(correct).split()
+    result = []
+    for tag, i1, i2, j1, j2 in SequenceMatcher(None, sp, co).get_opcodes():
+        if tag == "equal":
+            for w in co[j1:j2]: result.append({"word": w, "status": "correct"})
+        elif tag in ("replace", "delete"):
+            for w in co[j1:j2]: result.append({"word": w, "status": "wrong"})
+        elif tag == "insert":
+            for w in sp[i1:i2]: result.append({"word": w, "status": "extra"})
+    return result
 
-def normalize(s):
-    return re.sub(r"[^a-z ]", "", s.lower()).strip()
+def mastery_target_for(failures):
+    if failures <= 0:
+        return 0
+    return min(failures + 2, 5)
 
 def detect_cloze_word(sentence):
     words = normalize(sentence).split()
     if len(words) < 3:
         return None
-
     def is_verb(w):
-        if w in COMMON_VERBS:
-            return True
-        if w.endswith("ed") and (w[:-2] in COMMON_VERBS or w[:-1] in COMMON_VERBS):
-            return True
-        if w.endswith("ing") and w[:-3] in COMMON_VERBS:
-            return True
-        if w.endswith("s") and w[:-1] in COMMON_VERBS:
-            return True
-        return False
-
+        return (w in COMMON_VERBS or
+                (w.endswith("ed") and (w[:-2] in COMMON_VERBS or w[:-1] in COMMON_VERBS)) or
+                (w.endswith("ing") and w[:-3] in COMMON_VERBS) or
+                (w.endswith("s") and w[:-1] in COMMON_VERBS))
     for w in words[1:]:
         if is_verb(w):
             return w
-
     candidates = [(len(w), w) for w in words[1:-1] if len(w) > 4]
-    if candidates:
-        return sorted(candidates, reverse=True)[0][1]
-    return None
+    return sorted(candidates, reverse=True)[0][1] if candidates else None
 
-# ── Scoring ────────────────────────────────────────────────────────────────
-PASS_THRESHOLD = 85  # global fallback
-
-def similarity(a, b):
-    a, b = normalize(a), normalize(b)
-    if not a or not b:
-        return 0
-    base = round(SequenceMatcher(None, a, b).ratio() * 100)
-    # Bonus: all words present
-    wa, wb = set(a.split()), set(b.split())
-    coverage = len(wa & wb) / max(len(wb), 1)
-    bonus = round(coverage * 10)
-    return min(100, base + bonus)
-
-def word_level(spoken, correct):
-    sw = normalize(spoken).split()
-    cw = normalize(correct).split()
-    sm = SequenceMatcher(None, sw, cw)
-    result = []
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == "equal":
-            for w in cw[j1:j2]:
-                result.append({"word": w, "status": "correct"})
-        elif tag in ("replace", "delete"):
-            for w in cw[j1:j2]:
-                result.append({"word": w, "status": "wrong"})
-        elif tag == "insert":
-            for w in cw[j1:j2]:
-                result.append({"word": w, "status": "missing"})
-    return result
-
-# ── Session helpers ────────────────────────────────────────────────────────
-MASTERY_TARGET = 3
-
-def new_session(student_id, teacher_id, student_name=""):
-    sentences = list(get_teacher_sentences(teacher_id))
-    random.shuffle(sentences)
-    _sessions[student_id] = {
-        "teacher_id":           teacher_id,
-        "student_name":         student_name,
-        "queue":                sentences,
-        "index":                0,
-        "attempts":             0,
-        "phase":                "normal",   # normal | cloze | mastery
-        "mastery_consecutive":  0,
-        "mastery_target":       MASTERY_TARGET,
-        "cloze_word":           None,
-        "cloze_attempts":       0,
-        "results":              [],
-        "done":                 False,
+def session_payload(s):
+    return {
+        "mastery_target": s["mastery_target"],
+        "mastery_consecutive": s["mastery_consecutive"],
+        "mastery_remaining": max(0, s["mastery_target"] - s["mastery_consecutive"]),
+        "failed_attempts": s["failed_attempts"],
+        "cloze_active": s["cloze_active"],
+        "cloze_word": s["cloze_word"],
+        "cloze_attempts_left": max(0, 3 - s["cloze_attempts"]),
     }
 
-def get_session(student_id):
-    return _sessions.get(student_id)
+def new_session(student_id, teacher_id, student_name):
+    ts = _teacher_state[teacher_id]
+    sentences = load_sentences_from_csv(ts.get("csv_url", ""))
+    _sessions[student_id] = {
+        "student_id": student_id,
+        "teacher_id": teacher_id,
+        "student_name": student_name,
+        "threshold": int(ts["threshold"]),
+        "max_attempts": int(ts["max_attempts"]),
+        "voice_gender": TEACHERS[teacher_id]["voice_gender"],
+        "exercise_name": ts.get("exercise_name", "תרגול דמו"),
+        "csv_url": ts.get("csv_url", ""),
+        "sentences": sentences,
+        "current": 0,
+        "failed_attempts": 0,
+        "mastery_target": 0,
+        "mastery_consecutive": 0,
+        "mastery_score": 0,
+        "cloze_active": False,
+        "cloze_word": None,
+        "cloze_attempts": 0,
+        "results": [],
+        "exam_results": [],
+        "completed": False,
+        "created_at": int(time.time()),
+    }
 
-# ── Routes ─────────────────────────────────────────────────────────────────
+def write_result(row):
+    _pending_results.append(row)
+    svc_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if not svc_json:
+        print("RESULT STORED IN MEMORY ONLY", row)
+        return False
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        creds_info = json.loads(svc_json)
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+        sh = gspread.authorize(creds).open_by_key(RESULTS_SHEET_ID)
+        tab = TEACHERS[row["teacher_id"]]["results_tab"]
+        try:
+            ws = sh.worksheet(tab)
+        except gspread.WorksheetNotFound:
+            ws = sh.add_worksheet(title=tab, rows=1000, cols=20)
+            ws.append_row(["timestamp", "teacher", "student", "exercise", "phase", "sentence", "spoken", "score", "passed", "attempts", "mastery_reps"])
+        ws.append_row([row.get(k, "") for k in ["timestamp", "teacher_id", "student_name", "exercise", "phase", "sentence", "spoken", "score", "passed", "attempts", "mastery_reps"]])
+        return True
+    except Exception as e:
+        print("WRITE RESULT FAILED", e)
+        return False
+
+def record_and_advance(s, correct, spoken, score, passed=True, skipped=False):
+    row = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "teacher_id": s["teacher_id"], "student_name": s["student_name"], "exercise": s["exercise_name"],
+        "phase": "practice", "sentence": correct, "spoken": spoken, "score": score,
+        "passed": bool(passed), "skipped": bool(skipped),
+        "attempts": s["failed_attempts"] + max(1, s["mastery_target"]),
+        "mastery_reps": s["mastery_target"],
+    }
+    s["results"].append(row)
+    write_result(row)
+    s["current"] += 1
+    s["failed_attempts"] = 0
+    s["mastery_target"] = 0
+    s["mastery_consecutive"] = 0
+    s["mastery_score"] = 0
+    s["cloze_active"] = False
+    s["cloze_word"] = None
+    s["cloze_attempts"] = 0
 
 @app.route("/")
 def home():
-    with open(os.path.join(BASE_DIR, "index.html"), "rb") as f:
-        content = f.read()
-    return Response(content, content_type="text/html; charset=utf-8")
+    return Response(open(os.path.join(BASE_DIR, "index.html"), "rb").read(), content_type="text/html; charset=utf-8")
 
 @app.route("/teacher")
-def teacher_page():
-    with open(os.path.join(BASE_DIR, "teacher.html"), "rb") as f:
-        content = f.read()
-    return Response(content, content_type="text/html; charset=utf-8")
+def teacher():
+    return Response(open(os.path.join(BASE_DIR, "teacher.html"), "rb").read(), content_type="text/html; charset=utf-8")
 
-@app.route("/api/teachers", methods=["GET"])
+@app.get("/api/teachers")
 def api_teachers():
-    return jsonify({
-        tid: {
-            "name":         t["name"],
-            "color":        t["color"],
-            "color_light":  t["color_light"],
-            "voice_gender": t.get("voice_gender", "female"),
-            "threshold":    t_threshold(tid),
-            "max_attempts": t_max_attempts(tid),
-        }
-        for tid, t in TEACHERS.items()
-    })
+    return jsonify({tid: teacher_public(tid) for tid in TEACHERS})
 
-@app.route("/api/verify-student", methods=["POST"])
+@app.post("/api/verify-student")
 def verify_student():
-    data     = request.get_json(force=True)
-    teacher_id = data.get("teacher_id", "")
-    name     = data.get("name", "").strip()
-    password = data.get("password", "")
-
-    if teacher_id not in TEACHERS:
-        return jsonify({"ok": False, "error": "unknown teacher"}), 400
-
-    expected = TEACHERS[teacher_id]["student_password"]
+    data = request.get_json(force=True)
+    tid, name, password = data.get("teacher_id"), data.get("name", "").strip(), data.get("password", "")
+    if tid not in TEACHERS or not name:
+        return jsonify(ok=False, error="bad request"), 400
+    expected = TEACHERS[tid]["student_password"]
     if expected and password != expected:
-        return jsonify({"ok": False}), 401
+        return jsonify(ok=False, error="wrong password"), 401
+    safe_name = re.sub(r"[^A-Za-z0-9א-ת_-]", "_", name)
+    sid = f"{tid}_{safe_name}_{int(time.time())}_{os.getpid()}"
+    new_session(sid, tid, name)
+    return jsonify(ok=True, student_id=sid, teacher=teacher_public(tid), exercise=_sessions[sid]["exercise_name"])
 
-    student_id = f"{teacher_id}_{name}_{int(time.time())}"
-    new_session(student_id, teacher_id, student_name=name)
-    return jsonify({"ok": True, "student_id": student_id})
-
-@app.route("/api/question", methods=["GET"])
+@app.get("/api/question")
 def question():
-    student_id = request.args.get("student", "")
-    sess = get_session(student_id)
-    if not sess:
-        return jsonify({"error": "session not found"}), 404
+    s = _sessions.get(request.args.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    if s["current"] >= len(s["sentences"]):
+        s["completed"] = True
+        total = len(s["results"])
+        avg = int(sum(r["score"] for r in s["results"]) / total) if total else 0
+        return jsonify(done=True, results=s["results"], avg_score=avg, total=total, exercise=s["exercise_name"])
+    q = s["sentences"][s["current"]]
+    return jsonify({
+        "done": False, "he": q["he"], "en": q["en"], "index": s["current"], "total": len(s["sentences"]),
+        "threshold": s["threshold"], "max_attempts": s["max_attempts"], "voice_gender": s["voice_gender"],
+        "exercise": s["exercise_name"], **session_payload(s)
+    })
 
-    tid = sess["teacher_id"]
-    queue = sess["queue"]
-    idx   = sess["index"]
-
-    if idx >= len(queue):
-        results = sess["results"]
-        return jsonify({"done": True, "results": results})
-
-    q = queue[idx]
-    phase = sess["phase"]
-
-    resp = {
-        "he":    q["he"],
-        "en":    q["en"],
-        "index": idx,
-        "total": len(queue),
-        "phase": phase,
-        "mastery_target":      sess["mastery_target"] if phase == "mastery" else 0,
-        "mastery_consecutive": sess["mastery_consecutive"] if phase == "mastery" else 0,
-        "cloze_word":          sess["cloze_word"] if phase == "cloze" else None,
-    }
-    return jsonify(resp)
-
-@app.route("/api/answer", methods=["POST"])
+@app.post("/api/answer")
 def answer():
-    data       = request.get_json(force=True)
-    student_id = data.get("student", "")
-    spoken     = data.get("answer", "")
-    sess       = get_session(student_id)
-    if not sess:
-        return jsonify({"error": "session not found"}), 404
+    data = request.get_json(force=True)
+    sid, spoken = data.get("student", ""), data.get("answer", "")
+    s = _sessions.get(sid)
+    if not s:
+        return jsonify(error="session not found"), 404
+    if s["current"] >= len(s["sentences"]):
+        return jsonify(done=True, results=s["results"])
+    correct = s["sentences"][s["current"]]["en"]
+    score = similarity(spoken, correct)
+    passed = score >= s["threshold"]
+    words = word_level(spoken, correct)
+    base = {"correct": correct, "spoken": spoken, "score": score, "passed": passed, "words": words, "threshold": s["threshold"], "advance": False}
 
-    tid   = sess["teacher_id"]
-    threshold    = t_threshold(tid)
-    max_attempts = t_max_attempts(tid)
-    queue = sess["queue"]
-    idx   = sess["index"]
-    q     = queue[idx]
-    phase = sess["phase"]
-
-    score  = similarity(spoken, q["en"])
-    passed = score >= threshold
-    words  = word_level(spoken, q["en"])
-
-    # ── CLOZE phase ────────────────────────────────────────────────────────
-    if phase == "cloze":
-        sess["cloze_attempts"] += 1
-        cloze_word = sess["cloze_word"]
-
-        # Check if cloze word present in spoken
-        cloze_ok = cloze_word and (
-            cloze_word in normalize(spoken).split()
-        )
-        overall_ok = passed and cloze_ok
-
-        if overall_ok:
-            # Advance to mastery
-            sess["phase"] = "mastery"
-            sess["mastery_consecutive"] = 0
-            sess["mastery_target"] = MASTERY_TARGET
-            return jsonify({
-                "score": score, "passed": True, "words": words,
-                "cloze_mode": True, "cloze_done": True,
-                "cloze_word": cloze_word,
-                "mastery_mode": True,
-                "mastery_target": MASTERY_TARGET,
-                "mastery_consecutive": 0,
-                "advance": False,
-            })
-        else:
-            # Failed cloze attempt
-            if sess["cloze_attempts"] >= max_attempts:
-                # Give up on cloze, go to mastery anyway
-                sess["phase"] = "mastery"
-                sess["mastery_consecutive"] = 0
-                sess["mastery_target"] = MASTERY_TARGET
-                return jsonify({
-                    "score": score, "passed": False, "words": words,
-                    "cloze_mode": True, "cloze_done": True,
-                    "cloze_word": cloze_word,
-                    "cloze_attempts_left": 0,
-                    "mastery_mode": True,
-                    "mastery_target": MASTERY_TARGET,
-                    "mastery_consecutive": 0,
-                    "advance": False,
-                })
-            return jsonify({
-                "score": score, "passed": False, "words": words,
-                "cloze_mode": True, "cloze_done": False,
-                "cloze_word": cloze_word,
-                "cloze_attempts_left": max_attempts - sess["cloze_attempts"],
-            })
-
-    # ── MASTERY phase ──────────────────────────────────────────────────────
-    if phase == "mastery":
-        target = sess["mastery_target"]
+    if s["cloze_active"]:
         if passed:
-            sess["mastery_consecutive"] += 1
-        else:
-            broken = sess["mastery_consecutive"] > 0
-            sess["mastery_consecutive"] = 0
-            return jsonify({
-                "score": score, "passed": False, "words": words,
-                "mastery_mode": True,
-                "mastery_target": target,
-                "mastery_consecutive": 0,
-                "streak_broken": broken,
-                "advance": False,
-            })
+            s["cloze_active"] = False
+            s["cloze_word"] = None
+            if s["mastery_target"] > 0:
+                s["mastery_consecutive"] = 1
+                s["mastery_score"] = score
+                return jsonify({**base, "cloze_done": True, "mastery_mode": True, "first_pass": True, **session_payload(s)})
+            record_and_advance(s, correct, spoken, s["mastery_score"] or score, True)
+            return jsonify({**base, "cloze_done": True, "advance": True, **session_payload(s)})
+        s["cloze_attempts"] += 1
+        if s["cloze_attempts"] >= 3:
+            s["cloze_active"] = False
+            s["cloze_word"] = None
+            if s["mastery_target"] > 0:
+                return jsonify({**base, "cloze_done": True, "mastery_mode": True, "first_pass": True, **session_payload(s)})
+            record_and_advance(s, correct, spoken, s["mastery_score"] or score, True)
+            return jsonify({**base, "cloze_done": True, "advance": True, **session_payload(s)})
+        return jsonify({**base, "cloze_mode": True, **session_payload(s)})
 
-        consecutive = sess["mastery_consecutive"]
-        if consecutive >= target:
-            # Mastery achieved — advance
-            sess["results"].append({
-                "sentence": q["en"],
-                "score":    score,
-                "passed":   True,
-                "skipped":  False,
-            })
-            sess["index"]               += 1
-            sess["attempts"]             = 0
-            sess["phase"]                = "normal"
-            sess["mastery_consecutive"]  = 0
-            sess["cloze_word"]           = None
-            sess["cloze_attempts"]       = 0
-            _write_result(tid, student_id, q, score, True)
-            return jsonify({
-                "score": score, "passed": True, "words": words,
-                "mastery_mode": True,
-                "mastery_target": target,
-                "mastery_consecutive": consecutive,
-                "advance": True,
-            })
+    if s["mastery_target"] > 0:
+        if passed:
+            s["mastery_consecutive"] += 1
+            s["mastery_score"] = score
+            if s["mastery_consecutive"] >= s["mastery_target"]:
+                record_and_advance(s, correct, spoken, score, True)
+                return jsonify({**base, "mastery_mode_done": True, "advance": True, **session_payload(s)})
+            return jsonify({**base, "mastery_mode": True, "streak_broken": False, **session_payload(s)})
+        s["mastery_consecutive"] = 0
+        return jsonify({**base, "mastery_mode": True, "streak_broken": True, **session_payload(s)})
 
-        return jsonify({
-            "score": score, "passed": True, "words": words,
-            "mastery_mode": True,
-            "mastery_target": target,
-            "mastery_consecutive": consecutive,
-            "advance": False,
-        })
-
-    # ── NORMAL phase ───────────────────────────────────────────────────────
-    sess["attempts"] += 1
-
+    # Normal practice: first failure counts; passing after failures triggers mastery repetitions.
     if passed:
-        # Enter cloze phase
-        cloze_word = detect_cloze_word(q["en"])
-        if cloze_word:
-            sess["phase"] = "cloze"
-            sess["cloze_word"] = cloze_word
-            sess["cloze_attempts"] = 0
-            return jsonify({
-                "score": score, "passed": True, "words": words,
-                "cloze_mode": None,
-                "cloze_word": cloze_word,
-                "first_pass": True,
-            })
-        else:
-            # No cloze word — go straight to mastery
-            sess["phase"] = "mastery"
-            sess["mastery_consecutive"] = 0
-            sess["mastery_target"] = MASTERY_TARGET
-            return jsonify({
-                "score": score, "passed": True, "words": words,
-                "first_pass": True,
-                "mastery_mode": True,
-                "mastery_target": MASTERY_TARGET,
-                "mastery_consecutive": 0,
-                "advance": False,
-            })
+        target = mastery_target_for(s["failed_attempts"])
+        cw = detect_cloze_word(correct)
+        s["mastery_score"] = score
+        if target > 0:
+            s["mastery_target"] = target
+        if cw:
+            s["cloze_active"] = True
+            s["cloze_word"] = cw
+            s["cloze_attempts"] = 0
+            return jsonify({**base, "cloze_mode": True, **session_payload(s)})
+        if target > 0:
+            return jsonify({**base, "mastery_mode": True, "first_pass": True, **session_payload(s)})
+        record_and_advance(s, correct, spoken, score, True)
+        return jsonify({**base, "advance": True, **session_payload(s)})
 
-    # Failed normal attempt
-    if sess["attempts"] >= max_attempts:
-        # Skip sentence
-        sess["results"].append({
-            "sentence": q["en"],
-            "score":    score,
-            "passed":   False,
-            "skipped":  True,
-        })
-        sess["index"]    += 1
-        sess["attempts"]  = 0
-        sess["phase"]     = "normal"
-        _write_result(tid, student_id, q, score, False)
-        return jsonify({
-            "score": score, "passed": False, "words": words,
-            "skipped": True,
-        })
+    s["failed_attempts"] += 1
+    if s["failed_attempts"] >= s["max_attempts"]:
+        record_and_advance(s, correct, spoken, score, False, skipped=True)
+        return jsonify({**base, "skipped": True, "advance": True, **session_payload(s)})
+    return jsonify({**base, "attempts_left": s["max_attempts"] - s["failed_attempts"], **session_payload(s)})
 
-    return jsonify({
-        "score":    score,
-        "passed":   False,
-        "words":    words,
-        "threshold": threshold,
-        "advance":  False,
-    })
-
-@app.route("/api/skip", methods=["POST"])
+@app.post("/api/skip")
 def skip():
-    data       = request.get_json(force=True)
-    student_id = data.get("student", "")
-    sess = get_session(student_id)
-    if not sess:
-        return jsonify({"error": "session not found"}), 404
+    data = request.get_json(force=True)
+    s = _sessions.get(data.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    if s["current"] < len(s["sentences"]):
+        correct = s["sentences"][s["current"]]["en"]
+        record_and_advance(s, correct, "", 0, False, skipped=True)
+    return jsonify(ok=True)
 
-    tid = sess["teacher_id"]
-    queue = sess["queue"]
-    idx   = sess["index"]
-
-    if idx < len(queue):
-        q = queue[idx]
-        sess["results"].append({
-            "sentence": q["en"],
-            "score":    0,
-            "passed":   False,
-            "skipped":  True,
-        })
-        _write_result(tid, student_id, q, 0, False)
-
-    sess["index"]    += 1
-    sess["attempts"]  = 0
-    sess["phase"]     = "normal"
-    sess["cloze_word"] = None
-    sess["cloze_attempts"] = 0
-    sess["mastery_consecutive"] = 0
-    return jsonify({"ok": True})
-
-@app.route("/api/score-only", methods=["POST"])
+@app.post("/api/score-only")
 def score_only():
-    data    = request.get_json(force=True)
-    spoken  = data.get("spoken", "")
-    correct = data.get("correct", "")
-    tid     = data.get("teacher_id", "ben")
-    threshold = t_threshold(tid) if tid in TEACHERS else PASS_THRESHOLD
-    score   = similarity(spoken, correct)
-    passed  = score >= threshold
-    words   = word_level(spoken, correct)
-    return jsonify(score=score, passed=passed, words=words, threshold=threshold)
+    data = request.get_json(force=True)
+    tid = data.get("teacher_id", "ben")
+    threshold = _teacher_state.get(tid, {}).get("threshold", 85)
+    score = similarity(data.get("spoken", ""), data.get("correct", ""))
+    return jsonify(score=score, passed=score >= threshold, words=word_level(data.get("spoken", ""), data.get("correct", "")))
 
-@app.route("/api/reset", methods=["POST"])
-def reset():
-    data       = request.get_json(force=True)
-    student_id = data.get("student", "")
-    teacher_id = data.get("teacher_id", "ben")
-    if student_id in _sessions:
-        del _sessions[student_id]
-    new_session(student_id, teacher_id)
-    return jsonify({"ok": True})
+@app.post("/api/exam-result")
+def exam_result():
+    data = request.get_json(force=True)
+    s = _sessions.get(data.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    row = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "teacher_id": s["teacher_id"],
+        "student_name": s["student_name"], "exercise": s["exercise_name"], "phase": "final_exam",
+        "sentence": data.get("sentence", ""), "spoken": data.get("spoken", ""),
+        "score": data.get("score", 0), "passed": data.get("passed", False), "attempts": 1, "mastery_reps": 0,
+    }
+    s["exam_results"].append(row)
+    write_result(row)
+    return jsonify(ok=True)
 
-# ── Teacher dashboard API ──────────────────────────────────────────────────
-
-@app.route("/api/teacher-login", methods=["POST"])
+@app.post("/api/teacher-login")
 def teacher_login():
-    data     = request.get_json(force=True)
-    tid      = data.get("teacher_id", "")
-    password = data.get("password", "")
-    if tid not in TEACHERS:
-        return jsonify({"ok": False}), 400
-    if password != TEACHERS[tid]["teacher_password"]:
-        return jsonify({"ok": False}), 401
-    return jsonify({"ok": True, "teacher": {
-        "name":         TEACHERS[tid]["name"],
-        "color":        TEACHERS[tid]["color"],
-        "color_light":  TEACHERS[tid]["color_light"],
-        "threshold":    t_threshold(tid),
-        "max_attempts": t_max_attempts(tid),
-    }})
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+        return jsonify(ok=False), 401
+    return jsonify(ok=True, teacher=teacher_public(tid))
 
-@app.route("/api/teacher-settings", methods=["POST"])
+@app.post("/api/teacher-settings")
 def teacher_settings():
-    data     = request.get_json(force=True)
-    tid      = data.get("teacher_id", "")
-    password = data.get("password", "")
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
-        return jsonify({"ok": False}), 401
+        return jsonify(ok=False), 401
+    _teacher_state[tid]["threshold"] = max(80, min(100, int(data.get("threshold", _teacher_state[tid]["threshold"]))))
+    _teacher_state[tid]["max_attempts"] = max(4, min(7, int(data.get("max_attempts", _teacher_state[tid]["max_attempts"]))))
+    save_state()
+    return jsonify(ok=True, teacher=teacher_public(tid))
 
-    rt = _teacher_runtime.setdefault(tid, {})
-    if "threshold" in data:
-        rt["threshold"] = max(80, min(100, int(data["threshold"])))
-    if "max_attempts" in data:
-        rt["max_attempts"] = max(4, min(7, int(data["max_attempts"])))
-
-    return jsonify({"ok": True, "threshold": t_threshold(tid), "max_attempts": t_max_attempts(tid)})
-
-@app.route("/api/teacher-results", methods=["POST"])
-def teacher_results():
-    data     = request.get_json(force=True)
-    tid      = data.get("teacher_id", "")
-    password = data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
-        return jsonify({"ok": False}), 401
-
-    # Fetch from Google Sheets
-    sheet_id = TEACHERS[tid]["results_sheet_id"]
-    tab      = TEACHERS[tid]["results_tab"]
-    url = (
-        f"https://docs.google.com/spreadsheets/d/{sheet_id}"
-        f"/gviz/tq?tqx=out:csv&sheet={tab}"
-    )
-    try:
-        r = requests.get(url, timeout=15)
-        r.raise_for_status()
-        reader = csv.DictReader(io.StringIO(r.text))
-        rows = [dict(row) for row in reader]
-        return jsonify({"ok": True, "rows": rows})
-    except Exception as e:
-        return jsonify({"ok": True, "rows": [], "note": str(e)})
-
-
-@app.route("/api/teacher-students", methods=["POST"])
-def teacher_students():
-    data     = request.get_json(force=True)
-    tid      = data.get("teacher_id", "")
-    password = data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
-        return jsonify({"ok": False}), 401
-
-    ex_name, _ = t_exercise(tid)
-    students = []
-    for sid, sess in _sessions.items():
-        if sess.get("teacher_id") != tid:
-            continue
-        total = len(sess["queue"])
-        students.append({
-            "name":    sess.get("student_name") or sid,
-            "index":   sess["index"],
-            "total":   total,
-            "phase":   sess["phase"],
-            "done":    sess["done"],
-        })
-
-    return jsonify({
-        "ok":           True,
-        "exercise":     ex_name or "",
-        "threshold":    t_threshold(tid),
-        "max_attempts": t_max_attempts(tid),
-        "students":     students,
-    })
-
-@app.route("/api/catalog", methods=["POST"])
+@app.post("/api/catalog")
 def api_catalog():
-    data     = request.get_json(force=True)
-    tid      = data.get("teacher_id", "")
-    password = data.get("password", "")
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
-        return jsonify({"ok": False}), 401
+        return jsonify(ok=False), 401
+    return jsonify(ok=True, exercises=load_catalog("en"))
 
-    exercises = load_catalog(lang_filter="en")
-    return jsonify({"ok": True, "exercises": exercises})
-
-@app.route("/api/set-exercise", methods=["POST"])
+@app.post("/api/set-exercise")
 def set_exercise():
-    data     = request.get_json(force=True)
-    tid      = data.get("teacher_id", "")
-    password = data.get("password", "")
-    name     = data.get("name", "")
-    csv_url  = data.get("csv_url", "")
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
-        return jsonify({"ok": False}), 401
-    if not csv_url:
-        return jsonify({"ok": False, "error": "missing csv_url"}), 400
+        return jsonify(ok=False), 401
+    _teacher_state[tid]["exercise_name"] = data.get("name", "תרגול דמו")
+    _teacher_state[tid]["csv_url"] = data.get("csv_url", "")
+    save_state()
+    return jsonify(ok=True, teacher=teacher_public(tid), sentence_count=len(load_sentences_from_csv(data.get("csv_url", ""))))
 
-    _teacher_runtime.setdefault(tid, {})["exercise"] = (name, csv_url)
-    _sentences_cache.pop(csv_url, None)
-    return jsonify({"ok": True, "name": name})
-
-@app.route("/api/reload-sentences", methods=["POST"])
-def reload_sentences():
-    data     = request.get_json(force=True)
-    tid      = data.get("teacher_id", "")
-    password = data.get("password", "")
+@app.post("/api/teacher-results")
+def teacher_results():
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
-        return jsonify({"ok": False}), 401
-    _, csv_url = t_exercise(tid)
-    if csv_url:
-        _sentences_cache.pop(csv_url, None)
-    return jsonify({"ok": True})
+        return jsonify(ok=False), 401
+    rows = [r for r in _pending_results if r.get("teacher_id") == tid]
+    return jsonify(ok=True, rows=rows[-200:])
+
+@app.post("/api/teacher-students")
+def teacher_students():
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+        return jsonify(ok=False), 401
+    students = []
+    for s in _sessions.values():
+        if s["teacher_id"] == tid:
+            students.append({
+                "name": s["student_name"], "index": s["current"], "total": len(s["sentences"]),
+                "done": s["current"] >= len(s["sentences"]), "exercise": s["exercise_name"],
+                "threshold": s["threshold"], "max_attempts": s["max_attempts"],
+                "failed_attempts": s["failed_attempts"], "mastery_target": s["mastery_target"],
+                "mastery_consecutive": s["mastery_consecutive"],
+            })
+    return jsonify(ok=True, teacher=teacher_public(tid), students=students)
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(debug=True)

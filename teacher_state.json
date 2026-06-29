@@ -1,0 +1,14 @@
+{
+  "ben": {
+    "threshold": 85,
+    "max_attempts": 5,
+    "exercise_name": "תרגול דמו",
+    "csv_url": ""
+  },
+  "sara": {
+    "threshold": 85,
+    "max_attempts": 5,
+    "exercise_name": "Sandra Belinsky - 25 New words - Hebrew English",
+    "csv_url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsfvkzXkXhvueQ9c41O9QnhW_GryM_Joch0GbtFIvYeTtOEHLxWX8cSW1gCxTtaTcjwbXEXJPPssbA/pub?output=csv"
+  }
+}
