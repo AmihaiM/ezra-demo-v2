@@ -183,15 +183,30 @@ def similarity(spoken, correct):
     return int(SequenceMatcher(None, a, b).ratio() * 100)
 
 def word_level(spoken, correct):
+    """Word-level feedback from the expected sentence perspective.
+    correct = word was heard in the right place; missing = expected word not heard;
+    wrong = expected word was replaced; extra = extra spoken word.
+    """
     sp, co = normalize(spoken).split(), normalize(correct).split()
     result = []
     for tag, i1, i2, j1, j2 in SequenceMatcher(None, sp, co).get_opcodes():
         if tag == "equal":
-            for w in co[j1:j2]: result.append({"word": w, "status": "correct"})
-        elif tag in ("replace", "delete"):
-            for w in co[j1:j2]: result.append({"word": w, "status": "wrong"})
+            for w in co[j1:j2]:
+                result.append({"word": w, "status": "correct"})
         elif tag == "insert":
-            for w in sp[i1:i2]: result.append({"word": w, "status": "extra"})
+            # Words that exist in the correct sentence but were not spoken.
+            for w in co[j1:j2]:
+                result.append({"word": w, "status": "missing"})
+        elif tag == "delete":
+            # Extra spoken words that are not in the correct sentence.
+            for w in sp[i1:i2]:
+                result.append({"word": w, "status": "extra"})
+        elif tag == "replace":
+            for w in co[j1:j2]:
+                result.append({"word": w, "status": "wrong"})
+            for w in sp[i1:i2]:
+                if w not in co[j1:j2]:
+                    result.append({"word": w, "status": "extra"})
     return result
 
 def mastery_target_for(failures):
@@ -223,6 +238,8 @@ def session_payload(s):
         "cloze_active": s["cloze_active"],
         "cloze_word": s["cloze_word"],
         "cloze_attempts_left": max(0, 3 - s["cloze_attempts"]),
+        "attempts_used": s.get("sentence_attempts", 0),
+        "attempts_left": max(0, s.get("max_attempts", 5) - s.get("sentence_attempts", 0)),
     }
 
 def new_session(student_id, teacher_id, student_name):
@@ -240,6 +257,7 @@ def new_session(student_id, teacher_id, student_name):
         "sentences": sentences,
         "current": 0,
         "failed_attempts": 0,
+        "sentence_attempts": 0,
         "mastery_target": 0,
         "mastery_consecutive": 0,
         "mastery_score": 0,
@@ -283,13 +301,14 @@ def record_and_advance(s, correct, spoken, score, passed=True, skipped=False):
         "teacher_id": s["teacher_id"], "student_name": s["student_name"], "exercise": s["exercise_name"],
         "phase": "practice", "sentence": correct, "spoken": spoken, "score": score,
         "passed": bool(passed), "skipped": bool(skipped),
-        "attempts": s["failed_attempts"] + max(1, s["mastery_target"]),
+        "attempts": max(1, s.get("sentence_attempts", 0)),
         "mastery_reps": s["mastery_target"],
     }
     s["results"].append(row)
     write_result(row)
     s["current"] += 1
     s["failed_attempts"] = 0
+    s["sentence_attempts"] = 0
     s["mastery_target"] = 0
     s["mastery_consecutive"] = 0
     s["mastery_score"] = 0
@@ -340,32 +359,69 @@ def question():
         "exercise": s["exercise_name"], **session_payload(s)
     })
 
+def cap_and_advance(s, correct, spoken, score, base, passed=False):
+    """Hard safety valve: no sentence can consume more than max_attempts submissions.
+    If the student got a passing score on the last allowed try, move on as passed;
+    otherwise skip/move on so the exercise never loops forever.
+    """
+    record_and_advance(s, correct, spoken, score, bool(passed), skipped=not bool(passed))
+    return jsonify({
+        **base,
+        "passed": bool(passed),
+        "skipped": not bool(passed),
+        "advance": True,
+        "cap_reached": True,
+        "message": "עברנו הלאה אחרי מספר הניסיונות שהוגדר למורה.",
+        **session_payload(s),
+    })
+
 @app.post("/api/answer")
 def answer():
     data = request.get_json(force=True)
     sid, spoken = data.get("student", ""), data.get("answer", "")
     s = _sessions.get(sid)
     if not s:
-        return jsonify(error="session not found"), 404
+        return jsonify(error="session not found", score=0, passed=False, words=[], advance=False), 404
     if s["current"] >= len(s["sentences"]):
-        return jsonify(done=True, results=s["results"])
+        return jsonify(done=True, results=s["results"], score=0, passed=False, words=[])
+
     correct = s["sentences"][s["current"]]["en"]
+    s["sentence_attempts"] = int(s.get("sentence_attempts", 0)) + 1
+
     score = similarity(spoken, correct)
     passed = score >= s["threshold"]
     words = word_level(spoken, correct)
-    base = {"correct": correct, "spoken": spoken, "score": score, "passed": passed, "words": words, "threshold": s["threshold"], "advance": False}
+    base = {
+        "correct": correct, "spoken": spoken, "score": score, "passed": passed,
+        "words": words, "threshold": s["threshold"], "advance": False,
+        "max_attempts": s["max_attempts"],
+    }
 
+    cap_reached = s["sentence_attempts"] >= s["max_attempts"]
+
+    # Hard cap: if this was the last allowed try, never enter another loop.
+    # Passing on the last try advances as passed; failing on the last try advances as skipped.
+    if cap_reached and not s["cloze_active"] and s["mastery_target"] == 0:
+        if passed:
+            record_and_advance(s, correct, spoken, score, True)
+            return jsonify({**base, "advance": True, "cap_reached": True, **session_payload(s)})
+        # Let the normal failure branch below create a better failed response.
+
+    # Cloze mode
     if s["cloze_active"]:
         if passed:
             s["cloze_active"] = False
             s["cloze_word"] = None
-            if s["mastery_target"] > 0:
-                s["mastery_consecutive"] = 1
-                s["mastery_score"] = score
-                return jsonify({**base, "cloze_done": True, "mastery_mode": True, "first_pass": True, **session_payload(s)})
-            record_and_advance(s, correct, spoken, s["mastery_score"] or score, True)
-            return jsonify({**base, "cloze_done": True, "advance": True, **session_payload(s)})
+            s["mastery_score"] = score
+            if cap_reached or s["mastery_target"] == 0:
+                record_and_advance(s, correct, spoken, score, True)
+                return jsonify({**base, "cloze_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
+            s["mastery_consecutive"] = 1
+            return jsonify({**base, "cloze_done": True, "mastery_mode": True, "first_pass": True, **session_payload(s)})
+
         s["cloze_attempts"] += 1
+        if cap_reached:
+            return cap_and_advance(s, correct, spoken, score, base, passed=False)
         if s["cloze_attempts"] >= 3:
             s["cloze_active"] = False
             s["cloze_word"] = None
@@ -375,22 +431,28 @@ def answer():
             return jsonify({**base, "cloze_done": True, "advance": True, **session_payload(s)})
         return jsonify({**base, "cloze_mode": True, **session_payload(s)})
 
+    # Mastery mode
     if s["mastery_target"] > 0:
         if passed:
             s["mastery_consecutive"] += 1
             s["mastery_score"] = score
-            if s["mastery_consecutive"] >= s["mastery_target"]:
+            if s["mastery_consecutive"] >= s["mastery_target"] or cap_reached:
                 record_and_advance(s, correct, spoken, score, True)
-                return jsonify({**base, "mastery_mode_done": True, "advance": True, **session_payload(s)})
+                return jsonify({**base, "mastery_mode_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
             return jsonify({**base, "mastery_mode": True, "streak_broken": False, **session_payload(s)})
         s["mastery_consecutive"] = 0
+        if cap_reached:
+            return cap_and_advance(s, correct, spoken, score, base, passed=False)
         return jsonify({**base, "mastery_mode": True, "streak_broken": True, **session_payload(s)})
 
-    # Normal practice: first failure counts; passing after failures triggers mastery repetitions.
+    # Normal mode
     if passed:
         target = mastery_target_for(s["failed_attempts"])
         cw = detect_cloze_word(correct)
         s["mastery_score"] = score
+        if cap_reached:
+            record_and_advance(s, correct, spoken, score, True)
+            return jsonify({**base, "advance": True, "cap_reached": True, **session_payload(s)})
         if target > 0:
             s["mastery_target"] = target
         if cw:
@@ -404,10 +466,9 @@ def answer():
         return jsonify({**base, "advance": True, **session_payload(s)})
 
     s["failed_attempts"] += 1
-    if s["failed_attempts"] >= s["max_attempts"]:
-        record_and_advance(s, correct, spoken, score, False, skipped=True)
-        return jsonify({**base, "skipped": True, "advance": True, **session_payload(s)})
-    return jsonify({**base, "attempts_left": s["max_attempts"] - s["failed_attempts"], **session_payload(s)})
+    if cap_reached:
+        return cap_and_advance(s, correct, spoken, score, base, passed=False)
+    return jsonify({**base, **session_payload(s)})
 
 @app.post("/api/skip")
 def skip():

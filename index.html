@@ -25,7 +25,30 @@ function playSentence(){if(!currentQ)return;speechSynthesis.cancel();let u=new S
 function toggleEnglish(){let e=document.getElementById('en');e.style.opacity=e.style.opacity==='1'?'0':'1'}
 function startRecognition(){if(busy||(!currentQ&&!examMode))return;let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert('זיהוי קול נתמך בעיקר ב-Chrome/Edge');return}busy=true;let rec=new SR();recognition=rec;rec.lang='en-US';rec.continuous=true;rec.interimResults=false;rec.maxAlternatives=1;let finalText='',submitted=false,timer=null;document.getElementById('mic').classList.add('on');document.getElementById('hint').textContent='מקשיב...';rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)finalText+=(e.results[i][0].transcript+' ')}if(timer)clearTimeout(timer);timer=setTimeout(()=>{if(!submitted)rec.stop()},1200)};rec.onend=()=>{document.getElementById('mic').classList.remove('on');if(submitted)return;submitted=true;if(timer)clearTimeout(timer);let spoken=finalText.trim();if(!spoken){busy=false;document.getElementById('hint').textContent='לא נקלט דיבור — נסה שוב';return}document.getElementById('hint').textContent='מעבד...';if(examMode)submitExamAnswer(spoken);else submitAnswer(spoken)};rec.onerror=()=>{busy=false;submitted=true;document.getElementById('mic').classList.remove('on');document.getElementById('hint').textContent='שגיאה — נסה שוב'};rec.start()}
 function submitAnswer(spoken){fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,answer:spoken})}).then(r=>r.json()).then(res=>{busy=false;showResult(spoken,res)}).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה בשליחת תשובה'})}
-function showResult(spoken,res){let box=document.getElementById('result');let passed=res.passed;box.style.display='block';box.className='result '+(passed?'pass':'fail');let msg=passed?pick(MSG_PASS):pick(MSG_FAIL);let words=(res.words||[]).map(w=>'<span class="w '+w.status+'">'+esc(w.word)+'</span>').join(' ');box.innerHTML='<h3>'+(passed?'✅ ':'💪 ')+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div><div class="words">'+words+'</div>';document.getElementById('hint').textContent=passed?'יפה!':'נסה שוב';if(res.cloze_mode||res.cloze_active){showCloze(res.cloze_word,res.cloze_attempts_left||3);document.getElementById('en').style.opacity='1'}else hideCloze();if(res.mastery_mode||res.mastery_target>0){showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken)}else if(!res.cloze_mode)hideMastery();if(res.mastery_mode&&res.passed){box.innerHTML+='<p>'+pick(MSG_STREAK)+'</p>'}if(res.skipped){box.innerHTML+='<p>עברנו הלאה אחרי מספר הניסיונות שהוגדר למורה.</p>'}if(res.advance){document.getElementById('en').style.opacity='1';setTimeout(loadQuestion,1800)}}
+function showResult(spoken,res){
+  let box=document.getElementById('result');
+  if(!res || typeof res.score!=='number'){
+    box.style.display='block'; box.className='result fail';
+    box.innerHTML='<h3>⚠️ שגיאה בבדיקת התשובה</h3><div>לא התקבל ציון מהשרת. נסה לרענן או לבדוק את הלוג של Flask.</div>'+(res&&res.error?'<pre dir="ltr">'+esc(res.error)+'</pre>':'');
+    document.getElementById('hint').textContent='נסה שוב';
+    return;
+  }
+  let passed=!!res.passed;
+  box.style.display='block';
+  box.className='result '+(passed?'pass':'fail');
+  let msg=passed?pick(MSG_PASS):pick(MSG_FAIL);
+  let words=(res.words||[]).map(w=>'<span class="w '+esc(w.status)+'">'+esc(w.word)+'</span>').join(' ');
+  let attempts = (typeof res.attempts_used==='number' && typeof res.max_attempts==='number')
+    ? '<div class="small">ניסיון '+res.attempts_used+' מתוך '+res.max_attempts+'</div>' : '';
+  box.innerHTML='<h3>'+(passed?'✅ ':'💪 ')+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>'+attempts+'<div class="words">'+words+'</div>';
+  document.getElementById('hint').textContent=passed?'יפה!':'נסה שוב';
+  if(res.cloze_mode||res.cloze_active){showCloze(res.cloze_word,res.cloze_attempts_left||3);document.getElementById('en').style.opacity='1'}else hideCloze();
+  if(res.mastery_mode||res.mastery_target>0){showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken)}else if(!res.cloze_mode)hideMastery();
+  if(res.mastery_mode&&res.passed){box.innerHTML+='<p>'+pick(MSG_STREAK)+'</p>'}
+  if(res.cap_reached && res.passed){box.innerHTML+='<p>הגענו למספר הניסיונות המקסימלי — המשפט עבר, ממשיכים הלאה.</p>'}
+  if(res.skipped){box.innerHTML+='<p>עברנו הלאה אחרי מספר הניסיונות שהוגדר למורה.</p>'}
+  if(res.advance){document.getElementById('en').style.opacity='1';setTimeout(loadQuestion,1800)}
+}
 function showCloze(word,left){let el=document.getElementById('cloze');if(!word||!currentQ)return;let blank=currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');el.style.display='block';el.innerHTML='<h3>🧩 קלוז קטן</h3><p>אמור את כל המשפט עם המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none'}
 function showMastery(consecutive,target,broken){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';el.innerHTML='<h3>'+(broken?'⭐ הרצף נשבר — מתחילים מחדש':'⭐ מצב שליטה — Benjamin Bloom')+'</h3><p>צריך '+target+' חזרות נכונות ברצף. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'}
