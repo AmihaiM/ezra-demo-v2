@@ -6,9 +6,9 @@
 </style></head><body>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>בן</h2><p>קול גברי</p></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2><p>קול נשי</p></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד"><input id="pass" placeholder="סיסמת כיתה" type="password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
-<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div><div id="result" class="result"></div></div></div></section>
+<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div><div id="result" class="result"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
 <script>
-var teacherData={},currentTeacher=null,studentId='',studentName='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female';
+var teacherData={},currentTeacher=null,studentId='',studentName='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null;
 var emojis={ben:'👨‍🏫',sara:'👩‍🏫'};
 var MSG_PASS=['מצוין! 🎉','כל הכבוד! ⭐','יפה מאוד! 💫','נהדר! 🎯'];
 var MSG_FAIL=['כמעט! נסה שוב 💪','אתה יכול! 🌟','עוד קצת! 😊','נסה שוב — אתה קרוב'];
@@ -114,18 +114,27 @@ function showResult(spoken,res){
     ? '<div class="small">ניסיון '+res.attempts_used+' מתוך '+res.max_attempts+'</div>' : '';
   box.innerHTML='<h3>'+(passed?'✅ ':'💪 ')+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>'+attempts+'<div class="words">'+words+'</div>';
   document.getElementById('hint').textContent=passed?'יפה!':'נסה שוב';
-  if(res.cloze_mode||res.cloze_active){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||3)}else hideCloze();
+  let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
+  if(enteringCloze){
+    hideMastery();
+    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||3)});
+  } else if(res.cloze_mode||res.cloze_active){
+    setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||3);
+  } else hideCloze();
   if(res.mastery_mode||res.mastery_target>0){setStation('practice', currentQ||{threshold:res.threshold});showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken)}else if(!res.cloze_mode)hideMastery();
   if(res.mastery_mode&&res.passed){box.innerHTML+='<p>'+pick(MSG_STREAK)+'</p>'}
   if(res.cap_reached && res.passed){box.innerHTML+='<p>הגענו למספר הניסיונות המקסימלי — המשפט עבר, ממשיכים הלאה.</p>'}
   if(res.skipped){box.innerHTML+='<p>עברנו הלאה אחרי מספר הניסיונות שהוגדר למורה.</p>'}
-  if(res.advance){document.getElementById('en').style.opacity='1';setTimeout(loadQuestion,1800)}
+  if(res.advance){document.getElementById('en').style.opacity='1';showNextButton(loadQuestion)}
 }
+function showNextButton(action){nextAction=action;document.getElementById('mic').classList.add('hidden-final');document.getElementById('nextBtn').style.display='block'}
+function hideNextButton(){document.getElementById('nextBtn').style.display='none';nextAction=null;document.getElementById('mic').classList.remove('hidden-final')}
+function goNext(){let action=nextAction;hideNextButton();if(action)action()}
 function showCloze(word,left){let el=document.getElementById('cloze');if(!word||!currentQ)return;let blank=currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 תחנה 3 — בדיקת שליטה בקלוז</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';el.innerHTML='<h3>'+(broken?'⭐ הרצף נשבר — מתחילים מחדש':'⭐ מצב שליטה — Benjamin Bloom')+'</h3><p>צריך '+target+' חזרות נכונות ברצף. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
-function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';hideCloze();hideMastery()}
+function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';hideCloze();hideMastery();hideNextButton()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
 function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>r.sentence).filter(Boolean);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 function showExamQuestion(){let s=examSentences[examIndex];currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';document.getElementById('en').textContent=s;document.getElementById('en').style.opacity='1';document.getElementById('prog').textContent='מבחן: משפט '+(examIndex+1)+' מתוך '+examSentences.length;document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)}
