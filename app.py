@@ -1,4 +1,5 @@
 import os, json, time, re, csv, io
+from urllib.parse import urlparse, parse_qs, quote
 from difflib import SequenceMatcher
 from flask import Flask, request, jsonify, Response
 import requests
@@ -26,6 +27,7 @@ TEACHERS = {
 }
 CATALOG_SHEET_ID = os.getenv("CATALOG_SHEET_ID", "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk")
 RESULTS_SHEET_ID = os.getenv("RESULTS_SHEET_ID", "17a-y_-nL9L85Kl7zL1F1ovTGbQy7q5NlBX24C-a_6JU")
+EZRA_APP_BASE_URL = os.getenv("EZRA_APP_BASE_URL", "https://app.ezra.clap.co.il")
 
 _cache = {}
 _sessions = {}
@@ -51,6 +53,7 @@ def _default_teacher_state():
             "max_attempts": t["default_max_attempts"],
             "exercise_name": "תרגול דמו",
             "csv_url": "",
+            "custom_exercises": [],
         } for tid, t in TEACHERS.items()
     }
 
@@ -135,10 +138,9 @@ def load_catalog(lang_filter="en"):
         app_url = fix_mojibake((row[2] or "").strip().strip('"'))
         if "link=" not in app_url:
             continue
-        from urllib.parse import urlparse, parse_qs
         params = parse_qs(urlparse(app_url).query)
         lang = params.get("lang", [""])[0]
-        csv_url = params.get("link", [""])[0]
+        csv_url = extract_csv_url(app_url)
         if lang_filter and lang != lang_filter:
             continue
         if name and csv_url:
@@ -146,9 +148,89 @@ def load_catalog(lang_filter="en"):
     _cache[key] = (time.time(), out)
     return out
 
+
+def clean_cell(value):
+    return fix_mojibake(value).replace("\ufeff", "").strip().strip('"').strip()
+
+def looks_hebrew(text):
+    return bool(re.search(r"[א-ת]", text or ""))
+
+def looks_english(text):
+    """True for English sentence/definition text, including an en dash and punctuation."""
+    s = text or ""
+    letters = re.findall(r"[A-Za-z]", s)
+    if len(letters) < 2:
+        return False
+    # Avoid treating mojibake or Hebrew explanation as English just because it has one Latin label.
+    heb = len(re.findall(r"[א-ת]", s))
+    return len(letters) >= heb
+
+def english_score(text):
+    s = text or ""
+    words = re.findall(r"[A-Za-z]+", s)
+    heb = re.findall(r"[א-ת]", s)
+    return len(words) * 3 + len(re.findall(r"[A-Za-z]", s)) - len(heb) * 4
+
+def choose_en_he(row):
+    """Return a safe {en, he} for any CSV row.
+    Supports:
+    - no header: EN, HE
+    - no header reversed: HE, EN
+    - rows with a word + Hebrew explanation + English definition
+    - header columns named en/english/he/hebrew
+    """
+    cells = [clean_cell(c) for c in row]
+    cells = [c for c in cells if c]
+    if len(cells) < 2:
+        return None
+
+    lowered = [c.lower().strip() for c in cells]
+    header_words = {"english", "en", "sentence", "hebrew", "he", "עברית", "תרגום", "url", "link", "csv"}
+    if any(x in header_words for x in lowered[:3]):
+        return None
+
+    # If one cell includes both English and Hebrew via parentheses, keep the whole text as Hebrew prompt
+    # and choose the best English-only definition/sentence from another cell.
+    english_candidates = [(i, c, english_score(c)) for i, c in enumerate(cells) if looks_english(c)]
+    hebrew_candidates = [(i, c, len(re.findall(r"[א-ת]", c))) for i, c in enumerate(cells) if looks_hebrew(c)]
+
+    if english_candidates:
+        en_i, en, _ = max(english_candidates, key=lambda x: x[2])
+    else:
+        return None
+
+    # Prefer a Hebrew cell different from English. If none, use another descriptive cell as prompt.
+    he = ""
+    other_he = [x for x in hebrew_candidates if x[0] != en_i]
+    if other_he:
+        _, he, _ = max(other_he, key=lambda x: x[2])
+    else:
+        others = [c for i, c in enumerate(cells) if i != en_i]
+        he = others[0] if others else en
+
+    # Guard: never let Hebrew prompt become the answer to score against.
+    if not looks_english(en) or len(normalize(en).split()) < 1:
+        return None
+    return {"en": en, "he": he}
+
+def extract_csv_url(value):
+    """Accept either a raw published CSV URL or an EZRA app link with ?link=<csv>."""
+    raw = clean_cell(value)
+    if not raw:
+        return ""
+    try:
+        parsed = urlparse(raw)
+        params = parse_qs(parsed.query)
+        if params.get("link"):
+            return params["link"][0].strip()
+    except Exception:
+        pass
+    return raw
+
 def load_sentences_from_csv(csv_url):
     if not csv_url:
         return FALLBACK_SENTENCES[:]
+    csv_url = extract_csv_url(csv_url)
     key = "sentences:" + csv_url
     if key in _cache and time.time() - _cache[key][0] < CACHE_TTL:
         return [dict(x) for x in _cache[key][1]]
@@ -156,18 +238,16 @@ def load_sentences_from_csv(csv_url):
     if not text:
         return FALLBACK_SENTENCES[:]
     sentences = []
+    seen = set()
     for row in csv.reader(io.StringIO(text)):
-        if len(row) < 2:
+        item = choose_en_he(row)
+        if not item:
             continue
-        a, b = fix_mojibake(row[0].strip()), fix_mojibake(row[1].strip())
-        if not a or not b or a.lower() in ("english", "en", "sentence"):
+        en_norm = normalize(item["en"])
+        if not en_norm or en_norm in seen:
             continue
-        if re.search(r"[א-ת]", a) and re.search(r"[A-Za-z]", b):
-            he, en = a, b
-        else:
-            en, he = a, b
-        if len(en.split()) >= 2:
-            sentences.append({"en": en, "he": he})
+        seen.add(en_norm)
+        sentences.append(item)
     if not sentences:
         sentences = FALLBACK_SENTENCES[:]
     _cache[key] = (time.time(), sentences)
@@ -180,7 +260,29 @@ def similarity(spoken, correct):
     a, b = normalize(spoken), normalize(correct)
     if not a or not b:
         return 0
+    if a == b:
+        return 100
     return int(SequenceMatcher(None, a, b).ratio() * 100)
+
+def has_latin(text):
+    return bool(re.search(r"[A-Za-z]", text or ""))
+
+def best_score_for_spoken(spoken, sentence_obj):
+    """Score against the English field, but protect against swapped/corrupt CSV rows.
+    If the CSV mapping is wrong, choose the candidate that best matches the spoken English.
+    """
+    candidates = []
+    for key in ("en", "he"):
+        val = (sentence_obj.get(key) or "").strip()
+        if val:
+            candidates.append((key, val, similarity(spoken, val)))
+    if not candidates:
+        return "en", "", 0
+    # Prefer candidates that actually contain Latin letters, because speech recognition is English.
+    latin = [c for c in candidates if has_latin(c[1])]
+    pool = latin or candidates
+    key, correct, score = max(pool, key=lambda x: x[2])
+    return key, correct, score
 
 def word_level(spoken, correct):
     """Word-level feedback from the expected sentence perspective.
@@ -270,19 +372,59 @@ def new_session(student_id, teacher_id, student_name):
         "created_at": int(time.time()),
     }
 
+
+def get_gspread_client():
+    """Return an authorized gspread client using GOOGLE_CREDENTIALS_JSON.
+    The same service account must have Editor permission on the catalog/results sheets.
+    """
+    svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if not svc_json:
+        raise RuntimeError("GOOGLE_CREDENTIALS_JSON is missing")
+    import gspread
+    from google.oauth2.service_account import Credentials
+    creds_info = json.loads(svc_json)
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+    return gspread.authorize(creds)
+
+def build_exercise_app_url(csv_url):
+    base = (EZRA_APP_BASE_URL or "https://app.ezra.clap.co.il").rstrip("/")
+    return f"{base}/?lang=en&link={quote(csv_url, safe=':/?&=%') }"
+
+def append_exercise_to_catalog_sheet(name, csv_url):
+    """Option G: Teacher UI writes the new exercise into the master Google Sheet.
+    Google Sheet remains the single source of truth. Expected catalog layout:
+    col A = exercise name, col B = optional notes/lang, col C = EZRA app URL with ?link=<csv>.
+    """
+    gc = get_gspread_client()
+    sh = gc.open_by_key(CATALOG_SHEET_ID)
+    try:
+        ws = sh.worksheet("Sheet1")
+    except Exception:
+        ws = sh.sheet1
+
+    app_url = build_exercise_app_url(csv_url)
+    existing = load_catalog("en")
+    for item in existing:
+        if item.get("csv_url") == csv_url:
+            return {**item, "already_exists": True}
+
+    ws.append_row([name, "", app_url], value_input_option="USER_ENTERED")
+    # Invalidate the in-memory catalog cache so the new row appears immediately.
+    for key in list(_cache.keys()):
+        if key.startswith("catalog:"):
+            _cache.pop(key, None)
+    return {"name": name, "url": app_url, "csv_url": csv_url, "lang": "en", "source": "google_sheet", "already_exists": False}
+
 def write_result(row):
     _pending_results.append(row)
-    svc_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not svc_json:
         print("RESULT STORED IN MEMORY ONLY", row)
         return False
     try:
         import gspread
-        from google.oauth2.service_account import Credentials
-        creds_info = json.loads(svc_json)
-        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-        creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
-        sh = gspread.authorize(creds).open_by_key(RESULTS_SHEET_ID)
+        sh = get_gspread_client().open_by_key(RESULTS_SHEET_ID)
         tab = TEACHERS[row["teacher_id"]]["results_tab"]
         try:
             ws = sh.worksheet(tab)
@@ -385,14 +527,18 @@ def answer():
     if s["current"] >= len(s["sentences"]):
         return jsonify(done=True, results=s["results"], score=0, passed=False, words=[])
 
-    correct = s["sentences"][s["current"]]["en"]
+    sentence_obj = s["sentences"][s["current"]]
+    correct_key, correct, score = best_score_for_spoken(spoken, sentence_obj)
+    # If the CSV row was reversed, fix the session sentence from this point onward.
+    if correct_key != "en":
+        sentence_obj["en"], sentence_obj["he"] = sentence_obj.get(correct_key, correct), sentence_obj.get("en", "")
     s["sentence_attempts"] = int(s.get("sentence_attempts", 0)) + 1
 
-    score = similarity(spoken, correct)
     passed = score >= s["threshold"]
     words = word_level(spoken, correct)
     base = {
         "correct": correct, "spoken": spoken, "score": score, "passed": passed,
+        "debug_expected": correct,
         "words": words, "threshold": s["threshold"], "advance": False,
         "max_attempts": s["max_attempts"],
     }
@@ -486,8 +632,10 @@ def score_only():
     data = request.get_json(force=True)
     tid = data.get("teacher_id", "ben")
     threshold = _teacher_state.get(tid, {}).get("threshold", 85)
-    score = similarity(data.get("spoken", ""), data.get("correct", ""))
-    return jsonify(score=score, passed=score >= threshold, words=word_level(data.get("spoken", ""), data.get("correct", "")))
+    spoken = data.get("spoken", "")
+    correct = data.get("correct", "")
+    score = similarity(spoken, correct)
+    return jsonify(score=score, passed=score >= threshold, words=word_level(spoken, correct), debug_expected=correct)
 
 @app.post("/api/exam-result")
 def exam_result():
@@ -530,7 +678,48 @@ def api_catalog():
     tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
         return jsonify(ok=False), 401
-    return jsonify(ok=True, exercises=load_catalog("en"))
+    # Option G: the Google Sheet is the single source of truth for the exercise catalog.
+    # Legacy locally-saved exercises are intentionally not mixed into the main list,
+    # so teachers do not see a different catalog per server/computer.
+    sheet_items = load_catalog("en")
+    return jsonify(ok=True, exercises=sheet_items, source="google_sheet")
+
+@app.post("/api/add-exercise")
+def add_exercise():
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+        return jsonify(ok=False), 401
+
+    name = clean_cell(data.get("name", ""))
+    csv_url = extract_csv_url(data.get("csv_url", ""))
+    if not name:
+        return jsonify(ok=False, error="חסר שם תרגיל"), 400
+    if not csv_url or not csv_url.startswith(("http://", "https://")):
+        return jsonify(ok=False, error="CSV URL לא תקין"), 400
+
+    sentences = load_sentences_from_csv(csv_url)
+    if not sentences or sentences == FALLBACK_SENTENCES:
+        return jsonify(ok=False, error="לא נמצאו משפטים תקינים ב-CSV"), 400
+
+    try:
+        item = append_exercise_to_catalog_sheet(name, csv_url)
+    except Exception as e:
+        print("CATALOG APPEND FAILED", e)
+        return jsonify(
+            ok=False,
+            error=(
+                "לא הצלחתי לכתוב לגוגל שיט הראשי. ודא ש-GOOGLE_CREDENTIALS_JSON מוגדר "
+                "ושה-Service Account קיבל הרשאת Editor לגיליון התרגילים."
+            ),
+            details=str(e),
+        ), 500
+
+    # Select the newly-added/existing sheet exercise for this teacher immediately.
+    _teacher_state[tid]["exercise_name"] = item["name"]
+    _teacher_state[tid]["csv_url"] = item["csv_url"]
+    save_state()
+    return jsonify(ok=True, exercise=item, sentence_count=len(sentences), teacher=teacher_public(tid))
 
 @app.post("/api/set-exercise")
 def set_exercise():
@@ -538,10 +727,11 @@ def set_exercise():
     tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
         return jsonify(ok=False), 401
-    _teacher_state[tid]["exercise_name"] = data.get("name", "תרגול דמו")
-    _teacher_state[tid]["csv_url"] = data.get("csv_url", "")
+    csv_url = extract_csv_url(data.get("csv_url", ""))
+    _teacher_state[tid]["exercise_name"] = clean_cell(data.get("name", "תרגול דמו")) or "תרגול דמו"
+    _teacher_state[tid]["csv_url"] = csv_url
     save_state()
-    return jsonify(ok=True, teacher=teacher_public(tid), sentence_count=len(load_sentences_from_csv(data.get("csv_url", ""))))
+    return jsonify(ok=True, teacher=teacher_public(tid), sentence_count=len(load_sentences_from_csv(csv_url)))
 
 @app.post("/api/teacher-results")
 def teacher_results():
