@@ -1,6 +1,8 @@
 <!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EZRA — תרגול דיבור</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}button,input{font:inherit}button{border:0;border-radius:12px;padding:11px 16px;font-weight:700;cursor:pointer}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:24px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:22px;padding:24px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:14px 20px;display:flex;gap:12px;align-items:center}.student{margin-right:auto;background:#fff2;border-radius:20px;padding:6px 12px}.wrap{max-width:850px;margin:0 auto;padding:18px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:28px;font-weight:800;margin:16px 0}.en{direction:ltr;text-align:left;font-size:22px;color:#4318D1;opacity:0;transition:.25s}.row{display:flex;gap:10px;flex-wrap:wrap}.mic{width:78px;height:78px;border-radius:50%;font-size:30px;display:block;margin:22px auto}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:14px;padding:14px;margin:12px 0}.result{background:#f8fafc;border:2px solid #e0d9ff}.pass{background:#e8f5e9;border-color:#4CAF50}.fail{background:#ffebee;border-color:#ef5350}.cloze{background:#e0f2fe;border:2px solid #0284c7}.mastery{background:#fff3e0;border:2px solid #FF9800}.exam{background:#fff7ed;border:2px solid #fed7aa}.words{direction:ltr;text-align:left;line-height:2}.w{display:inline-block;padding:2px 7px;margin:2px;border-radius:7px}.w.correct{background:#e8f5e9;color:#2e7d32}.w.wrong,.w.missing{background:#ffebee;color:#c62828;text-decoration:line-through}.w.extra{background:#fff3e0;color:#e65100}.ok{color:#16a34a}.bad{color:#dc2626}.dots{display:flex;gap:7px}.dot{width:20px;height:20px;border-radius:50%;border:2px solid #FF9800;background:#ffe0b2}.dot.done{background:#FF9800}.small{font-size:13px;color:#666}
+
+.summary-hero{background:linear-gradient(135deg,#4318D1,#be185d);color:#fff;border-radius:24px;padding:26px;margin-bottom:20px;text-align:center;box-shadow:0 18px 44px #4318d133}.summary-hero h2{font-size:34px;margin:0 0 8px}.score-circle{width:140px;height:140px;border-radius:50%;background:conic-gradient(#22c55e var(--score-deg),rgba(255,255,255,.25) 0);display:grid;place-items:center;margin:18px auto;border:8px solid rgba(255,255,255,.25)}.score-circle b{font-size:34px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}.summary-card{background:#fff;border:1px solid #ede7ff;border-radius:18px;padding:16px;box-shadow:0 8px 24px #4318d112;text-align:center}.summary-card .num{font-size:28px;font-weight:900;color:var(--tc,#4318D1)}.summary-list{display:grid;gap:12px;margin-top:16px}.summary-row{background:#fff;border:1px solid #ede7ff;border-radius:16px;padding:14px;box-shadow:0 6px 18px #4318d10d;direction:ltr;text-align:left}.summary-row.pass{border-inline-start:7px solid #22c55e}.summary-row.fail{border-inline-start:7px solid #ef4444}.summary-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}.hidden-final{display:none!important}
 </style></head><body>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>בן</h2><p>קול גברי</p></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2><p>קול נשי</p></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד"><input id="pass" placeholder="סיסמת כיתה" type="password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
@@ -19,7 +21,7 @@ function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGend
 function closeLogin(){document.getElementById('login').classList.remove('show')}
 function submitLogin(){let name=document.getElementById('name').value.trim(),pass=document.getElementById('pass').value;if(!name)return;fetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,password:pass})}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(d=>{studentId=d.student_id;studentName=name;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;startApp()}).catch(()=>document.getElementById('loginErr').style.display='block')}
 function startApp(){let t=teacherData[currentTeacher]||{};document.getElementById('teacherName').textContent=emojis[currentTeacher]+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';loadQuestion()}
-function loadQuestion(){busy=false;hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];startExam();return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
+function loadQuestion(){busy=false;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];startExam();return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
   if(q.cloze_active){
     setStation('cloze', q);
     showCloze(q.cloze_word,q.cloze_attempts_left);
@@ -53,8 +55,48 @@ function setStation(st,q){
 function pickVoice(){let voices=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().startsWith('en'));if(!voices.length)return null;let kw=voiceGender==='male'?['david','mark','daniel','alex','fred','male']:['samantha','zira','victoria','karen','female','woman'];return voices.find(v=>kw.some(k=>v.name.toLowerCase().includes(k)))||voices[0]}
 function playSentence(){if(!currentQ)return;speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(currentQ.en);u.lang='en-US';u.rate=.88;let v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}
 function toggleEnglish(){let e=document.getElementById('en');e.style.opacity=e.style.opacity==='1'?'0':'1'}
-function startRecognition(){if(busy||(!currentQ&&!examMode))return;let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert('זיהוי קול נתמך בעיקר ב-Chrome/Edge');return}busy=true;let rec=new SR();recognition=rec;rec.lang='en-US';rec.continuous=true;rec.interimResults=false;rec.maxAlternatives=1;let finalText='',submitted=false,timer=null;document.getElementById('mic').classList.add('on');document.getElementById('hint').textContent='מקשיב...';rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)finalText+=(e.results[i][0].transcript+' ')}if(timer)clearTimeout(timer);timer=setTimeout(()=>{if(!submitted)rec.stop()},1200)};rec.onend=()=>{document.getElementById('mic').classList.remove('on');if(submitted)return;submitted=true;if(timer)clearTimeout(timer);let spoken=finalText.trim();if(!spoken){busy=false;document.getElementById('hint').textContent='לא נקלט דיבור — נסה שוב';return}document.getElementById('hint').textContent='מעבד...';if(examMode)submitExamAnswer(spoken);else submitAnswer(spoken)};rec.onerror=()=>{busy=false;submitted=true;document.getElementById('mic').classList.remove('on');document.getElementById('hint').textContent='שגיאה — נסה שוב'};rec.start()}
-function submitAnswer(spoken){fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,answer:spoken})}).then(r=>r.json()).then(res=>{busy=false;showResult(spoken,res)}).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה בשליחת תשובה'})}
+function buildSpeechMetrics(startMs,lastSpeechMs,endMs,spoken){
+  let duration=Math.max(0,Math.round(endMs-startMs));
+  let silence=Math.max(0,Math.round(endMs-(lastSpeechMs||startMs)));
+  let words=(spoken.trim().match(/\S+/g)||[]).length;
+  let wpm=duration>0?Math.round(words*60000/duration):0;
+  return {recording_duration_ms:duration,silence_ms:silence,words_per_minute:wpm};
+}
+function startRecognition(){
+  if(busy||(!currentQ&&!examMode))return;
+  let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){alert('זיהוי קול נתמך בעיקר ב-Chrome/Edge');return}
+  busy=true;
+  let rec=new SR(); recognition=rec;
+  rec.lang='en-US'; rec.continuous=true; rec.interimResults=false; rec.maxAlternatives=1;
+  let finalText='',submitted=false,timer=null;
+  let startedAt=performance.now(), lastSpeechAt=startedAt;
+  document.getElementById('mic').classList.add('on');
+  document.getElementById('hint').textContent='מקשיב...';
+  rec.onresult=e=>{
+    lastSpeechAt=performance.now();
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) finalText+=(e.results[i][0].transcript+' ');
+    }
+    if(timer)clearTimeout(timer);
+    timer=setTimeout(()=>{if(!submitted)rec.stop()},1200);
+  };
+  rec.onend=()=>{
+    let endedAt=performance.now();
+    document.getElementById('mic').classList.remove('on');
+    if(submitted)return;
+    submitted=true;
+    if(timer)clearTimeout(timer);
+    let spoken=finalText.trim();
+    let metrics=buildSpeechMetrics(startedAt,lastSpeechAt,endedAt,spoken);
+    if(!spoken){busy=false;document.getElementById('hint').textContent='לא נקלט דיבור — נסה שוב';return}
+    document.getElementById('hint').textContent='מעבד...';
+    if(examMode)submitExamAnswer(spoken,metrics);else submitAnswer(spoken,metrics);
+  };
+  rec.onerror=()=>{busy=false;submitted=true;document.getElementById('mic').classList.remove('on');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
+  rec.start();
+}
+function submitAnswer(spoken,metrics){fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,answer:spoken,metrics:metrics||{}})}).then(r=>r.json()).then(res=>{busy=false;showResult(spoken,res)}).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה בשליחת תשובה'})}
 function showResult(spoken,res){
   let box=document.getElementById('result');
   if(!res || typeof res.score!=='number'){
@@ -87,7 +129,25 @@ function hideAll(){document.getElementById('result').style.display='none';docume
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
 function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>r.sentence).filter(Boolean);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 function showExamQuestion(){let s=examSentences[examIndex];currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';document.getElementById('en').textContent=s;document.getElementById('en').style.opacity='1';document.getElementById('prog').textContent='מבחן: משפט '+(examIndex+1)+' מתוך '+examSentences.length;document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)}
-function submitExamAnswer(spoken){let correct=examSentences[examIndex];fetch('/api/score-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,spoken:spoken,correct:correct})}).then(r=>r.json()).then(res=>{examResults.push({sentence:correct,spoken:spoken,score:res.score,passed:res.passed});fetch('/api/exam-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,sentence:correct,spoken:spoken,score:res.score,passed:res.passed})});examIndex++;busy=false;if(examIndex>=examSentences.length)showExamSummary();else showExamQuestion()})}
-function showExamSummary(){examMode=false;currentQ=null;let avg=examResults.length?Math.round(examResults.reduce((a,b)=>a+b.score,0)/examResults.length):0;document.getElementById('bar').style.width='100%';document.getElementById('he').textContent='ציון סופי: '+avg+'%';document.getElementById('en').style.opacity='1';document.getElementById('en').innerHTML=examResults.map((r,i)=>'<div style="margin:8px 0"><b>'+(i+1)+'. '+r.score+'%</b> — '+esc(r.sentence)+'<br><small>אמרת: '+esc(r.spoken)+'</small></div>').join('')||'אין משפטים למבחן';document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">✅ הסתיים</div>';document.getElementById('hint').textContent='כל הכבוד — סיימת את התרגול'}
+function submitExamAnswer(spoken,metrics){let correct=examSentences[examIndex];fetch('/api/score-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,spoken:spoken,correct:correct})}).then(r=>r.json()).then(res=>{examResults.push({sentence:correct,spoken:spoken,score:res.score,passed:res.passed});fetch('/api/exam-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,sentence:correct,spoken:spoken,score:res.score,passed:res.passed,metrics:metrics||{}})});examIndex++;busy=false;if(examIndex>=examSentences.length)showExamSummary();else showExamQuestion()})}
+function showExamSummary(){
+  examMode=false; currentQ=null; busy=true;
+  let total=examResults.length;
+  let avg=total?Math.round(examResults.reduce((a,b)=>a+(Number(b.score)||0),0)/total):0;
+  let passed=examResults.filter(r=>r.passed).length;
+  let deg=Math.max(0,Math.min(100,avg))*3.6+'deg';
+  document.getElementById('bar').style.width='100%';
+  document.getElementById('phase').innerHTML='';
+  document.getElementById('he').innerHTML='';
+  document.getElementById('en').style.opacity='1';
+  document.getElementById('play').classList.add('hidden-final');
+  document.getElementById('show').classList.add('hidden-final');
+  document.getElementById('skip').classList.add('hidden-final');
+  document.getElementById('mic').classList.add('hidden-final');
+  document.getElementById('hint').textContent='כל הכבוד — סיימת את התרגול';
+  document.getElementById('prog').textContent='תחנה 4 הושלמה — סיכום אישי';
+  let rows=examResults.map((r,i)=>'<div class="summary-row '+(r.passed?'pass':'fail')+'"><b>'+(i+1)+'. '+(Number(r.score)||0)+'%</b> — '+esc(r.sentence)+'<br><small>אמרת: '+esc(r.spoken||'')+'</small></div>').join('') || '<div class="summary-row">אין משפטים למבחן</div>';
+  document.getElementById('en').innerHTML='<section class="summary-hero"><h2>🎉 סיימת!</h2><div class="score-circle" style="--score-deg:'+deg+'"><b>'+avg+'%</b></div><p>ציון סופי במבחן הרציף</p></section><div class="summary-grid"><div class="summary-card"><div class="num">'+passed+'/'+total+'</div><div>משפטים שעברו</div></div><div class="summary-card"><div class="num">'+avg+'%</div><div>ממוצע</div></div><div class="summary-card"><div class="num">⭐</div><div>Mastery נרשם בלוח המורה</div></div></div><div class="summary-actions"><button class="ghost" onclick="location.reload()">🔄 תרגול חדש</button><button class="primary" onclick="window.print()">🖨️ הדפס סיכום</button></div><div class="summary-list">'+rows+'</div>';
+}
 function esc(s){return String(s==null?'':s).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 </script></body></html>

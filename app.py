@@ -366,10 +366,13 @@ def new_session(student_id, teacher_id, student_name):
         "cloze_active": False,
         "cloze_word": None,
         "cloze_attempts": 0,
+        "cloze_passed": False,
+        "last_mastery_target": 0,
         "results": [],
         "exam_results": [],
         "completed": False,
         "created_at": int(time.time()),
+        "updated_at": int(time.time()),
     }
 
 
@@ -416,6 +419,45 @@ def append_exercise_to_catalog_sheet(name, csv_url):
             _cache.pop(key, None)
     return {"name": name, "url": app_url, "csv_url": csv_url, "lang": "en", "source": "google_sheet", "already_exists": False}
 
+RESULT_HEADERS = [
+    "Time", "Teacher", "Student", "Exercise", "Phase", "Sentence", "Spoken",
+    "Score", "Passed", "Skipped", "Attempts", "Max Attempts",
+    "Mastery Repetitions", "Mastery Status", "Mastery Score", "Cloze Passed",
+    "Recording Duration MS", "Silence MS", "Words Per Minute", "Fluency Status"
+]
+
+RESULT_KEY_ALIASES = {
+    "Time": "timestamp", "Teacher": "teacher_id", "Student": "student_name",
+    "Exercise": "exercise", "Phase": "phase", "Sentence": "sentence", "Spoken": "spoken",
+    "Score": "score", "Passed": "passed", "Skipped": "skipped", "Attempts": "attempts",
+    "Max Attempts": "max_attempts", "Mastery Repetitions": "mastery_reps",
+    "Mastery Status": "mastery_status", "Mastery Score": "mastery_score",
+    "Cloze Passed": "cloze_passed",
+    "Recording Duration MS": "recording_duration_ms",
+    "Silence MS": "silence_ms",
+    "Words Per Minute": "words_per_minute",
+    "Fluency Status": "fluency_status",
+}
+
+def ensure_results_header(ws):
+    """Keep old sheets compatible while adding the new mastery columns."""
+    try:
+        values = ws.get_all_values()
+        if not values:
+            ws.append_row(RESULT_HEADERS, value_input_option="USER_ENTERED")
+            return RESULT_HEADERS
+        header = values[0]
+        changed = False
+        for h in RESULT_HEADERS:
+            if h not in header:
+                header.append(h)
+                changed = True
+        if changed:
+            ws.update("1:1", [header])
+        return header
+    except Exception:
+        return RESULT_HEADERS
+
 def write_result(row):
     _pending_results.append(row)
     svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
@@ -429,35 +471,76 @@ def write_result(row):
         try:
             ws = sh.worksheet(tab)
         except gspread.WorksheetNotFound:
-            ws = sh.add_worksheet(title=tab, rows=1000, cols=20)
-            ws.append_row(["timestamp", "teacher", "student", "exercise", "phase", "sentence", "spoken", "score", "passed", "attempts", "mastery_reps", "mastery_status"])
-        ws.append_row([row.get(k, "") for k in ["timestamp", "teacher_id", "student_name", "exercise", "phase", "sentence", "spoken", "score", "passed", "attempts", "mastery_reps", "mastery_status"]])
+            ws = sh.add_worksheet(title=tab, rows=1000, cols=24)
+            ws.append_row(RESULT_HEADERS, value_input_option="USER_ENTERED")
+        header = ensure_results_header(ws)
+        out = []
+        for h in header:
+            key = RESULT_KEY_ALIASES.get(h, h)
+            out.append(row.get(key, ""))
+        ws.append_row(out, value_input_option="USER_ENTERED")
         return True
     except Exception as e:
         print("WRITE RESULT FAILED", e)
         return False
 
-def record_and_advance(s, correct, spoken, score, passed=True, skipped=False):
+def fluency_from_metrics(spoken, score, metrics=None):
+    """Lightweight fluency estimate from browser timing, not acoustic analysis.
+    The browser sends recording duration and trailing silence; we combine that
+    with score to label mastery/fluency consistently.
+    """
+    metrics = metrics or {}
+    try:
+        duration_ms = int(metrics.get("recording_duration_ms") or 0)
+    except Exception:
+        duration_ms = 0
+    try:
+        silence_ms = int(metrics.get("silence_ms") or 0)
+    except Exception:
+        silence_ms = 0
+    words = len(normalize(spoken).split())
+    wpm = int(round(words * 60000 / duration_ms)) if duration_ms > 0 and words else 0
+    if score >= 90 and words and duration_ms and silence_ms <= 1800 and wpm >= 65:
+        status = "fluent_mastery"
+    elif score >= 85:
+        status = "accurate_needs_fluency"
+    else:
+        status = "not_mastered"
+    return {
+        "recording_duration_ms": duration_ms,
+        "silence_ms": silence_ms,
+        "words_per_minute": wpm,
+        "fluency_status": status,
+    }
+
+def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, metrics=None):
+    fluency = fluency_from_metrics(spoken, score, metrics)
     row = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "teacher_id": s["teacher_id"], "student_name": s["student_name"], "exercise": s["exercise_name"],
         "phase": "practice", "sentence": correct, "spoken": spoken, "score": score,
         "passed": bool(passed), "skipped": bool(skipped),
         "attempts": max(1, s.get("sentence_attempts", 0)),
-        "mastery_reps": s["mastery_target"],
+        "max_attempts": s.get("max_attempts", ""),
+        "mastery_reps": s.get("mastery_target", 0),
         "mastery_status": "mastered" if passed and not skipped else "not_mastered",
+        "mastery_score": s.get("mastery_score", score),
+        "cloze_passed": bool(s.get("cloze_passed", False)),
+        **fluency,
     }
     s["results"].append(row)
     write_result(row)
     s["current"] += 1
     s["failed_attempts"] = 0
     s["sentence_attempts"] = 0
+    s["last_mastery_target"] = s.get("mastery_target", 0)
     s["mastery_target"] = 0
     s["mastery_consecutive"] = 0
     s["mastery_score"] = 0
     s["cloze_active"] = False
     s["cloze_word"] = None
     s["cloze_attempts"] = 0
+    s["cloze_passed"] = False
 
 @app.route("/")
 def home():
@@ -502,12 +585,12 @@ def question():
         "exercise": s["exercise_name"], **session_payload(s)
     })
 
-def cap_and_advance(s, correct, spoken, score, base, passed=False):
+def cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=None):
     """Hard safety valve: no sentence can consume more than max_attempts submissions.
     If the student got a passing score on the last allowed try, move on as passed;
     otherwise skip/move on so the exercise never loops forever.
     """
-    record_and_advance(s, correct, spoken, score, bool(passed), skipped=not bool(passed))
+    record_and_advance(s, correct, spoken, score, bool(passed), skipped=not bool(passed), metrics=metrics)
     return jsonify({
         **base,
         "passed": bool(passed),
@@ -522,11 +605,13 @@ def cap_and_advance(s, correct, spoken, score, base, passed=False):
 def answer():
     data = request.get_json(force=True)
     sid, spoken = data.get("student", ""), data.get("answer", "")
+    metrics = data.get("metrics") or {}
     s = _sessions.get(sid)
     if not s:
         return jsonify(error="session not found", score=0, passed=False, words=[], advance=False), 404
     if s["current"] >= len(s["sentences"]):
         return jsonify(done=True, results=s["results"], score=0, passed=False, words=[])
+    s["updated_at"] = int(time.time())
 
     sentence_obj = s["sentences"][s["current"]]
     correct_key, correct, score = best_score_for_spoken(spoken, sentence_obj)
@@ -550,7 +635,7 @@ def answer():
     # Passing on the last try advances as passed; failing on the last try advances as skipped.
     if cap_reached and not s["cloze_active"] and s["mastery_target"] == 0:
         if passed:
-            record_and_advance(s, correct, spoken, score, True)
+            record_and_advance(s, correct, spoken, score, True, metrics=metrics)
             return jsonify({**base, "advance": True, "cap_reached": True, **session_payload(s)})
         # Let the normal failure branch below create a better failed response.
 
@@ -560,16 +645,17 @@ def answer():
         if passed:
             s["cloze_active"] = False
             s["cloze_word"] = None
+            s["cloze_passed"] = True
             s["mastery_score"] = max(s.get("mastery_score", 0), score)
-            record_and_advance(s, correct, spoken, s["mastery_score"] or score, True)
+            record_and_advance(s, correct, spoken, s["mastery_score"] or score, True, metrics=metrics)
             return jsonify({**base, "station": "cloze", "cloze_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
 
         s["cloze_attempts"] += 1
         if cap_reached:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze"}, passed=False)
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze"}, passed=False, metrics=metrics)
         # Keep cloze bounded, but do not jump back into mastery.
         if s["cloze_attempts"] >= 3:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, passed=False)
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, passed=False, metrics=metrics)
         return jsonify({**base, "station": "cloze", "cloze_mode": True, **session_payload(s)})
 
     # Station 2: Bloom practice/mastery. The cloze station is NOT shown yet.
@@ -583,7 +669,7 @@ def answer():
                 s["mastery_target"] = 0
                 s["mastery_consecutive"] = 0
                 if cap_reached or not cw:
-                    record_and_advance(s, correct, spoken, s["mastery_score"] or score, True)
+                    record_and_advance(s, correct, spoken, s["mastery_score"] or score, True, metrics=metrics)
                     return jsonify({**base, "station": "practice", "mastery_mode_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
                 s["cloze_active"] = True
                 s["cloze_word"] = cw
@@ -592,7 +678,7 @@ def answer():
             return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": False, **session_payload(s)})
         s["mastery_consecutive"] = 0
         if cap_reached:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "practice"}, passed=False)
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "practice"}, passed=False, metrics=metrics)
         return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": True, **session_payload(s)})
 
     # Station 2 starts here: normal practice. A passing first read enters either
@@ -601,7 +687,7 @@ def answer():
         target = mastery_target_for(s["failed_attempts"])
         s["mastery_score"] = score
         if cap_reached:
-            record_and_advance(s, correct, spoken, score, True)
+            record_and_advance(s, correct, spoken, score, True, metrics=metrics)
             return jsonify({**base, "station": "practice", "advance": True, "cap_reached": True, **session_payload(s)})
         if target > 0:
             s["mastery_target"] = target
@@ -615,12 +701,12 @@ def answer():
             s["cloze_attempts"] = 0
             return jsonify({**base, "station": "practice", "cloze_mode": True, **session_payload(s)})
 
-        record_and_advance(s, correct, spoken, score, True)
+        record_and_advance(s, correct, spoken, score, True, metrics=metrics)
         return jsonify({**base, "station": "practice", "advance": True, **session_payload(s)})
 
     s["failed_attempts"] += 1
     if cap_reached:
-        return cap_and_advance(s, correct, spoken, score, base, passed=False)
+        return cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=metrics)
     return jsonify({**base, **session_payload(s)})
 
 @app.post("/api/skip")
@@ -650,12 +736,17 @@ def exam_result():
     s = _sessions.get(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
+    metrics = data.get("metrics") or {}
+    fluency = fluency_from_metrics(data.get("spoken", ""), int(data.get("score", 0) or 0), metrics)
     row = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "teacher_id": s["teacher_id"],
         "student_name": s["student_name"], "exercise": s["exercise_name"], "phase": "final_exam",
         "sentence": data.get("sentence", ""), "spoken": data.get("spoken", ""),
-        "score": data.get("score", 0), "passed": data.get("passed", False), "attempts": 1, "mastery_reps": 0,
+        "score": data.get("score", 0), "passed": data.get("passed", False), "skipped": False,
+        "attempts": 1, "max_attempts": s.get("max_attempts", ""), "mastery_reps": 0,
         "mastery_status": "final_exam_pass" if data.get("passed", False) else "final_exam_fail",
+        "mastery_score": data.get("score", 0), "cloze_passed": "final_exam",
+        **fluency,
     }
     s["exam_results"].append(row)
     write_result(row)
@@ -759,14 +850,18 @@ def teacher_students():
     students = []
     for s in _sessions.values():
         if s["teacher_id"] == tid:
+            phase = "סיים" if s["current"] >= len(s["sentences"]) else ("קלוז" if s.get("cloze_active") else ("Mastery" if s.get("mastery_target", 0) > 0 else "אימון"))
             students.append({
                 "name": s["student_name"], "index": s["current"], "total": len(s["sentences"]),
                 "done": s["current"] >= len(s["sentences"]), "exercise": s["exercise_name"],
+                "teacher_current_exercise": _teacher_state[tid].get("exercise_name", ""),
                 "threshold": s["threshold"], "max_attempts": s["max_attempts"],
-                "failed_attempts": s["failed_attempts"], "mastery_target": s["mastery_target"],
-                "mastery_consecutive": s["mastery_consecutive"],
+                "failed_attempts": s["failed_attempts"], "sentence_attempts": s.get("sentence_attempts", 0),
+                "mastery_target": s["mastery_target"], "mastery_consecutive": s["mastery_consecutive"],
+                "phase": phase, "created_at": s.get("created_at"), "updated_at": s.get("updated_at"),
             })
-    return jsonify(ok=True, teacher=teacher_public(tid), students=students)
+    students.sort(key=lambda x: x.get("updated_at") or 0, reverse=True)
+    return jsonify(ok=True, teacher=teacher_public(tid), active_exercise=_teacher_state[tid].get("exercise_name", ""), students=students)
 
 if __name__ == "__main__":
     app.run(debug=True)
