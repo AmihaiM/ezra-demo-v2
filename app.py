@@ -430,8 +430,8 @@ def write_result(row):
             ws = sh.worksheet(tab)
         except gspread.WorksheetNotFound:
             ws = sh.add_worksheet(title=tab, rows=1000, cols=20)
-            ws.append_row(["timestamp", "teacher", "student", "exercise", "phase", "sentence", "spoken", "score", "passed", "attempts", "mastery_reps"])
-        ws.append_row([row.get(k, "") for k in ["timestamp", "teacher_id", "student_name", "exercise", "phase", "sentence", "spoken", "score", "passed", "attempts", "mastery_reps"]])
+            ws.append_row(["timestamp", "teacher", "student", "exercise", "phase", "sentence", "spoken", "score", "passed", "attempts", "mastery_reps", "mastery_status"])
+        ws.append_row([row.get(k, "") for k in ["timestamp", "teacher_id", "student_name", "exercise", "phase", "sentence", "spoken", "score", "passed", "attempts", "mastery_reps", "mastery_status"]])
         return True
     except Exception as e:
         print("WRITE RESULT FAILED", e)
@@ -445,6 +445,7 @@ def record_and_advance(s, correct, spoken, score, passed=True, skipped=False):
         "passed": bool(passed), "skipped": bool(skipped),
         "attempts": max(1, s.get("sentence_attempts", 0)),
         "mastery_reps": s["mastery_target"],
+        "mastery_status": "mastered" if passed and not skipped else "not_mastered",
     }
     s["results"].append(row)
     write_result(row)
@@ -553,63 +554,69 @@ def answer():
             return jsonify({**base, "advance": True, "cap_reached": True, **session_payload(s)})
         # Let the normal failure branch below create a better failed response.
 
-    # Cloze mode
+    # Station 3: Cloze check. This must happen ONLY after the practice/mastery station is complete.
+    # In cloze we hide the full English sentence and ask the student to rebuild it.
     if s["cloze_active"]:
         if passed:
             s["cloze_active"] = False
             s["cloze_word"] = None
-            s["mastery_score"] = score
-            if cap_reached or s["mastery_target"] == 0:
-                record_and_advance(s, correct, spoken, score, True)
-                return jsonify({**base, "cloze_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
-            s["mastery_consecutive"] = 1
-            return jsonify({**base, "cloze_done": True, "mastery_mode": True, "first_pass": True, **session_payload(s)})
+            s["mastery_score"] = max(s.get("mastery_score", 0), score)
+            record_and_advance(s, correct, spoken, s["mastery_score"] or score, True)
+            return jsonify({**base, "station": "cloze", "cloze_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
 
         s["cloze_attempts"] += 1
         if cap_reached:
-            return cap_and_advance(s, correct, spoken, score, base, passed=False)
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze"}, passed=False)
+        # Keep cloze bounded, but do not jump back into mastery.
         if s["cloze_attempts"] >= 3:
-            s["cloze_active"] = False
-            s["cloze_word"] = None
-            if s["mastery_target"] > 0:
-                return jsonify({**base, "cloze_done": True, "mastery_mode": True, "first_pass": True, **session_payload(s)})
-            record_and_advance(s, correct, spoken, s["mastery_score"] or score, True)
-            return jsonify({**base, "cloze_done": True, "advance": True, **session_payload(s)})
-        return jsonify({**base, "cloze_mode": True, **session_payload(s)})
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, passed=False)
+        return jsonify({**base, "station": "cloze", "cloze_mode": True, **session_payload(s)})
 
-    # Mastery mode
+    # Station 2: Bloom practice/mastery. The cloze station is NOT shown yet.
     if s["mastery_target"] > 0:
         if passed:
             s["mastery_consecutive"] += 1
-            s["mastery_score"] = score
-            if s["mastery_consecutive"] >= s["mastery_target"] or cap_reached:
-                record_and_advance(s, correct, spoken, score, True)
-                return jsonify({**base, "mastery_mode_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
-            return jsonify({**base, "mastery_mode": True, "streak_broken": False, **session_payload(s)})
+            s["mastery_score"] = max(s.get("mastery_score", 0), score)
+            if s["mastery_consecutive"] >= s["mastery_target"]:
+                # Practice mastery is complete. Now move to the separate cloze station.
+                cw = detect_cloze_word(correct)
+                s["mastery_target"] = 0
+                s["mastery_consecutive"] = 0
+                if cap_reached or not cw:
+                    record_and_advance(s, correct, spoken, s["mastery_score"] or score, True)
+                    return jsonify({**base, "station": "practice", "mastery_mode_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
+                s["cloze_active"] = True
+                s["cloze_word"] = cw
+                s["cloze_attempts"] = 0
+                return jsonify({**base, "station": "practice", "mastery_mode_done": True, "cloze_mode": True, **session_payload(s)})
+            return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": False, **session_payload(s)})
         s["mastery_consecutive"] = 0
         if cap_reached:
-            return cap_and_advance(s, correct, spoken, score, base, passed=False)
-        return jsonify({**base, "mastery_mode": True, "streak_broken": True, **session_payload(s)})
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "practice"}, passed=False)
+        return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": True, **session_payload(s)})
 
-    # Normal mode
+    # Station 2 starts here: normal practice. A passing first read enters either
+    # Bloom repetition mode (if there were failures) or the separate cloze check.
     if passed:
         target = mastery_target_for(s["failed_attempts"])
-        cw = detect_cloze_word(correct)
         s["mastery_score"] = score
         if cap_reached:
             record_and_advance(s, correct, spoken, score, True)
-            return jsonify({**base, "advance": True, "cap_reached": True, **session_payload(s)})
+            return jsonify({**base, "station": "practice", "advance": True, "cap_reached": True, **session_payload(s)})
         if target > 0:
             s["mastery_target"] = target
+            s["mastery_consecutive"] = 1
+            return jsonify({**base, "station": "practice", "mastery_mode": True, "first_pass": True, **session_payload(s)})
+
+        cw = detect_cloze_word(correct)
         if cw:
             s["cloze_active"] = True
             s["cloze_word"] = cw
             s["cloze_attempts"] = 0
-            return jsonify({**base, "cloze_mode": True, **session_payload(s)})
-        if target > 0:
-            return jsonify({**base, "mastery_mode": True, "first_pass": True, **session_payload(s)})
+            return jsonify({**base, "station": "practice", "cloze_mode": True, **session_payload(s)})
+
         record_and_advance(s, correct, spoken, score, True)
-        return jsonify({**base, "advance": True, **session_payload(s)})
+        return jsonify({**base, "station": "practice", "advance": True, **session_payload(s)})
 
     s["failed_attempts"] += 1
     if cap_reached:
@@ -648,6 +655,7 @@ def exam_result():
         "student_name": s["student_name"], "exercise": s["exercise_name"], "phase": "final_exam",
         "sentence": data.get("sentence", ""), "spoken": data.get("spoken", ""),
         "score": data.get("score", 0), "passed": data.get("passed", False), "attempts": 1, "mastery_reps": 0,
+        "mastery_status": "final_exam_pass" if data.get("passed", False) else "final_exam_fail",
     }
     s["exam_results"].append(row)
     write_result(row)

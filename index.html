@@ -19,7 +19,37 @@ function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGend
 function closeLogin(){document.getElementById('login').classList.remove('show')}
 function submitLogin(){let name=document.getElementById('name').value.trim(),pass=document.getElementById('pass').value;if(!name)return;fetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,password:pass})}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(d=>{studentId=d.student_id;studentName=name;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;startApp()}).catch(()=>document.getElementById('loginErr').style.display='block')}
 function startApp(){let t=teacherData[currentTeacher]||{};document.getElementById('teacherName').textContent=emojis[currentTeacher]+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';loadQuestion()}
-function loadQuestion(){busy=false;hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];startExam();return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';document.getElementById('phase').innerHTML='📘 אימון קריאה — צריך '+q.threshold+'% לעבור';if(q.mastery_target>0)showMastery(q.mastery_consecutive,q.mastery_target,false);if(q.cloze_active)showCloze(q.cloze_word,q.cloze_attempts_left);setTimeout(playSentence,350)}).catch(e=>document.getElementById('he').textContent='שגיאה בטעינת משפט')}
+function loadQuestion(){busy=false;hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];startExam();return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
+  if(q.cloze_active){
+    setStation('cloze', q);
+    showCloze(q.cloze_word,q.cloze_attempts_left);
+  } else if(q.mastery_target>0){
+    setStation('practice', q);
+    showMastery(q.mastery_consecutive,q.mastery_target,false);
+    document.getElementById('en').style.opacity='1';
+    setTimeout(playSentence,350);
+  } else {
+    setStation('listen', q);
+    setTimeout(playSentence,350);
+  }
+}).catch(e=>document.getElementById('he').textContent='שגיאה בטעינת משפט')}
+function setStation(st,q){
+  let phase=document.getElementById('phase');
+  let play=document.getElementById('play'), show=document.getElementById('show');
+  play.style.display=''; show.style.display='';
+  if(st==='cloze'){
+    phase.innerHTML='🧩 תחנה 3 — קלוז: השלמת המשפט בלי לראות את כל האנגלית';
+    document.getElementById('en').style.opacity='0';
+    play.style.display='none'; show.style.display='none';
+    document.getElementById('hint').textContent='אמור את המשפט המלא עם המילה החסרה';
+  } else if(st==='practice'){
+    phase.innerHTML='⭐ תחנה 2 — אימון שליטה בשיטת Bloom | צריך '+q.threshold+'%';
+    document.getElementById('hint').textContent='חזור על המשפט עד לרצף נכון';
+  } else {
+    phase.innerHTML='📘 תחנה 1 — קבלת המשפט, שמיעה וקריאה | צריך '+q.threshold+'% לעבור';
+    document.getElementById('hint').textContent='שמע את המשפט ואז לחץ על המיקרופון לאימון';
+  }
+}
 function pickVoice(){let voices=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().startsWith('en'));if(!voices.length)return null;let kw=voiceGender==='male'?['david','mark','daniel','alex','fred','male']:['samantha','zira','victoria','karen','female','woman'];return voices.find(v=>kw.some(k=>v.name.toLowerCase().includes(k)))||voices[0]}
 function playSentence(){if(!currentQ)return;speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(currentQ.en);u.lang='en-US';u.rate=.88;let v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}
 function toggleEnglish(){let e=document.getElementById('en');e.style.opacity=e.style.opacity==='1'?'0':'1'}
@@ -42,18 +72,18 @@ function showResult(spoken,res){
     ? '<div class="small">ניסיון '+res.attempts_used+' מתוך '+res.max_attempts+'</div>' : '';
   box.innerHTML='<h3>'+(passed?'✅ ':'💪 ')+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>'+attempts+'<div class="words">'+words+'</div>';
   document.getElementById('hint').textContent=passed?'יפה!':'נסה שוב';
-  if(res.cloze_mode||res.cloze_active){showCloze(res.cloze_word,res.cloze_attempts_left||3);document.getElementById('en').style.opacity='1'}else hideCloze();
-  if(res.mastery_mode||res.mastery_target>0){showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken)}else if(!res.cloze_mode)hideMastery();
+  if(res.cloze_mode||res.cloze_active){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||3)}else hideCloze();
+  if(res.mastery_mode||res.mastery_target>0){setStation('practice', currentQ||{threshold:res.threshold});showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken)}else if(!res.cloze_mode)hideMastery();
   if(res.mastery_mode&&res.passed){box.innerHTML+='<p>'+pick(MSG_STREAK)+'</p>'}
   if(res.cap_reached && res.passed){box.innerHTML+='<p>הגענו למספר הניסיונות המקסימלי — המשפט עבר, ממשיכים הלאה.</p>'}
   if(res.skipped){box.innerHTML+='<p>עברנו הלאה אחרי מספר הניסיונות שהוגדר למורה.</p>'}
   if(res.advance){document.getElementById('en').style.opacity='1';setTimeout(loadQuestion,1800)}
 }
-function showCloze(word,left){let el=document.getElementById('cloze');if(!word||!currentQ)return;let blank=currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');el.style.display='block';el.innerHTML='<h3>🧩 קלוז קטן</h3><p>אמור את כל המשפט עם המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
-function hideCloze(){document.getElementById('cloze').style.display='none'}
+function showCloze(word,left){let el=document.getElementById('cloze');if(!word||!currentQ)return;let blank=currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 תחנה 3 — בדיקת שליטה בקלוז</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
+function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';el.innerHTML='<h3>'+(broken?'⭐ הרצף נשבר — מתחילים מחדש':'⭐ מצב שליטה — Benjamin Bloom')+'</h3><p>צריך '+target+' חזרות נכונות ברצף. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
-function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';hideCloze();hideMastery()}
+function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';hideCloze();hideMastery()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
 function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>r.sentence).filter(Boolean);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 function showExamQuestion(){let s=examSentences[examIndex];currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';document.getElementById('en').textContent=s;document.getElementById('en').style.opacity='1';document.getElementById('prog').textContent='מבחן: משפט '+(examIndex+1)+' מתוך '+examSentences.length;document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)}
