@@ -11,7 +11,7 @@ STATE_FILE = os.path.join(BASE_DIR, "teacher_state.json")
 
 TEACHERS = {
     "ben": {
-        "name": "בן", "color": "#1a56db", "color_light": "#e8f0fe", "voice_gender": "male",
+        "name": "דן", "color": "#1a56db", "color_light": "#e8f0fe", "voice_gender": "male",
         "results_tab": "Ben", "student_password": os.getenv("BEN_STUDENT_PASSWORD", "class2026"),
         "teacher_password": os.getenv("BEN_TEACHER_PASSWORD", "ben2026"),
         "default_threshold": int(os.getenv("BEN_THRESHOLD", "85")),
@@ -54,6 +54,8 @@ def _default_teacher_state():
             "exercise_name": "תרגול דמו",
             "csv_url": "",
             "custom_exercises": [],
+            "allowed_students": [],
+            "restrict_to_list": False,
         } for tid, t in TEACHERS.items()
     }
 
@@ -71,6 +73,10 @@ def load_state():
     for tid in state:
         state[tid]["threshold"] = max(80, min(100, int(state[tid].get("threshold", 85))))
         state[tid]["max_attempts"] = max(4, min(7, int(state[tid].get("max_attempts", 5))))
+        state[tid]["allowed_students"] = sorted({
+            str(n).strip() for n in state[tid].get("allowed_students", []) if str(n).strip()
+        })
+        state[tid]["restrict_to_list"] = bool(state[tid].get("restrict_to_list", False))
     return state
 
 def save_state():
@@ -214,7 +220,12 @@ def choose_en_he(row):
     return {"en": en, "he": he}
 
 def extract_csv_url(value):
-    """Accept either a raw published CSV URL or an EZRA app link with ?link=<csv>."""
+    """Accept a raw published CSV URL, an EZRA app link with ?link=<csv>,
+    or a normal Google Sheets share/edit link (e.g. copied straight from the
+    browser address bar). Normal Sheets links are auto-converted to a CSV
+    export URL so teachers don't need to "Publish to web" first.
+    Note: the sheet still needs to be shared as "Anyone with the link -
+    Viewer" for the server to be able to fetch it without signing in."""
     raw = clean_cell(value)
     if not raw:
         return ""
@@ -223,6 +234,15 @@ def extract_csv_url(value):
         params = parse_qs(parsed.query)
         if params.get("link"):
             return params["link"][0].strip()
+        if "docs.google.com" in parsed.netloc and "/spreadsheets/" in parsed.path:
+            m = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", parsed.path)
+            if m and "/export" not in parsed.path and "/gviz/" not in parsed.path:
+                sheet_id = m.group(1)
+                gid = params.get("gid", [None])[0]
+                if not gid:
+                    frag_m = re.search(r"gid=(\d+)", parsed.fragment or "")
+                    gid = frag_m.group(1) if frag_m else "0"
+                return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
     except Exception:
         pass
     return raw
@@ -563,6 +583,11 @@ def verify_student():
     expected = TEACHERS[tid]["student_password"]
     if expected and password != expected:
         return jsonify(ok=False, error="wrong password"), 401
+    ts = _teacher_state[tid]
+    if ts.get("restrict_to_list"):
+        allowed = {n.casefold() for n in ts.get("allowed_students", [])}
+        if name.casefold() not in allowed:
+            return jsonify(ok=False, error="השם שלך אינו ברשימת התלמידים המורשים. פנה למורה שלך."), 403
     safe_name = re.sub(r"[^A-Za-z0-9א-ת_-]", "_", name)
     sid = f"{tid}_{safe_name}_{int(time.time())}_{os.getpid()}"
     new_session(sid, tid, name)
@@ -758,7 +783,33 @@ def teacher_login():
     tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
         return jsonify(ok=False), 401
-    return jsonify(ok=True, teacher=teacher_public(tid))
+    s = _teacher_state[tid]
+    return jsonify(
+        ok=True, teacher=teacher_public(tid),
+        allowed_students=s.get("allowed_students", []),
+        restrict_to_list=bool(s.get("restrict_to_list", False)),
+    )
+
+@app.post("/api/teacher-allowed-students")
+def teacher_allowed_students():
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+        return jsonify(ok=False), 401
+    if "allowed_students" in data:
+        raw = data.get("allowed_students", [])
+        names = re.split(r"[\n,]+", raw) if isinstance(raw, str) else raw
+        _teacher_state[tid]["allowed_students"] = sorted({
+            str(n).strip() for n in names if str(n).strip()
+        })
+    if "restrict_to_list" in data:
+        _teacher_state[tid]["restrict_to_list"] = bool(data.get("restrict_to_list"))
+    save_state()
+    return jsonify(
+        ok=True,
+        allowed_students=_teacher_state[tid]["allowed_students"],
+        restrict_to_list=_teacher_state[tid]["restrict_to_list"],
+    )
 
 @app.post("/api/teacher-settings")
 def teacher_settings():
@@ -799,7 +850,14 @@ def add_exercise():
 
     sentences = load_sentences_from_csv(csv_url)
     if not sentences or sentences == FALLBACK_SENTENCES:
-        return jsonify(ok=False, error="לא נמצאו משפטים תקינים ב-CSV"), 400
+        return jsonify(
+            ok=False,
+            error=(
+                "לא נמצאו משפטים תקינים ב-CSV. ודא שהגיליון משותף לפי "
+                "\"כל מי שיש לו את הקישור — צפייה\" (Anyone with the link - Viewer), "
+                "ושהקישור מצביע לגיליון (sheet/gid) הנכון."
+            ),
+        ), 400
 
     try:
         item = append_exercise_to_catalog_sheet(name, csv_url)
