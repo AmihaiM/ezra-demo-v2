@@ -211,7 +211,18 @@ def choose_en_he(row):
     if other_he:
         _, he, _ = max(other_he, key=lambda x: x[2])
     else:
-        others = [c for i, c in enumerate(cells) if i != en_i]
+        # No real Hebrew translation in this row. Never fall back to a pre-blanked
+        # cloze variant of the sentence (e.g. "I like ____ shirt") - that would show
+        # a spoiler-ish, wrong-language prompt instead of a Hebrew one. The app
+        # already builds its own fill-in-the-blank later (station 3), so a
+        # pre-blanked column in the sheet is redundant and should be ignored here.
+        def is_blanked_variant(c):
+            if "___" in c or "____" in c:
+                return True
+            # Also treat a near-duplicate of the English sentence (just missing a
+            # word or two) as a blanked variant rather than a genuine translation.
+            return looks_english(c) and similarity(c, en) >= 70
+        others = [c for i, c in enumerate(cells) if i != en_i and not is_blanked_variant(c)]
         he = others[0] if others else en
 
     # Guard: never let Hebrew prompt become the answer to score against.
