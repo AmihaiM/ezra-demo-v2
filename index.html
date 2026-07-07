@@ -4,30 +4,34 @@
 
 .summary-hero{background:linear-gradient(135deg,#4318D1,#be185d);color:#fff;border-radius:24px;padding:26px;margin-bottom:20px;text-align:center;box-shadow:0 18px 44px #4318d133}.summary-hero h2{font-size:34px;margin:0 0 8px}.score-circle{width:140px;height:140px;border-radius:50%;background:conic-gradient(#22c55e var(--score-deg),rgba(255,255,255,.25) 0);display:grid;place-items:center;margin:18px auto;border:8px solid rgba(255,255,255,.25)}.score-circle b{font-size:34px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}.summary-card{background:#fff;border:1px solid #ede7ff;border-radius:18px;padding:16px;box-shadow:0 8px 24px #4318d112;text-align:center}.summary-card .num{font-size:28px;font-weight:900;color:var(--tc,#4318D1)}.summary-list{display:grid;gap:12px;margin-top:16px}.summary-row{background:#fff;border:1px solid #ede7ff;border-radius:16px;padding:14px;box-shadow:0 6px 18px #4318d10d;direction:ltr;text-align:left}.summary-row.pass{border-inline-start:7px solid #22c55e}.summary-row.fail{border-inline-start:7px solid #ef4444}.summary-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}.hidden-final{display:none!important}
 </style></head><body>
-<section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2><p>קול גברי</p></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2><p>קול נשי</p></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
+<section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד"><input id="pass" placeholder="סיסמת כיתה" type="password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
-<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div><div id="result" class="result"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
+<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div><div id="result" class="result"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
 <script>
-var teacherData={},currentTeacher=null,studentId='',studentName='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null;
+var teacherData={},currentTeacher=null,studentId='',studentName='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200;
 var emojis={ben:'👨‍🏫',sara:'👩‍🏫'};
 var MSG_PASS=['מצוין! 🎉','כל הכבוד! ⭐','יפה מאוד! 💫','נהדר! 🎯'];
 var MSG_FAIL=['כמעט! נסה שוב 💪','אתה יכול! 🌟','עוד קצת! 😊','נסה שוב — אתה קרוב'];
-var MSG_STREAK=['הרצף נבנה! 🔥','ממשיך מעולה! ⚡','עוד חזרה אחת ואתה שם!'];
 function pick(a){return a[Math.floor(Math.random()*a.length)]}
 document.addEventListener('DOMContentLoaded',init);
 function init(){fetch('/api/teachers').then(r=>r.json()).then(d=>{teacherData=d;Object.keys(d).forEach(id=>{let c=document.getElementById('tc-'+id),t=d[id];if(c){c.querySelector('h2').textContent=t.name;c.querySelector('.avatar').style.background=t.color_light;c.querySelector('.avatar').style.color=t.color}})}).catch(e=>alert('יש להריץ דרך Flask: http://127.0.0.1:5000'));
 document.getElementById('tc-ben').onclick=()=>selectTeacher('ben');document.getElementById('tc-sara').onclick=()=>selectTeacher('sara');document.getElementById('name').onkeydown=e=>{if(e.key==='Enter')document.getElementById('pass').focus()};document.getElementById('pass').onkeydown=e=>{if(e.key==='Enter')submitLogin()};if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices()}}
-function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#4318D1');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | מעבר: '+(t.threshold||85)+'% | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';setTimeout(()=>document.getElementById('name').focus(),100)}
+function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#4318D1');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | נדרשת התאמה מלאה (100%) בכל משפט | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';setTimeout(()=>document.getElementById('name').focus(),100)}
 function closeLogin(){document.getElementById('login').classList.remove('show')}
-function submitLogin(){let name=document.getElementById('name').value.trim(),pass=document.getElementById('pass').value;if(!name)return;fetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;startApp()}).catch(e=>{let el=document.getElementById('loginErr');el.textContent=e.message||'שם/סיסמה לא תקינים';el.style.display='block'})}
+function submitLogin(){let name=document.getElementById('name').value.trim(),pass=document.getElementById('pass').value;if(!name)return;fetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;startApp()}).catch(e=>{let el=document.getElementById('loginErr');el.textContent=e.message||'שם/סיסמה לא תקינים';el.style.display='block'})}
 function startApp(){let t=teacherData[currentTeacher]||{};document.getElementById('teacherName').textContent=emojis[currentTeacher]+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';loadQuestion()}
 function loadQuestion(){busy=false;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];startExam();return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
-  if(q.cloze_active){
+  let mw=document.getElementById('mismatchWarn');
+  if(q.content_mismatch){mw.style.display='block';mw.textContent='⚠️ לא הצלחנו לטעון את התרגיל האמיתי ("'+q.exercise+'") מהגיליון של המורה, ולכן מוצג כרגע תרגיל לדוגמה במקום. בקש מהמורה לבדוק ששיתוף הגיליון הוגדר כ"כל מי שיש לו את הקישור — צפייה".'}else{mw.style.display='none'}
+  if(q.review_round){
+    setStation('review', q);
+    setTimeout(playSentence,350);
+  } else if(q.cloze_active){
     setStation('cloze', q);
     showCloze(q.cloze_word,q.cloze_attempts_left);
   } else if(q.mastery_target>0){
     setStation('practice', q);
-    showMastery(q.mastery_consecutive,q.mastery_target,false);
+    showMastery(q.mastery_consecutive,q.mastery_target,false,q.attempts_left);
     document.getElementById('en').style.opacity='1';
     setTimeout(playSentence,350);
   } else {
@@ -40,15 +44,18 @@ function setStation(st,q){
   let play=document.getElementById('play'), show=document.getElementById('show');
   play.style.display=''; show.style.display='';
   if(st==='cloze'){
-    phase.innerHTML='🧩 תחנה 3 — קלוז: השלמת המשפט בלי לראות את כל האנגלית';
+    phase.innerHTML='🧩 תחנה 3 — תרגיל קריאה עם השלמת המשפט';
     document.getElementById('en').style.opacity='0';
     play.style.display='none'; show.style.display='none';
     document.getElementById('hint').textContent='אמור את המשפט המלא עם המילה החסרה';
   } else if(st==='practice'){
-    phase.innerHTML='⭐ תחנה 2 — אימון שליטה בשיטת Bloom | צריך '+q.threshold+'%';
+    phase.innerHTML='⭐ תחנה 2 — אימון שליטה בשיטת Bloom | צריך התאמה מלאה (100%)';
     document.getElementById('hint').textContent='חזור על המשפט עד לרצף נכון';
+  } else if(st==='review'){
+    phase.innerHTML='🔁 סבב חזרה — משפטים שדילגת עליהם קודם';
+    document.getElementById('hint').textContent='הזדמנות אחת אחרונה, ואז המשפט יסומן למורה';
   } else {
-    phase.innerHTML='📘 תחנה 1 — קבלת המשפט, שמיעה וקריאה | צריך '+q.threshold+'% לעבור';
+    phase.innerHTML='📘 תחנה 1 — קבלת המשפט, שמיעה וקריאה | צריך התאמה מלאה (100%)';
     document.getElementById('hint').textContent='שמע את המשפט ואז לחץ על המיקרופון לאימון';
   }
 }
@@ -72,6 +79,10 @@ function startRecognition(){
   let finalText='',submitted=false,timer=null;
   let startedAt=performance.now(), lastSpeechAt=startedAt;
   document.getElementById('mic').classList.add('on');
+  // Never let the student play the reference audio into their own mic while
+  // recording - that would score 100% without them actually saying anything.
+  document.getElementById('play').disabled=true;
+  document.getElementById('play').classList.add('hidden-final');
   document.getElementById('hint').textContent='מקשיב...';
   rec.onresult=e=>{
     lastSpeechAt=performance.now();
@@ -79,11 +90,13 @@ function startRecognition(){
       if(e.results[i].isFinal) finalText+=(e.results[i][0].transcript+' ');
     }
     if(timer)clearTimeout(timer);
-    timer=setTimeout(()=>{if(!submitted)rec.stop()},1200);
+    timer=setTimeout(()=>{if(!submitted)rec.stop()},silenceTimeoutMs);
   };
   rec.onend=()=>{
     let endedAt=performance.now();
     document.getElementById('mic').classList.remove('on');
+    document.getElementById('play').disabled=false;
+    document.getElementById('play').classList.remove('hidden-final');
     if(submitted)return;
     submitted=true;
     if(timer)clearTimeout(timer);
@@ -93,7 +106,7 @@ function startRecognition(){
     document.getElementById('hint').textContent='מעבד...';
     if(examMode)submitExamAnswer(spoken,metrics);else submitAnswer(spoken,metrics);
   };
-  rec.onerror=()=>{busy=false;submitted=true;document.getElementById('mic').classList.remove('on');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
+  rec.onerror=()=>{busy=false;submitted=true;document.getElementById('mic').classList.remove('on');document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
   rec.start();
 }
 function submitAnswer(spoken,metrics){fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,answer:spoken,metrics:metrics||{}})}).then(r=>r.json()).then(res=>{busy=false;showResult(spoken,res)}).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה בשליחת תשובה'})}
@@ -101,38 +114,63 @@ function showResult(spoken,res){
   let box=document.getElementById('result');
   if(!res || typeof res.score!=='number'){
     box.style.display='block'; box.className='result fail';
-    box.innerHTML='<h3>⚠️ שגיאה בבדיקת התשובה</h3><div>לא התקבל ציון מהשרת. נסה לרענן או לבדוק את הלוג של Flask.</div>'+(res&&res.error?'<pre dir="ltr">'+esc(res.error)+'</pre>':'');
+    if(res && res.error==='session not found'){
+      box.innerHTML='<h3>⏳ החיבור פג תוקף</h3><div>כנראה שהייתה הפסקה ארוכה והשרת התאפס. לחצו לרענן ולהתחיל את התרגיל הזה מחדש — זה לא באמת ציון 0.</div><button class="primary" style="margin-top:10px" onclick="location.reload()">🔄 רענן והתחל מחדש</button>';
+    } else {
+      box.innerHTML='<h3>⚠️ שגיאה בבדיקת התשובה</h3><div>לא התקבל ציון מהשרת. נסה לרענן או לבדוק את הלוג של Flask.</div>'+(res&&res.error?'<pre dir="ltr">'+esc(res.error)+'</pre>':'');
+    }
     document.getElementById('hint').textContent='נסה שוב';
     return;
   }
   let passed=!!res.passed;
-  box.style.display='block';
-  box.className='result '+(passed?'pass':'fail');
-  let msg=passed?pick(MSG_PASS):pick(MSG_FAIL);
-  let words=(res.words||[]).map(w=>'<span class="w '+esc(w.status)+'">'+esc(w.word)+'</span>').join(' ');
-  let attempts = (typeof res.attempts_used==='number' && typeof res.max_attempts==='number')
-    ? '<div class="small">ניסיון '+res.attempts_used+' מתוך '+res.max_attempts+'</div>' : '';
-  box.innerHTML='<h3>'+(passed?'✅ ':'💪 ')+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>'+attempts+'<div class="words">'+words+'</div>';
+  let isCloze=res.station==='cloze';
   document.getElementById('hint').textContent=passed?'יפה!':'נסה שוב';
+  if(isCloze){
+    // Cloze feedback is intentionally minimal - just pass/fail, no per-word
+    // breakdown box (that belongs to stations 1-2, not the cloze rebuild check).
+    box.style.display='none'; box.innerHTML='';
+  } else {
+    box.style.display='block';
+    box.className='result '+(passed?'pass':'fail');
+    let msg=passed?pick(MSG_PASS):pick(MSG_FAIL);
+    let words=(res.words||[]).map(w=>'<span class="w '+esc(w.status)+'">'+esc(w.word)+'</span>').join(' ');
+    let attempts = (typeof res.attempts_used==='number' && typeof res.max_attempts==='number')
+      ? '<div class="small">ניסיון '+res.attempts_used+' מתוך '+res.max_attempts+'</div>' : '';
+    box.innerHTML='<h3>'+(passed?'✅ ':'💪 ')+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>'+attempts+'<div class="words">'+words+'</div>';
+  }
   let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
   if(enteringCloze){
     hideMastery();
-    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||3)});
+    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5)});
   } else if(res.cloze_mode||res.cloze_active){
-    setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||3);
+    setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5);
   } else hideCloze();
-  if(res.mastery_mode||res.mastery_target>0){setStation('practice', currentQ||{threshold:res.threshold});showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken)}else if(!res.cloze_mode)hideMastery();
-  if(res.mastery_mode&&res.passed){box.innerHTML+='<p>'+pick(MSG_STREAK)+'</p>'}
+  if(res.mastery_mode||res.mastery_target>0){setStation('practice', currentQ||{threshold:res.threshold});showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken,res.attempts_left)}else if(!res.cloze_mode)hideMastery();
+  if(res.mastery_mode&&res.passed){
+    let rem=res.mastery_remaining;
+    let msg=(typeof rem!=='number'||rem<=0)?'כמעט שם! ⭐':rem===1?'עוד חזרה אחת ואתה שם! 🔥':'עוד '+rem+' חזרות ואתה שם! 💪';
+    box.innerHTML+='<p>'+msg+'</p>';
+  }
   if(res.cap_reached && res.passed){box.innerHTML+='<p>הגענו למספר הניסיונות המקסימלי — המשפט עבר, ממשיכים הלאה.</p>'}
-  if(res.skipped){box.innerHTML+='<p>עברנו הלאה אחרי מספר הניסיונות שהוגדר למורה.</p>'}
+  if(res.skipped){box.innerHTML+='<p>עברנו הלאה — המשפט סומן לחזרה בהמשך התרגול.</p>'}
+  if(res.station==='review'){
+    box.style.display='block'; box.className='result '+(passed?'pass':'fail');
+    box.innerHTML=passed?'<h3>✅ מצוין!</h3>':'<h3>💪 עדיין לא — סומן למורה להמשך תרגול</h3>';
+  }
   if(res.advance){document.getElementById('en').style.opacity='1';showNextButton(loadQuestion)}
 }
 function showNextButton(action){nextAction=action;document.getElementById('mic').classList.add('hidden-final');document.getElementById('nextBtn').style.display='block'}
 function hideNextButton(){document.getElementById('nextBtn').style.display='none';nextAction=null;document.getElementById('mic').classList.remove('hidden-final')}
 function goNext(){let action=nextAction;hideNextButton();if(action)action()}
-function showCloze(word,left){let el=document.getElementById('cloze');if(!word||!currentQ)return;let blank=currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
+function showCloze(word,left){let el=document.getElementById('cloze');if(!word||!currentQ)return;
+  // The score/word-breakdown box belongs to the PREVIOUS station (1/2) - once we
+  // are actually showing the cloze fill-in-the-blank UI it must never linger
+  // underneath it (recurring user report: leftover "✅ מצוין! ציון: 100%..." box
+  // stuck below the cloze sentence).
+  let resultBox=document.getElementById('result');resultBox.style.display='none';resultBox.innerHTML='';
+  let blank=currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
-function showMastery(consecutive,target,broken){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';el.innerHTML='<h3>'+(broken?'⭐ הרצף נשבר — מתחילים מחדש':'⭐ מצב שליטה')+'</h3><p>צריך '+target+' חזרות נכונות ברצף. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'}
+function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';let attemptsLine=(typeof attemptsLeft==='number')?'<p class="small">ניסיונות שנותרו למשפט הזה: '+attemptsLeft+'</p>':'';el.innerHTML='<h3>⭐ מצב שליטה</h3><p>צריך '+target+' חזרות נכונות. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'+attemptsLine}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
 function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';hideCloze();hideMastery();hideNextButton()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}

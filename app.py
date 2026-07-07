@@ -27,6 +27,12 @@ TEACHERS = {
 }
 CATALOG_SHEET_ID = os.getenv("CATALOG_SHEET_ID", "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk")
 RESULTS_SHEET_ID = os.getenv("RESULTS_SHEET_ID", "17a-y_-nL9L85Kl7zL1F1ovTGbQy7q5NlBX24C-a_6JU")
+# Each teacher writes results into their own separate spreadsheet file (not just a separate
+# tab) so that opening the file directly never exposes the other teacher's data.
+RESULTS_SHEET_IDS = {
+    "ben": RESULTS_SHEET_ID,
+    "sara": os.getenv("SARA_RESULTS_SHEET_ID", "1JGWw_Jf8m3WF2-HS6sEohRmV6v2mmp29b6iSE3rgsOQ"),
+}
 EZRA_APP_BASE_URL = os.getenv("EZRA_APP_BASE_URL", "https://app.ezra.clap.co.il")
 
 _cache = {}
@@ -56,6 +62,7 @@ def _default_teacher_state():
             "custom_exercises": [],
             "allowed_students": [],
             "restrict_to_list": False,
+            "silence_timeout_ms": 1200,
         } for tid, t in TEACHERS.items()
     }
 
@@ -77,6 +84,7 @@ def load_state():
             str(n).strip() for n in state[tid].get("allowed_students", []) if str(n).strip()
         })
         state[tid]["restrict_to_list"] = bool(state[tid].get("restrict_to_list", False))
+        state[tid]["silence_timeout_ms"] = max(400, min(3000, int(state[tid].get("silence_timeout_ms", 1200))))
     return state
 
 def save_state():
@@ -125,7 +133,8 @@ def teacher_public(tid):
     return {
         "id": tid, "name": t["name"], "color": t["color"], "color_light": t["color_light"],
         "voice_gender": t["voice_gender"], "threshold": s["threshold"], "max_attempts": s["max_attempts"],
-        "exercise_name": s.get("exercise_name", "תרגול דמו")
+        "exercise_name": s.get("exercise_name", "תרגול דמו"),
+        "silence_timeout_ms": s.get("silence_timeout_ms", 1200),
     }
 
 def load_catalog(lang_filter="en"):
@@ -259,15 +268,27 @@ def extract_csv_url(value):
     return raw
 
 def load_sentences_from_csv(csv_url):
+    sentences, _used_fallback = load_sentences_from_csv_ex(csv_url)
+    return sentences
+
+def load_sentences_from_csv_ex(csv_url):
+    """Like load_sentences_from_csv but also reports whether the generic demo
+    sentences had to be substituted because the real sheet could not be fetched
+    or parsed. This used_fallback flag matters: without it, a session/teacher
+    dashboard can silently label demo content with the real exercise's name,
+    which is confusing and hides a sharing/URL problem (the exact bug reported:
+    a student's row said "Sandra Belinsky - 25 New words" but the sentences
+    actually delivered were the 3 generic FALLBACK_SENTENCES)."""
     if not csv_url:
-        return FALLBACK_SENTENCES[:]
+        return FALLBACK_SENTENCES[:], True
     csv_url = extract_csv_url(csv_url)
     key = "sentences:" + csv_url
     if key in _cache and time.time() - _cache[key][0] < CACHE_TTL:
-        return [dict(x) for x in _cache[key][1]]
+        cached_sentences, cached_fallback = _cache[key][1]
+        return [dict(x) for x in cached_sentences], cached_fallback
     text = safe_fetch(csv_url)
     if not text:
-        return FALLBACK_SENTENCES[:]
+        return FALLBACK_SENTENCES[:], True
     sentences = []
     seen = set()
     for row in csv.reader(io.StringIO(text)):
@@ -279,10 +300,11 @@ def load_sentences_from_csv(csv_url):
             continue
         seen.add(en_norm)
         sentences.append(item)
-    if not sentences:
+    used_fallback = not sentences
+    if used_fallback:
         sentences = FALLBACK_SENTENCES[:]
-    _cache[key] = (time.time(), sentences)
-    return [dict(x) for x in sentences]
+    _cache[key] = (time.time(), (sentences, used_fallback))
+    return [dict(x) for x in sentences], used_fallback
 
 def normalize(text):
     return re.sub(r"[^a-z0-9\s]", "", (text or "").lower()).strip()
@@ -363,6 +385,18 @@ def detect_cloze_word(sentence):
     return sorted(candidates, reverse=True)[0][1] if candidates else None
 
 def session_payload(s):
+    # Each station (1 = initial read, 2 = Bloom mastery, 3 = cloze) has its OWN
+    # independent attempt budget. They used to share one global counter, which
+    # meant station 1's failures could silently eat into station 2's budget and
+    # station 3 (cloze) would then never get a turn. attempts_used/attempts_left
+    # here always reflect whichever station is currently active.
+    cap = s.get("max_attempts", 5)
+    if s["cloze_active"]:
+        used, left = s.get("cloze_attempts", 0), max(0, cap - s.get("cloze_attempts", 0))
+    elif s["mastery_target"] > 0:
+        used, left = s.get("stage2_attempts", 0), max(0, cap - s.get("stage2_attempts", 0))
+    else:
+        used, left = s.get("sentence_attempts", 0), max(0, cap - s.get("sentence_attempts", 0))
     return {
         "mastery_target": s["mastery_target"],
         "mastery_consecutive": s["mastery_consecutive"],
@@ -370,14 +404,21 @@ def session_payload(s):
         "failed_attempts": s["failed_attempts"],
         "cloze_active": s["cloze_active"],
         "cloze_word": s["cloze_word"],
-        "cloze_attempts_left": max(0, 3 - s["cloze_attempts"]),
-        "attempts_used": s.get("sentence_attempts", 0),
-        "attempts_left": max(0, s.get("max_attempts", 5) - s.get("sentence_attempts", 0)),
+        "cloze_attempts_left": max(0, cap - s.get("cloze_attempts", 0)),
+        "attempts_used": used,
+        "attempts_left": left,
     }
 
 def new_session(student_id, teacher_id, student_name):
     ts = _teacher_state[teacher_id]
-    sentences = load_sentences_from_csv(ts.get("csv_url", ""))
+    csv_url = ts.get("csv_url", "")
+    sentences, used_fallback = load_sentences_from_csv_ex(csv_url)
+    # content_mismatch=True means a real exercise was selected (csv_url is set)
+    # but its sheet could not be loaded, so generic demo sentences were used
+    # instead - the session/exercise NAME still says the real exercise, so the
+    # teacher dashboard and student view must both flag this clearly instead of
+    # silently mislabeling demo content as the real exercise.
+    content_mismatch = used_fallback and bool(csv_url.strip())
     _sessions[student_id] = {
         "student_id": student_id,
         "teacher_id": teacher_id,
@@ -386,11 +427,13 @@ def new_session(student_id, teacher_id, student_name):
         "max_attempts": int(ts["max_attempts"]),
         "voice_gender": TEACHERS[teacher_id]["voice_gender"],
         "exercise_name": ts.get("exercise_name", "תרגול דמו"),
-        "csv_url": ts.get("csv_url", ""),
+        "csv_url": csv_url,
+        "content_mismatch": content_mismatch,
         "sentences": sentences,
         "current": 0,
         "failed_attempts": 0,
         "sentence_attempts": 0,
+        "stage2_attempts": 0,
         "mastery_target": 0,
         "mastery_consecutive": 0,
         "mastery_score": 0,
@@ -399,6 +442,10 @@ def new_session(student_id, teacher_id, student_name):
         "cloze_attempts": 0,
         "cloze_passed": False,
         "last_mastery_target": 0,
+        "review_queue": [],
+        "in_review": False,
+        "review_index": 0,
+        "needs_review_final": [],
         "results": [],
         "exam_results": [],
         "completed": False,
@@ -497,7 +544,8 @@ def write_result(row):
         return False
     try:
         import gspread
-        sh = get_gspread_client().open_by_key(RESULTS_SHEET_ID)
+        sheet_id = RESULTS_SHEET_IDS.get(row["teacher_id"], RESULTS_SHEET_ID)
+        sh = get_gspread_client().open_by_key(sheet_id)
         tab = TEACHERS[row["teacher_id"]]["results_tab"]
         try:
             ws = sh.worksheet(tab)
@@ -564,6 +612,7 @@ def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, me
     s["current"] += 1
     s["failed_attempts"] = 0
     s["sentence_attempts"] = 0
+    s["stage2_attempts"] = 0
     s["last_mastery_target"] = s.get("mastery_target", 0)
     s["mastery_target"] = 0
     s["mastery_consecutive"] = 0
@@ -610,6 +659,19 @@ def question():
     if not s:
         return jsonify(error="session not found"), 404
     if s["current"] >= len(s["sentences"]):
+        # Main pass is done. Before the final exam, give one extra single-attempt
+        # round for any sentence that had to be skipped after 5 failed tries.
+        if not s.get("in_review") and s.get("review_queue"):
+            s["in_review"] = True
+            s["review_index"] = 0
+        if s.get("in_review") and s["review_index"] < len(s["review_queue"]):
+            q = s["review_queue"][s["review_index"]]
+            return jsonify({
+                "done": False, "he": q["he"], "en": q["en"],
+                "index": s["review_index"], "total": len(s["review_queue"]),
+                "threshold": s["threshold"], "max_attempts": 1, "voice_gender": s["voice_gender"],
+                "exercise": s["exercise_name"], "review_round": True, **session_payload(s)
+            })
         s["completed"] = True
         total = len(s["results"])
         avg = int(sum(r["score"] for r in s["results"]) / total) if total else 0
@@ -618,15 +680,21 @@ def question():
     return jsonify({
         "done": False, "he": q["he"], "en": q["en"], "index": s["current"], "total": len(s["sentences"]),
         "threshold": s["threshold"], "max_attempts": s["max_attempts"], "voice_gender": s["voice_gender"],
-        "exercise": s["exercise_name"], **session_payload(s)
+        "exercise": s["exercise_name"], "review_round": False,
+        "content_mismatch": s.get("content_mismatch", False), **session_payload(s)
     })
 
-def cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=None):
+def cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=None, sentence_obj=None):
     """Hard safety valve: no sentence can consume more than max_attempts submissions.
     If the student got a passing score on the last allowed try, move on as passed;
     otherwise skip/move on so the exercise never loops forever.
+    A sentence that had to be skipped this way gets one more single-attempt
+    chance in a review round before the final exam (unless we're already in
+    that review round, in which case it's simply flagged for the teacher).
     """
     record_and_advance(s, correct, spoken, score, bool(passed), skipped=not bool(passed), metrics=metrics)
+    if not passed and sentence_obj and not s.get("in_review"):
+        s["review_queue"].append(dict(sentence_obj))
     return jsonify({
         **base,
         "passed": bool(passed),
@@ -644,19 +712,54 @@ def answer():
     metrics = data.get("metrics") or {}
     s = _sessions.get(sid)
     if not s:
-        return jsonify(error="session not found", score=0, passed=False, words=[], advance=False), 404
-    if s["current"] >= len(s["sentences"]):
+        # score=None (not 0) is deliberate: the front-end treats a missing/non-numeric
+        # score as "couldn't check the answer" rather than a real failed attempt.
+        # This happens when the server restarted (redeploy or free-tier spin-down)
+        # and lost this student's in-memory session - it is NOT a real 0%.
+        return jsonify(error="session not found", score=None, passed=False, words=[], advance=False), 404
+    if s["current"] >= len(s["sentences"]) and not s.get("in_review"):
         return jsonify(done=True, results=s["results"], score=0, passed=False, words=[])
     s["updated_at"] = int(time.time())
+
+    # Review round: one single extra attempt for sentences skipped earlier.
+    # This bypasses the normal listen/mastery/cloze stations entirely.
+    if s.get("in_review"):
+        if s["review_index"] >= len(s["review_queue"]):
+            return jsonify(done=True, results=s["results"], score=0, passed=False, words=[])
+        review_sentence = s["review_queue"][s["review_index"]]
+        _, r_correct, r_score = best_score_for_spoken(spoken, review_sentence)
+        r_passed = r_score >= 100
+        r_words = word_level(spoken, r_correct)
+        fluency = fluency_from_metrics(spoken, r_score, metrics)
+        row = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "teacher_id": s["teacher_id"],
+            "student_name": s["student_name"], "exercise": s["exercise_name"],
+            "phase": "review_retry", "sentence": r_correct, "spoken": spoken, "score": r_score,
+            "passed": bool(r_passed), "skipped": False, "attempts": 1, "max_attempts": 1,
+            "mastery_reps": 0, "mastery_status": "review_pass" if r_passed else "needs_review",
+            "mastery_score": r_score, "cloze_passed": "review", **fluency,
+        }
+        s["results"].append(row)
+        write_result(row)
+        if not r_passed:
+            s["needs_review_final"].append(r_correct)
+        s["review_index"] += 1
+        return jsonify({
+            "correct": r_correct, "spoken": spoken, "score": r_score, "passed": r_passed,
+            "words": r_words, "threshold": 100, "advance": True, "station": "review",
+            "max_attempts": 1, **session_payload(s)
+        })
 
     sentence_obj = s["sentences"][s["current"]]
     correct_key, correct, score = best_score_for_spoken(spoken, sentence_obj)
     # If the CSV row was reversed, fix the session sentence from this point onward.
     if correct_key != "en":
         sentence_obj["en"], sentence_obj["he"] = sentence_obj.get(correct_key, correct), sentence_obj.get("en", "")
-    s["sentence_attempts"] = int(s.get("sentence_attempts", 0)) + 1
 
-    passed = score >= s["threshold"]
+    # Stations 1-3 require an exact, perfect match - no missed or wrong words.
+    # The teacher's configurable threshold (80-100%) is only used later, in the
+    # final exam (station 4), where it's combined with the mastery/fluency data.
+    passed = score >= 100
     words = word_level(spoken, correct)
     base = {
         "correct": correct, "spoken": spoken, "score": score, "passed": passed,
@@ -665,15 +768,14 @@ def answer():
         "max_attempts": s["max_attempts"],
     }
 
-    cap_reached = s["sentence_attempts"] >= s["max_attempts"]
-
-    # Hard cap: if this was the last allowed try, never enter another loop.
-    # Passing on the last try advances as passed; failing on the last try advances as skipped.
-    if cap_reached and not s["cloze_active"] and s["mastery_target"] == 0:
-        if passed:
-            record_and_advance(s, correct, spoken, score, True, metrics=metrics)
-            return jsonify({**base, "advance": True, "cap_reached": True, **session_payload(s)})
-        # Let the normal failure branch below create a better failed response.
+    # IMPORTANT: each station (1 = initial read, 2 = Bloom mastery, 3 = cloze) has
+    # its OWN independent attempt budget, counted separately. They used to share
+    # one global "sentence_attempts" counter, which meant failures on station 1
+    # could quietly use up the whole budget before station 2/3 even started -
+    # so a student could pass everything and still never see station 3, and the
+    # app would silently skip straight to the next sentence. Never again: cloze
+    # is only ever skipped if the sentence has no clozeable word at all, or if
+    # its OWN budget (below) runs out.
 
     # Station 3: Cloze check. This must happen ONLY after the practice/mastery station is complete.
     # In cloze we hide the full English sentence and ask the student to rebuild it.
@@ -684,50 +786,55 @@ def answer():
             s["cloze_passed"] = True
             s["mastery_score"] = max(s.get("mastery_score", 0), score)
             record_and_advance(s, correct, spoken, s["mastery_score"] or score, True, metrics=metrics)
-            return jsonify({**base, "station": "cloze", "cloze_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
+            return jsonify({**base, "station": "cloze", "cloze_done": True, "advance": True, **session_payload(s)})
 
         s["cloze_attempts"] += 1
-        if cap_reached:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze"}, passed=False, metrics=metrics)
-        # Keep cloze bounded, but do not jump back into mastery.
-        if s["cloze_attempts"] >= 3:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, passed=False, metrics=metrics)
+        if s["cloze_attempts"] >= s["max_attempts"]:
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, passed=False, metrics=metrics, sentence_obj=sentence_obj)
         return jsonify({**base, "station": "cloze", "cloze_mode": True, **session_payload(s)})
 
     # Station 2: Bloom practice/mastery. The cloze station is NOT shown yet.
     if s["mastery_target"] > 0:
+        s["stage2_attempts"] = int(s.get("stage2_attempts", 0)) + 1
+        stage2_cap_reached = s["stage2_attempts"] >= s["max_attempts"]
         if passed:
             s["mastery_consecutive"] += 1
             s["mastery_score"] = max(s.get("mastery_score", 0), score)
             if s["mastery_consecutive"] >= s["mastery_target"]:
-                # Practice mastery is complete. Now move to the separate cloze station.
+                # Practice mastery is complete. Now move to the separate cloze station -
+                # ALWAYS, regardless of how many station-2 attempts that took.
                 cw = detect_cloze_word(correct)
                 s["mastery_target"] = 0
                 s["mastery_consecutive"] = 0
-                if cap_reached or not cw:
+                s["stage2_attempts"] = 0
+                if not cw:
                     record_and_advance(s, correct, spoken, s["mastery_score"] or score, True, metrics=metrics)
-                    return jsonify({**base, "station": "practice", "mastery_mode_done": True, "advance": True, "cap_reached": cap_reached, **session_payload(s)})
+                    return jsonify({**base, "station": "practice", "mastery_mode_done": True, "advance": True, **session_payload(s)})
                 s["cloze_active"] = True
                 s["cloze_word"] = cw
                 s["cloze_attempts"] = 0
                 return jsonify({**base, "station": "practice", "mastery_mode_done": True, "cloze_mode": True, **session_payload(s)})
             return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": False, **session_payload(s)})
-        s["mastery_consecutive"] = 0
-        if cap_reached:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "practice"}, passed=False, metrics=metrics)
+        # A failed repetition mid-way through Bloom reinforcement does NOT reset
+        # progress back to zero - it simply isn't counted as one of the required
+        # successes. The student still just needs (target - consecutive) more
+        # correct repetitions. Only running out of station 2's own attempt budget
+        # ends the loop (handled below) - this never borrows from station 1 or 3.
+        if stage2_cap_reached:
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "practice"}, passed=False, metrics=metrics, sentence_obj=sentence_obj)
         return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": True, **session_payload(s)})
 
-    # Station 2 starts here: normal practice. A passing first read enters either
+    # Station 1: normal practice / initial read. A passing first read enters either
     # Bloom repetition mode (if there were failures) or the separate cloze check.
+    s["sentence_attempts"] = int(s.get("sentence_attempts", 0)) + 1
+    cap_reached = s["sentence_attempts"] >= s["max_attempts"]
     if passed:
         target = mastery_target_for(s["failed_attempts"])
         s["mastery_score"] = score
-        if cap_reached:
-            record_and_advance(s, correct, spoken, score, True, metrics=metrics)
-            return jsonify({**base, "station": "practice", "advance": True, "cap_reached": True, **session_payload(s)})
         if target > 0:
             s["mastery_target"] = target
             s["mastery_consecutive"] = 1
+            s["stage2_attempts"] = 0
             return jsonify({**base, "station": "practice", "mastery_mode": True, "first_pass": True, **session_payload(s)})
 
         cw = detect_cloze_word(correct)
@@ -742,7 +849,7 @@ def answer():
 
     s["failed_attempts"] += 1
     if cap_reached:
-        return cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=metrics)
+        return cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=metrics, sentence_obj=sentence_obj)
     return jsonify({**base, **session_payload(s)})
 
 @app.post("/api/skip")
@@ -795,10 +902,12 @@ def teacher_login():
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
         return jsonify(ok=False), 401
     s = _teacher_state[tid]
+    sheet_id = RESULTS_SHEET_IDS.get(tid, RESULTS_SHEET_ID)
     return jsonify(
         ok=True, teacher=teacher_public(tid),
         allowed_students=s.get("allowed_students", []),
         restrict_to_list=bool(s.get("restrict_to_list", False)),
+        results_sheet_url=f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit",
     )
 
 @app.post("/api/teacher-allowed-students")
@@ -830,6 +939,8 @@ def teacher_settings():
         return jsonify(ok=False), 401
     _teacher_state[tid]["threshold"] = max(80, min(100, int(data.get("threshold", _teacher_state[tid]["threshold"]))))
     _teacher_state[tid]["max_attempts"] = max(4, min(7, int(data.get("max_attempts", _teacher_state[tid]["max_attempts"]))))
+    if "silence_timeout_ms" in data:
+        _teacher_state[tid]["silence_timeout_ms"] = max(400, min(3000, int(data.get("silence_timeout_ms", 1200))))
     save_state()
     return jsonify(ok=True, teacher=teacher_public(tid))
 
@@ -928,6 +1039,8 @@ def teacher_students():
                 "failed_attempts": s["failed_attempts"], "sentence_attempts": s.get("sentence_attempts", 0),
                 "mastery_target": s["mastery_target"], "mastery_consecutive": s["mastery_consecutive"],
                 "phase": phase, "created_at": s.get("created_at"), "updated_at": s.get("updated_at"),
+                "needs_review": s.get("needs_review_final", []),
+                "content_mismatch": s.get("content_mismatch", False),
             })
     students.sort(key=lambda x: x.get("updated_at") or 0, reverse=True)
     return jsonify(ok=True, teacher=teacher_public(tid), active_exercise=_teacher_state[tid].get("exercise_name", ""), students=students)
