@@ -716,6 +716,15 @@ def my_history():
 
     rows = []
     svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    # Diagnostics returned in the response (not just server logs, which aren't
+    # visible from outside Render) so a "why are my results missing" report can
+    # be root-caused from the client side alone.
+    debug = {
+        "sheet_configured": bool(svc_json),
+        "sheet_rows_scanned": 0,
+        "sheet_error": None,
+        "email_column_found": False,
+    }
     if svc_json:
         try:
             import gspread
@@ -726,8 +735,11 @@ def my_history():
             values = ws.get_all_values()
             if values:
                 header = values[0]
-                if "Student Email" in header:
-                    email_col = header.index("Student Email")
+                header_norm = [h.strip().lower() for h in header]
+                if "student email" in header_norm:
+                    email_col = header_norm.index("student email")
+                    debug["email_column_found"] = True
+                    debug["sheet_rows_scanned"] = len(values) - 1
                     for r in values[1:]:
                         if email_col < len(r) and r[email_col].strip().lower() == email:
                             rows.append({
@@ -735,9 +747,10 @@ def my_history():
                                 for i, h in enumerate(header)
                             })
         except gspread.WorksheetNotFound:
-            pass
+            debug["sheet_error"] = f"worksheet '{TEACHERS[tid]['results_tab']}' not found"
         except Exception as e:
             print("MY HISTORY SHEET READ FAILED", e)
+            debug["sheet_error"] = str(e)
 
     # Supplement with anything still only in memory (e.g. written moments ago,
     # or a local run with no GOOGLE_CREDENTIALS_JSON configured at all).
@@ -758,7 +771,7 @@ def my_history():
     exam_rows = [r for r in rows if r.get("phase") == "final_exam"]
     exam_avg = int(sum(float(r.get("score") or 0) for r in exam_rows) / len(exam_rows)) if exam_rows else None
     exercises = sorted({r.get("exercise") for r in rows if r.get("exercise")})
-    return jsonify(ok=True, rows=rows, total=total, exam_avg=exam_avg, exercises=exercises)
+    return jsonify(ok=True, rows=rows, total=total, exam_avg=exam_avg, exercises=exercises, debug=debug)
 
 @app.get("/api/question")
 def question():
