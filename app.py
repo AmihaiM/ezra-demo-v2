@@ -427,7 +427,7 @@ def session_payload(s):
         "attempts_left": left,
     }
 
-def new_session(student_id, teacher_id, student_name):
+def new_session(student_id, teacher_id, student_name, student_email=""):
     ts = _teacher_state[teacher_id]
     csv_url = ts.get("csv_url", "")
     sentences, used_fallback = load_sentences_from_csv_ex(csv_url)
@@ -441,6 +441,7 @@ def new_session(student_id, teacher_id, student_name):
         "student_id": student_id,
         "teacher_id": teacher_id,
         "student_name": student_name,
+        "student_email": (student_email or "").strip().lower(),
         "threshold": int(ts["threshold"]),
         "max_attempts": int(ts["max_attempts"]),
         "voice_gender": TEACHERS[teacher_id]["voice_gender"],
@@ -516,7 +517,7 @@ def append_exercise_to_catalog_sheet(name, csv_url):
     return {"name": name, "url": app_url, "csv_url": csv_url, "lang": "en", "source": "google_sheet", "already_exists": False}
 
 RESULT_HEADERS = [
-    "Time", "Teacher", "Student", "Exercise", "Phase", "Sentence", "Spoken",
+    "Time", "Teacher", "Student", "Student Email", "Exercise", "Phase", "Sentence", "Spoken",
     "Score", "Passed", "Skipped", "Attempts", "Max Attempts",
     "Mastery Repetitions", "Mastery Status", "Mastery Score", "Cloze Passed",
     "Recording Duration MS", "Silence MS", "Words Per Minute", "Fluency Status"
@@ -524,6 +525,7 @@ RESULT_HEADERS = [
 
 RESULT_KEY_ALIASES = {
     "Time": "timestamp", "Teacher": "teacher_id", "Student": "student_name",
+    "Student Email": "student_email",
     "Exercise": "exercise", "Phase": "phase", "Sentence": "sentence", "Spoken": "spoken",
     "Score": "score", "Passed": "passed", "Skipped": "skipped", "Attempts": "attempts",
     "Max Attempts": "max_attempts", "Mastery Repetitions": "mastery_reps",
@@ -624,7 +626,8 @@ def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, me
     fluency = fluency_from_metrics(spoken, score, metrics)
     row = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "teacher_id": s["teacher_id"], "student_name": s["student_name"], "exercise": s["exercise_name"],
+        "teacher_id": s["teacher_id"], "student_name": s["student_name"],
+        "student_email": s.get("student_email", ""), "exercise": s["exercise_name"],
         "phase": "practice", "sentence": correct, "spoken": spoken, "score": score,
         "passed": bool(passed), "skipped": bool(skipped),
         "attempts": max(1, s.get("sentence_attempts", 0)),
@@ -662,12 +665,22 @@ def teacher():
 def api_teachers():
     return jsonify({tid: teacher_public(tid) for tid in TEACHERS})
 
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 @app.post("/api/verify-student")
 def verify_student():
     data = request.get_json(force=True)
     tid, name, password = data.get("teacher_id"), data.get("name", "").strip(), data.get("password", "")
+    email = (data.get("email") or "").strip().lower()
     if tid not in TEACHERS or not name:
         return jsonify(ok=False, error="bad request"), 400
+    # Email is required (not just recommended): it is the stable identifier used
+    # to give each student a real, persistent history across logins/devices in
+    # "My Results" (/api/my-history) - a freeform name alone collides too easily
+    # (two students both named "עמיחי") and a fresh in-memory session ID is
+    # generated on every login, so name+session-id gives no real continuity.
+    if not email or not EMAIL_RE.match(email):
+        return jsonify(ok=False, error="נדרש אימייל תקין כדי להתחבר."), 400
     expected = TEACHERS[tid]["student_password"]
     if expected and password != expected:
         return jsonify(ok=False, error="wrong password"), 401
@@ -678,8 +691,74 @@ def verify_student():
             return jsonify(ok=False, error="השם שלך אינו ברשימת התלמידים המורשים. פנה למורה שלך."), 403
     safe_name = re.sub(r"[^A-Za-z0-9א-ת_-]", "_", name)
     sid = f"{tid}_{safe_name}_{int(time.time())}_{os.getpid()}"
-    new_session(sid, tid, name)
+    new_session(sid, tid, name, student_email=email)
     return jsonify(ok=True, student_id=sid, teacher=teacher_public(tid), exercise=_sessions[sid]["exercise_name"])
+
+@app.post("/api/my-history")
+def my_history():
+    """A student's full practice history, looked up by email - independent of
+    any single in-memory session (which is discarded on every server restart
+    and re-created fresh on every login). The Google Sheet is the durable
+    source of truth, so this reads directly from it when credentials are
+    configured; _pending_results is used as a fallback/supplement so results
+    from the last few minutes (or from a local run with no sheet configured)
+    still show up immediately without waiting on a sheet round-trip."""
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    email = (data.get("email") or "").strip().lower()
+    if tid not in TEACHERS:
+        return jsonify(ok=False, error="bad request"), 400
+    if not email or not EMAIL_RE.match(email):
+        return jsonify(ok=False, error="נדרש אימייל תקין."), 400
+    expected = TEACHERS[tid]["student_password"]
+    if expected and password != expected:
+        return jsonify(ok=False, error="wrong password"), 401
+
+    rows = []
+    svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if svc_json:
+        try:
+            import gspread
+            sheet_id = RESULTS_SHEET_IDS.get(tid, RESULTS_SHEET_ID)
+            sh = get_gspread_client().open_by_key(sheet_id)
+            tab = TEACHERS[tid]["results_tab"]
+            ws = sh.worksheet(tab)
+            values = ws.get_all_values()
+            if values:
+                header = values[0]
+                if "Student Email" in header:
+                    email_col = header.index("Student Email")
+                    for r in values[1:]:
+                        if email_col < len(r) and r[email_col].strip().lower() == email:
+                            rows.append({
+                                RESULT_KEY_ALIASES.get(h, h): (r[i] if i < len(r) else "")
+                                for i, h in enumerate(header)
+                            })
+        except gspread.WorksheetNotFound:
+            pass
+        except Exception as e:
+            print("MY HISTORY SHEET READ FAILED", e)
+
+    # Supplement with anything still only in memory (e.g. written moments ago,
+    # or a local run with no GOOGLE_CREDENTIALS_JSON configured at all).
+    seen_keys = {(r.get("timestamp"), r.get("sentence"), r.get("phase")) for r in rows}
+    for r in _pending_results:
+        if r.get("teacher_id") != tid:
+            continue
+        if (r.get("student_email") or "").strip().lower() != email:
+            continue
+        k = (r.get("timestamp"), r.get("sentence"), r.get("phase"))
+        if k in seen_keys:
+            continue
+        seen_keys.add(k)
+        rows.append(r)
+
+    rows.sort(key=lambda r: r.get("timestamp") or "")
+    total = len(rows)
+    exam_rows = [r for r in rows if r.get("phase") == "final_exam"]
+    exam_avg = int(sum(float(r.get("score") or 0) for r in exam_rows) / len(exam_rows)) if exam_rows else None
+    exercises = sorted({r.get("exercise") for r in rows if r.get("exercise")})
+    return jsonify(ok=True, rows=rows, total=total, exam_avg=exam_avg, exercises=exercises)
 
 @app.get("/api/question")
 def question():
@@ -761,7 +840,8 @@ def answer():
         fluency = fluency_from_metrics(spoken, r_score, metrics)
         row = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "teacher_id": s["teacher_id"],
-            "student_name": s["student_name"], "exercise": s["exercise_name"],
+            "student_name": s["student_name"], "student_email": s.get("student_email", ""),
+            "exercise": s["exercise_name"],
             "phase": "review_retry", "sentence": r_correct, "spoken": spoken, "score": r_score,
             "passed": bool(r_passed), "skipped": False, "attempts": 1, "max_attempts": 1,
             "mastery_reps": 0, "mastery_status": "review_pass" if r_passed else "needs_review",
@@ -911,7 +991,8 @@ def exam_result():
     fluency = fluency_from_metrics(data.get("spoken", ""), int(data.get("score", 0) or 0), metrics)
     row = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "teacher_id": s["teacher_id"],
-        "student_name": s["student_name"], "exercise": s["exercise_name"], "phase": "final_exam",
+        "student_name": s["student_name"], "student_email": s.get("student_email", ""),
+        "exercise": s["exercise_name"], "phase": "final_exam",
         "sentence": data.get("sentence", ""), "spoken": data.get("spoken", ""),
         "score": data.get("score", 0), "passed": data.get("passed", False), "skipped": False,
         "attempts": 1, "max_attempts": s.get("max_attempts", ""), "mastery_reps": 0,
