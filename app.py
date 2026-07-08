@@ -255,8 +255,26 @@ def extract_csv_url(value):
         if params.get("link"):
             return params["link"][0].strip()
         if "docs.google.com" in parsed.netloc and "/spreadsheets/" in parsed.path:
+            # "Publish to web" links look like /spreadsheets/d/e/<long-publish-id>/pub...
+            # - note the literal "e" path segment. These (and any link that is already
+            # /export or /gviz/) are already working CSV URLs and must be left untouched.
+            # The bug this guards against: the sheet-ID regex below would otherwise treat
+            # that literal "e" as the sheet ID and rewrite a perfectly good published CSV
+            # link into a broken one (.../d/e/export?format=csv&gid=0), which silently
+            # breaks every "Publish to web" exercise in the catalog - exactly what
+            # happened to the existing Motke exercise list after this auto-convert
+            # feature was added. Only genuine "d/<sheet-id>/edit" browser share links
+            # (copied straight from the address bar) should be rewritten.
+            already_csv = (
+                "/spreadsheets/d/e/" in parsed.path
+                or "/export" in parsed.path
+                or "/gviz/" in parsed.path
+                or parsed.path.rstrip("/").endswith("/pub")
+            )
+            if already_csv:
+                return raw
             m = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", parsed.path)
-            if m and "/export" not in parsed.path and "/gviz/" not in parsed.path:
+            if m:
                 sheet_id = m.group(1)
                 gid = params.get("gid", [None])[0]
                 if not gid:

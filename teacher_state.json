@@ -2,13 +2,21 @@
   "ben": {
     "threshold": 85,
     "max_attempts": 5,
-    "exercise_name": "תרגול דמו",
-    "csv_url": ""
+    "exercise_name": "Lesson 14 Advanced Motke - Problems and Solutions",
+    "csv_url": "https://docs.google.com/spreadsheets/d/e/export?format=csv&gid=0",
+    "custom_exercises": [],
+    "allowed_students": [],
+    "restrict_to_list": false,
+    "silence_timeout_ms": 1200
   },
   "sara": {
     "threshold": 85,
     "max_attempts": 5,
     "exercise_name": "Sandra Belinsky - 25 New words - Hebrew English",
-    "csv_url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsfvkzXkXhvueQ9c41O9QnhW_GryM_Joch0GbtFIvYeTtOEHLxWX8cSW1gCxTtaTcjwbXEXJPPssbA/pub?output=csv"
+    "csv_url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsfvkzXkXhvueQ9c41O9QnhW_GryM_Joch0GbtFIvYeTtOEHLxWX8cSW1gCxTtaTcjwbXEXJPPssbA/pub?output=csv",
+    "custom_exercises": [],
+    "allowed_students": [],
+    "restrict_to_list": false,
+    "silence_timeout_ms": 1200
   }
 }
