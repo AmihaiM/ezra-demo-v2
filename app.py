@@ -437,6 +437,26 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
     # teacher dashboard and student view must both flag this clearly instead of
     # silently mislabeling demo content as the real exercise.
     content_mismatch = used_fallback and bool(csv_url.strip())
+    if content_mismatch:
+        # Self-heal instead of just warning forever: the saved link can go
+        # stale (e.g. it was computed and saved by a buggy older version of
+        # extract_csv_url before that bug was fixed - exactly what happened
+        # to "Lesson 14 Advanced Motke"). Rather than requiring the teacher to
+        # manually re-select the exercise to force a recompute, look it up by
+        # name in the live catalog (which always recomputes csv_url fresh) and
+        # retry once. If that works, permanently overwrite the saved link too,
+        # so the warning never has to appear again for anyone.
+        exercise_name = ts.get("exercise_name", "")
+        for item in load_catalog("en"):
+            if item.get("name") == exercise_name and item.get("csv_url") and item.get("csv_url") != csv_url:
+                retry_sentences, retry_fallback = load_sentences_from_csv_ex(item["csv_url"])
+                if not retry_fallback:
+                    csv_url = item["csv_url"]
+                    sentences, used_fallback = retry_sentences, retry_fallback
+                    content_mismatch = False
+                    ts["csv_url"] = csv_url
+                    save_state()
+                break
     _sessions[student_id] = {
         "student_id": student_id,
         "teacher_id": teacher_id,
