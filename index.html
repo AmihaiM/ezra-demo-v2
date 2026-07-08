@@ -81,7 +81,23 @@ function setStation(st,q){
   }
 }
 function pickVoice(){let voices=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().startsWith('en'));if(!voices.length)return null;let kw=voiceGender==='male'?['david','mark','daniel','alex','fred','male']:['samantha','zira','victoria','karen','female','woman'];return voices.find(v=>kw.some(k=>v.name.toLowerCase().includes(k)))||voices[0]}
-function playSentence(){if(!currentQ)return;speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(currentQ.en);u.lang='en-US';u.rate=.88;let v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}
+function playSentence(){
+  if(!currentQ)return;
+  let text=currentQ.en;
+  speechSynthesis.cancel();
+  // Chrome/Edge's speech engine sometimes hasn't fully reset by the time
+  // speak() runs right after cancel(), so the first syllable of the new
+  // utterance gets clipped - happens on both the first playback and every
+  // "שמע שוב" repeat. A short delay before actually speaking lets the engine
+  // settle first, consistently fixing the dropped-first-syllable complaint.
+  setTimeout(()=>{
+    speechSynthesis.resume();
+    let u=new SpeechSynthesisUtterance(text);
+    u.lang='en-US';u.rate=.88;
+    let v=pickVoice();if(v)u.voice=v;
+    speechSynthesis.speak(u);
+  },200);
+}
 function toggleEnglish(){let e=document.getElementById('en');e.style.opacity=e.style.opacity==='1'?'0':'1'}
 function buildSpeechMetrics(startMs,lastSpeechMs,endMs,spoken){
   let duration=Math.max(0,Math.round(endMs-startMs));
