@@ -146,10 +146,33 @@ function showResult(spoken,res){
   let passed=!!res.passed;
   let isCloze=res.station==='cloze';
   document.getElementById('hint').textContent=passed?'יפה!':'נסה שוב';
+
+  let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
+  if(enteringCloze){
+    hideMastery();
+    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5)});
+  } else if(res.cloze_mode||res.cloze_active){
+    // showCloze() below always clears #result first (it removes a stale box
+    // left over from the PREVIOUS station) - so the cloze feedback box for
+    // THIS attempt must be built after it, not before, or it gets wiped.
+    setStation('cloze', currentQ||{});
+    showCloze(res.cloze_word,res.cloze_attempts_left||5);
+  } else hideCloze();
+
   if(isCloze){
-    // Cloze feedback is intentionally minimal - just pass/fail, no per-word
-    // breakdown box (that belongs to stations 1-2, not the cloze rebuild check).
-    box.style.display='none'; box.innerHTML='';
+    // Cloze gets its own compact transcript feedback - both the expected
+    // sentence and what was actually heard - instead of the per-word colored
+    // breakdown (that stays exclusive to stations 1-2). This lets the student
+    // see exactly what they got wrong instead of guessing blindly.
+    box.style.display='block';
+    box.className='result '+(passed?'pass':'fail');
+    box.innerHTML='<h3>'+(passed?'✅ מצוין! 🎉':'💪 עדיין לא בדיוק')+'</h3><div>המשפט המלא: <span dir="ltr">'+esc(res.correct||'')+'</span></div><div>אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>';
+    if(!passed && res.cloze_mode){
+      // Let the student request to hear the full correct sentence as a hint
+      // before their next attempt - recording has already ended by the time
+      // we get here, so this never overlaps with an active recording.
+      document.getElementById('play').style.display='';
+    }
   } else {
     box.style.display='block';
     box.className='result '+(passed?'pass':'fail');
@@ -159,13 +182,7 @@ function showResult(spoken,res){
       ? '<div class="small">ניסיון '+res.attempts_used+' מתוך '+res.max_attempts+'</div>' : '';
     box.innerHTML='<h3>'+(passed?'✅ ':'💪 ')+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>'+attempts+'<div class="words">'+words+'</div>';
   }
-  let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
-  if(enteringCloze){
-    hideMastery();
-    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5)});
-  } else if(res.cloze_mode||res.cloze_active){
-    setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5);
-  } else hideCloze();
+
   if(res.mastery_mode||res.mastery_target>0){setStation('practice', currentQ||{threshold:res.threshold});showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken,res.attempts_left)}else if(!res.cloze_mode)hideMastery();
   if(res.mastery_mode&&res.passed){
     let rem=res.mastery_remaining;
