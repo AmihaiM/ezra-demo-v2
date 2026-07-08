@@ -694,15 +694,73 @@ def verify_student():
     new_session(sid, tid, name, student_email=email)
     return jsonify(ok=True, student_id=sid, teacher=teacher_public(tid), exercise=_sessions[sid]["exercise_name"])
 
+def read_results_sheet_rows(tid):
+    """Read every row for a teacher's results sheet/tab back into dicts keyed
+    by the same field names used elsewhere (timestamp, student_name, score...).
+    This is the shared building block behind both "My Results" (filtered by
+    student email) and the teacher's own Results tab (unfiltered) - both need
+    the SAME durability: the Google Sheet is the only store that survives a
+    Render restart/redeploy, unlike _pending_results which lives only in this
+    process's memory and is wiped every time the free-tier dyno spins down or
+    a new deploy goes out. Returns (rows, debug) where debug explains exactly
+    what happened if rows comes back empty (sheet not configured, worksheet
+    missing, a fetch/auth error, etc.) so that can be surfaced to a caller
+    instead of silently looking like "there is no data"."""
+    rows = []
+    svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    debug = {
+        "sheet_configured": bool(svc_json),
+        "sheet_rows_scanned": 0,
+        "sheet_error": None,
+    }
+    if not svc_json:
+        return rows, debug
+    try:
+        import gspread
+        sheet_id = RESULTS_SHEET_IDS.get(tid, RESULTS_SHEET_ID)
+        sh = get_gspread_client().open_by_key(sheet_id)
+        tab = TEACHERS[tid]["results_tab"]
+        ws = sh.worksheet(tab)
+        values = ws.get_all_values()
+        if values:
+            header = values[0]
+            debug["sheet_rows_scanned"] = len(values) - 1
+            for r in values[1:]:
+                rows.append({
+                    RESULT_KEY_ALIASES.get(h, h): (r[i] if i < len(r) else "")
+                    for i, h in enumerate(header)
+                })
+    except gspread.WorksheetNotFound:
+        debug["sheet_error"] = f"worksheet '{TEACHERS[tid]['results_tab']}' not found"
+    except Exception as e:
+        print("RESULTS SHEET READ FAILED", tid, e)
+        debug["sheet_error"] = str(e)
+    return rows, debug
+
+def merge_with_pending(sheet_rows, tid, email=None):
+    """Supplement sheet_rows with anything still only in _pending_results
+    (written moments ago, or from a local run with no sheet configured at
+    all), de-duplicated against what the sheet already returned."""
+    seen_keys = {(r.get("timestamp"), r.get("sentence"), r.get("phase"), r.get("student_name")) for r in sheet_rows}
+    merged = list(sheet_rows)
+    for r in _pending_results:
+        if r.get("teacher_id") != tid:
+            continue
+        if email is not None and (r.get("student_email") or "").strip().lower() != email:
+            continue
+        k = (r.get("timestamp"), r.get("sentence"), r.get("phase"), r.get("student_name"))
+        if k in seen_keys:
+            continue
+        seen_keys.add(k)
+        merged.append(r)
+    merged.sort(key=lambda r: r.get("timestamp") or "")
+    return merged
+
 @app.post("/api/my-history")
 def my_history():
     """A student's full practice history, looked up by email - independent of
     any single in-memory session (which is discarded on every server restart
-    and re-created fresh on every login). The Google Sheet is the durable
-    source of truth, so this reads directly from it when credentials are
-    configured; _pending_results is used as a fallback/supplement so results
-    from the last few minutes (or from a local run with no sheet configured)
-    still show up immediately without waiting on a sheet round-trip."""
+    and re-created fresh on every login)."""
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
     email = (data.get("email") or "").strip().lower()
@@ -714,59 +772,11 @@ def my_history():
     if expected and password != expected:
         return jsonify(ok=False, error="wrong password"), 401
 
-    rows = []
-    svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    # Diagnostics returned in the response (not just server logs, which aren't
-    # visible from outside Render) so a "why are my results missing" report can
-    # be root-caused from the client side alone.
-    debug = {
-        "sheet_configured": bool(svc_json),
-        "sheet_rows_scanned": 0,
-        "sheet_error": None,
-        "email_column_found": False,
-    }
-    if svc_json:
-        try:
-            import gspread
-            sheet_id = RESULTS_SHEET_IDS.get(tid, RESULTS_SHEET_ID)
-            sh = get_gspread_client().open_by_key(sheet_id)
-            tab = TEACHERS[tid]["results_tab"]
-            ws = sh.worksheet(tab)
-            values = ws.get_all_values()
-            if values:
-                header = values[0]
-                header_norm = [h.strip().lower() for h in header]
-                if "student email" in header_norm:
-                    email_col = header_norm.index("student email")
-                    debug["email_column_found"] = True
-                    debug["sheet_rows_scanned"] = len(values) - 1
-                    for r in values[1:]:
-                        if email_col < len(r) and r[email_col].strip().lower() == email:
-                            rows.append({
-                                RESULT_KEY_ALIASES.get(h, h): (r[i] if i < len(r) else "")
-                                for i, h in enumerate(header)
-                            })
-        except gspread.WorksheetNotFound:
-            debug["sheet_error"] = f"worksheet '{TEACHERS[tid]['results_tab']}' not found"
-        except Exception as e:
-            print("MY HISTORY SHEET READ FAILED", e)
-            debug["sheet_error"] = str(e)
+    sheet_rows, debug = read_results_sheet_rows(tid)
+    debug["email_column_found"] = bool(sheet_rows and "student_email" in sheet_rows[0])
+    sheet_rows = [r for r in sheet_rows if (r.get("student_email") or "").strip().lower() == email]
+    rows = merge_with_pending(sheet_rows, tid, email=email)
 
-    # Supplement with anything still only in memory (e.g. written moments ago,
-    # or a local run with no GOOGLE_CREDENTIALS_JSON configured at all).
-    seen_keys = {(r.get("timestamp"), r.get("sentence"), r.get("phase")) for r in rows}
-    for r in _pending_results:
-        if r.get("teacher_id") != tid:
-            continue
-        if (r.get("student_email") or "").strip().lower() != email:
-            continue
-        k = (r.get("timestamp"), r.get("sentence"), r.get("phase"))
-        if k in seen_keys:
-            continue
-        seen_keys.add(k)
-        rows.append(r)
-
-    rows.sort(key=lambda r: r.get("timestamp") or "")
     total = len(rows)
     exam_rows = [r for r in rows if r.get("phase") == "final_exam"]
     exam_avg = int(sum(float(r.get("score") or 0) for r in exam_rows) / len(exam_rows)) if exam_rows else None
@@ -1140,8 +1150,13 @@ def teacher_results():
     tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
         return jsonify(ok=False), 401
-    rows = [r for r in _pending_results if r.get("teacher_id") == tid]
-    return jsonify(ok=True, rows=rows[-200:])
+    # Read from the Google Sheet (durable) instead of only _pending_results
+    # (wiped on every server restart/redeploy) - same persistence model as
+    # the student-facing "My Results" view, so the teacher's Results tab no
+    # longer silently loses history whenever Render spins the dyno down.
+    sheet_rows, debug = read_results_sheet_rows(tid)
+    rows = merge_with_pending(sheet_rows, tid)
+    return jsonify(ok=True, rows=rows[-200:], debug=debug)
 
 @app.post("/api/teacher-students")
 def teacher_students():
