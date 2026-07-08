@@ -571,10 +571,20 @@ def write_result(row):
             ws = sh.add_worksheet(title=tab, rows=1000, cols=24)
             ws.append_row(RESULT_HEADERS, value_input_option="USER_ENTERED")
         header = ensure_results_header(ws)
+        # Older sheets may still have a legacy lowercase header row (timestamp,
+        # teacher, student, ... - from before the 20-column RESULT_HEADERS design)
+        # sitting to the left of the current headers, because ensure_results_header
+        # only ever APPENDS missing columns rather than replacing the row. Do not
+        # keep filling those legacy columns going forward - only write into columns
+        # whose header is a real, recognized RESULT_HEADERS label. This stops new
+        # rows from duplicating every value into two side-by-side sets of columns.
         out = []
         for h in header:
-            key = RESULT_KEY_ALIASES.get(h, h)
-            out.append(row.get(key, ""))
+            if h in RESULT_HEADERS:
+                key = RESULT_KEY_ALIASES.get(h, h)
+                out.append(row.get(key, ""))
+            else:
+                out.append("")
         ws.append_row(out, value_input_option="USER_ENTERED")
         return True
     except Exception as e:
