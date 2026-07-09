@@ -126,8 +126,17 @@ function startRecognition(){
   if(!SR){alert('זיהוי קול נתמך בעיקר ב-Chrome/Edge');return}
   busy=true;
   let rec=new SR(); recognition=rec;
-  rec.lang='en-US'; rec.continuous=true; rec.interimResults=false; rec.maxAlternatives=1;
-  let finalText='',submitted=false,timer=null;
+  // interimResults was false, which is the likely cause of the widespread
+  // "לא נקלט דיבור" complaints: with continuous=true and interimResults=false,
+  // Chrome only fires onresult once it internally decides a segment is FINAL
+  // - and for short sentences, or when our own silence-timeout calls
+  // rec.stop() first, that finalization sometimes never happens even though
+  // the student spoke perfectly clearly. interimResults=true makes the
+  // browser report the in-progress transcript as it goes, which we now keep
+  // as a fallback (interimText) so a genuine attempt is never thrown away
+  // just because Chrome never got around to marking it "final".
+  rec.lang='en-US'; rec.continuous=true; rec.interimResults=true; rec.maxAlternatives=1;
+  let finalText='',interimText='',submitted=false,timer=null;
   let startedAt=performance.now(), lastSpeechAt=startedAt;
   // Delay only the VISUAL "recording" cue (mic turning red) by 250ms - the
   // recognition engine itself starts immediately below (rec.start()), but it
@@ -143,9 +152,12 @@ function startRecognition(){
   document.getElementById('hint').textContent='מקשיב...';
   rec.onresult=e=>{
     lastSpeechAt=performance.now();
+    let interim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
       if(e.results[i].isFinal) finalText+=(e.results[i][0].transcript+' ');
+      else interim+=e.results[i][0].transcript;
     }
+    if(interim) interimText=interim;
     if(timer)clearTimeout(timer);
     timer=setTimeout(()=>{if(!submitted)rec.stop()},silenceTimeoutMs);
   };
@@ -159,7 +171,11 @@ function startRecognition(){
     if(submitted)return;
     submitted=true;
     if(timer)clearTimeout(timer);
-    let spoken=finalText.trim();
+    // Prefer the finalized transcript, but fall back to the last interim one
+    // if Chrome ended the session without ever finalizing anything - that is
+    // the "spoke clearly but got 'לא נקלט דיבור' anyway" bug, not a real
+    // silence.
+    let spoken=(finalText.trim()||interimText.trim());
     let metrics=buildSpeechMetrics(startedAt,lastSpeechAt,endedAt,spoken);
     if(!spoken){busy=false;document.getElementById('hint').textContent='לא נקלט דיבור — נסה שוב';return}
     document.getElementById('hint').textContent='מעבד...';
