@@ -199,7 +199,13 @@ function showResult(spoken,res){
   }
   let passed=!!res.passed;
   let isCloze=res.station==='cloze';
-  document.getElementById('hint').textContent=passed?'יפה!':'נסה שוב';
+  // When the teacher's max-attempts cap is hit on a FAILED try, the server
+  // sets skipped+cap_reached and moves straight to the next sentence - there
+  // is no "try again" left. Showing "נסה שוב"/"אתה יכול!" in that case used
+  // to directly contradict the "עברנו הלאה" text shown right below it and
+  // the "הבא" button, which is exactly the confusing mixed message reported.
+  let outOfAttempts=!passed&&!!res.skipped&&!!res.cap_reached;
+  document.getElementById('hint').textContent=passed?'יפה!':(outOfAttempts?'עברנו הלאה':'נסה שוב');
 
   let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
   if(enteringCloze){
@@ -220,7 +226,8 @@ function showResult(spoken,res){
     // see exactly what they got wrong instead of guessing blindly.
     box.style.display='block';
     box.className='result '+(passed?'pass':'fail');
-    box.innerHTML='<h3>'+(passed?'✅ מצוין! 🎉':'💪 עדיין לא בדיוק')+'</h3><div>המשפט המלא: <span dir="ltr">'+esc(res.correct||'')+'</span></div><div>אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>';
+    let clozeTitle=passed?'✅ מצוין! 🎉':(outOfAttempts?'⏭️ עברנו הלאה':'💪 עדיין לא בדיוק');
+    box.innerHTML='<h3>'+clozeTitle+'</h3><div>המשפט המלא: <span dir="ltr">'+esc(res.correct||'')+'</span></div><div>אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>';
     if(!passed && res.cloze_mode){
       // Let the student request to hear the full correct sentence as a hint
       // before their next attempt - recording has already ended by the time
@@ -230,11 +237,12 @@ function showResult(spoken,res){
   } else {
     box.style.display='block';
     box.className='result '+(passed?'pass':'fail');
-    let msg=passed?pick(MSG_PASS):pick(MSG_FAIL);
+    let msg=passed?pick(MSG_PASS):(outOfAttempts?'לא הצלחנו הפעם':pick(MSG_FAIL));
+    let icon=passed?'✅ ':(outOfAttempts?'⏭️ ':'💪 ');
     let words=(res.words||[]).map(w=>'<span class="w '+esc(w.status)+'">'+esc(w.word)+'</span>').join(' ');
     let attempts = (typeof res.attempts_used==='number' && typeof res.max_attempts==='number')
       ? '<div class="small">ניסיון '+res.attempts_used+' מתוך '+res.max_attempts+'</div>' : '';
-    box.innerHTML='<h3>'+(passed?'✅ ':'💪 ')+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>'+attempts+'<div class="words">'+words+'</div>';
+    box.innerHTML='<h3>'+icon+msg+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>'+attempts+'<div class="words">'+words+'</div>';
   }
 
   if(res.mastery_mode||res.mastery_target>0){setStation('practice', currentQ||{threshold:res.threshold});showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken,res.attempts_left)}else if(!res.cloze_mode)hideMastery();

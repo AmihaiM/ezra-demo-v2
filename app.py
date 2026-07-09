@@ -834,7 +834,7 @@ def question():
         "content_mismatch": s.get("content_mismatch", False), **session_payload(s)
     })
 
-def cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=None, sentence_obj=None):
+def cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=None, sentence_obj=None, attempts_used=None):
     """Hard safety valve: no sentence can consume more than max_attempts submissions.
     If the student got a passing score on the last allowed try, move on as passed;
     otherwise skip/move on so the exercise never loops forever.
@@ -842,10 +842,19 @@ def cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=None,
     chance in a review round before the final exam (unless we're already in
     that review round, in which case it's simply flagged for the teacher).
     """
+    # attempts_used must be captured by the caller BEFORE this function runs,
+    # from whichever per-station counter (sentence_attempts/stage2_attempts/
+    # cloze_attempts) actually hit the cap. record_and_advance() below resets
+    # ALL of those counters to 0 to prepare the (now-advanced) session for the
+    # next sentence, and session_payload(s) - spread in below - reports
+    # whatever counter is live for the session's new state. Without capturing
+    # the real value first, the response was showing the next sentence's
+    # fresh "0 attempts used" instead of the capped station's true count
+    # (e.g. "ניסיון 0 מתוך 5" right after actually using all 5).
     record_and_advance(s, correct, spoken, score, bool(passed), skipped=not bool(passed), metrics=metrics)
     if not passed and sentence_obj and not s.get("in_review"):
         s["review_queue"].append(dict(sentence_obj))
-    return jsonify({
+    payload = {
         **base,
         "passed": bool(passed),
         "skipped": not bool(passed),
@@ -853,7 +862,11 @@ def cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=None,
         "cap_reached": True,
         "message": "עברנו הלאה אחרי מספר הניסיונות שהוגדר למורה.",
         **session_payload(s),
-    })
+    }
+    if attempts_used is not None:
+        payload["attempts_used"] = attempts_used
+        payload["attempts_left"] = 0
+    return jsonify(payload)
 
 @app.post("/api/answer")
 def answer():
@@ -941,7 +954,7 @@ def answer():
 
         s["cloze_attempts"] += 1
         if s["cloze_attempts"] >= s["max_attempts"]:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, passed=False, metrics=metrics, sentence_obj=sentence_obj)
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, passed=False, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["cloze_attempts"])
         return jsonify({**base, "station": "cloze", "cloze_mode": True, **session_payload(s)})
 
     # Station 2: Bloom practice/mastery. The cloze station is NOT shown yet.
@@ -972,7 +985,7 @@ def answer():
         # correct repetitions. Only running out of station 2's own attempt budget
         # ends the loop (handled below) - this never borrows from station 1 or 3.
         if stage2_cap_reached:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "practice"}, passed=False, metrics=metrics, sentence_obj=sentence_obj)
+            return cap_and_advance(s, correct, spoken, score, {**base, "station": "practice"}, passed=False, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["stage2_attempts"])
         return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": True, **session_payload(s)})
 
     # Station 1: normal practice / initial read. A passing first read enters either
@@ -1000,7 +1013,7 @@ def answer():
 
     s["failed_attempts"] += 1
     if cap_reached:
-        return cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=metrics, sentence_obj=sentence_obj)
+        return cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["sentence_attempts"])
     return jsonify({**base, **session_payload(s)})
 
 @app.post("/api/skip")
