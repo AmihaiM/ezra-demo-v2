@@ -1,6 +1,21 @@
 <!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EZRA — לוח מורה</title>
 <style>*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}input,button{font:inherit}button{border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.screen{min-height:100vh;padding:24px}.center{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1)}.card{background:white;border-radius:20px;padding:24px;box-shadow:0 8px 28px #0002;margin-bottom:18px}.login{width:min(420px,94vw)}.tabs{display:flex;gap:8px}.tab{flex:1;background:#fff;border:2px solid #ddd6fe;color:#4318D1}.tab.active{background:var(--tc,#4318D1);color:white}input,select,textarea{width:100%;padding:11px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0;font-family:inherit}input[type=checkbox]{width:auto;margin:0}.err{display:none;background:#ffebee;color:#c62828;border-radius:10px;padding:8px;margin:8px 0}.top{display:none;background:var(--tc,#4318D1);color:white;padding:14px 20px;gap:12px;align-items:center}.logout{margin-right:auto;background:#fff2;color:white}.wrap{display:none;max-width:980px;margin:0 auto;padding:18px}.nav{display:flex;gap:8px;margin-bottom:18px}.nav button{flex:1;background:white;color:#4318D1}.nav button.active{background:var(--tc,#4318D1);color:white}.section{display:none}.section.active{display:block}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.list{max-height:420px;overflow:auto;border:2px solid #ddd6fe;border-radius:14px}.item{display:flex;gap:10px;align-items:center;padding:12px;border-bottom:1px solid #eee}.item:hover{background:#f8f7ff}.item b{flex:1}.badge{border-radius:999px;padding:4px 10px;background:#ede7ff;color:#4318D1;font-size:12px}table{width:100%;border-collapse:collapse;direction:ltr;text-align:left}td,th{border-bottom:1px solid #eee;padding:8px;font-size:13px}th{background:#f8f7ff}
 .results-wrap{width:100%;overflow-x:auto;border:1px solid #ede7ff;border-radius:16px;background:white}.results-table{min-width:1100px;width:max-content}.results-table th{position:sticky;top:0;background:#4318D1;color:#fff;z-index:1;white-space:nowrap}.results-table td{max-width:220px;vertical-align:top;word-break:break-word}.results-table td.sentence,.results-table td.spoken{min-width:210px}.pill{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800}.pill-ok{background:#dcfce7;color:#166534}.pill-bad{background:#fee2e2;color:#991b1b}.pill-master{background:#fef3c7;color:#92400e}.hint-card{background:linear-gradient(135deg,#fff,#f8f7ff);border:1px solid #ede7ff;border-radius:16px;padding:12px;margin:10px 0;color:#555;font-size:13px}
+/* Compact results table redesign: only the essentials are visible by default;
+   clicking a row expands an inline detail panel with the sentence, spoken
+   text and speech-timing metrics instead of dumping all 19 columns at once. */
+.filters{margin:10px 0}.filters select{width:auto;min-width:150px;margin:0}
+.rtable-wrap{width:100%;overflow-x:auto;border:1px solid #ede7ff;border-radius:16px;background:white}
+.rtable{width:100%;border-collapse:collapse;min-width:760px}
+.rtable th{position:sticky;top:0;background:#4318D1;color:#fff;white-space:nowrap;text-align:right;padding:9px 10px;font-size:12px}
+.rtable td{padding:9px 10px;font-size:13px;border-bottom:1px solid #eee;vertical-align:top}
+.rtable tr.rrow{cursor:pointer}.rtable tr.rrow:hover{background:#f8f7ff}
+.rtable td.ex{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rtable td.caret{width:18px;color:#9d8fe0;text-align:center}
+.detail-row td{background:#faf9ff;padding:12px 16px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:13px}
+.detail-grid div b{color:#4318D1}
+.pill-green{background:#dcfce7;color:#166534}.pill-red{background:#fee2e2;color:#991b1b}.pill-amber{background:#fef3c7;color:#92400e}.pill-gray{background:#ede7ff;color:#4318D1}
 </style></head><body>
 <section id="login" class="screen center"><div class="card login"><h1>🎓 לוח מורה</h1><div class="tabs"><button id="tab-ben" class="tab active" onclick="chooseTeacher('ben')">דן</button><button id="tab-sara" class="tab" onclick="chooseTeacher('sara')">שרה</button></div><input id="password" type="password" placeholder="סיסמת מורה"><div id="err" class="err">סיסמה לא תקינה</div><button class="primary" style="width:100%" onclick="doLogin()">כניסה</button><p style="font-size:13px;color:#777">ברירת מחדל: ben2026 / sara2026, אלא אם הוגדרו משתני סביבה.</p><p><a href="/">חזרה לתלמיד</a></p></div></section>
 <header id="top" class="top"><b>EZRA</b><span id="who"></span><button class="logout" onclick="logout()">יציאה</button></header>
@@ -8,7 +23,7 @@
 <section id="settings" class="section active"><div class="card"><h2>הגדרות כיתה</h2><label>Threshold למבחן הסופי בלבד: <b id="thresholdVal">85</b></label><input id="threshold" type="range" min="80" max="100" value="85" oninput="thresholdVal.textContent=this.value"><p style="color:#666;font-size:12px;margin:-4px 0 8px">בתחנות 1-3 תמיד נדרשת התאמה מלאה של 100% כדי לעבור. ה-Threshold הזה משפיע רק על ציון המבחן הסופי (תחנה 4).</p><label>מספר ניסיונות למשפט: <b id="attemptsVal">5</b></label><input id="attempts" type="range" min="4" max="7" value="5" oninput="attemptsVal.textContent=this.value"><label>זמן שתיקה לסיום הקלטה (שניות): <b id="silenceVal">1.2</b></label><input id="silence" type="range" min="400" max="3000" step="100" value="1200" oninput="silenceVal.textContent=(this.value/1000).toFixed(1)"><button class="primary" onclick="saveSettings()">שמור</button><span id="saveMsg" class="badge" style="display:none">נשמר</span></div><div class="card"><h2>תלמידים מורשים</h2><p style="color:#666;font-size:13px">רשימת שמות תלמידים מורשים להיכנס לתרגול — שם אחד בכל שורה (או מופרדים בפסיקים).</p><textarea id="allowedStudents" rows="6" placeholder="לדוגמה:&#10;דני כהן&#10;נועה לוי"></textarea><label style="display:flex;align-items:center;gap:8px;margin:8px 0"><input id="allowOutsideList" type="checkbox" checked> לאפשר כניסה גם לתלמידים שאינם ברשימה</label><button class="primary" onclick="saveAllowedStudents()">שמור רשימת תלמידים</button><span id="allowedMsg" class="badge" style="display:none">נשמר</span></div></section>
 <section id="exercises" class="section"><div class="card"><h2>בחירת תרגיל מהגוגל שיט</h2><input id="search" placeholder="חיפוש תרגיל" oninput="renderExercises()"><div class="row"><button class="ghost" onclick="loadCatalog()">רענן רשימה</button><button class="ghost" onclick="useDemoExercise()">🔄 חזרה לתרגיל הדמו</button><button class="primary" onclick="document.getElementById('addExerciseCard').scrollIntoView({behavior:'smooth',block:'start'})">⬇️ הוספת תרגיל חדש</button></div><p id="exCount"></p><div id="exList" class="list"><div class="item">טוען...</div></div></div><div id="addExerciseCard" class="card"><h2>הוספת תרגיל חדש</h2><p style="color:#666;font-size:13px">אפשר להדביק קישור CSV מפורסם של Google Sheets, קישור רגיל לגיליון (כמו שמעתיקים מסרגל הכתובת), או קישור EZRA שיש בו ?link=CSV. חשוב: הגיליון חייב להיות משותף לפי "כל מי שיש לו את הקישור — צפייה" אחרת השרת לא יוכל לקרוא אותו. לאחר הוספה התרגיל נכתב לגוגל שיט הראשי, נטען מחדש מהרשימה, ונבחר מיד למורה.</p><input id="newExName" placeholder="שם התרגיל למשל: Sandra Belinsky - 25 New words"><input id="newExCsv" placeholder="קישור CSV מפורסם"><button class="primary" onclick="addExercise()">הוסף ובחר תרגיל</button><span id="addMsg" class="badge" style="display:none"></span></div></section>
 <section id="live" class="section"><div class="card"><h2>תלמידים פעילים</h2><button class="ghost" onclick="loadStudents()">רענן</button><p id="activeExercise"></p><div id="students"></div></div></section>
-<section id="results" class="section"><div class="card"><h2>תוצאות אחרונות</h2><div class="row"><button class="ghost" onclick="loadResults()">רענן</button><a id="sheetLink" class="primary" style="display:none;text-decoration:none;padding:10px 16px;border-radius:12px" target="_blank" rel="noopener">📊 פתח את גיליון התוצאות בגוגל שיט</a></div><p style="color:#666;font-size:12px">הגיליון מתעדכן אוטומטית בזמן אמת — זה כבר ה"אקספורט" החי שלך, בלי צורך בכפתור ייצוא נפרד. עיצוב (צבעים, גופנים) נשלט מתוך Google Sheets עצמו דרך ה-Apps Script שהתקנת.</p><div id="resultsBody"></div></div></section></main>
+<section id="results" class="section"><div class="card"><h2>תוצאות אחרונות</h2><div class="row"><button class="ghost" onclick="loadResults()">רענן</button><a id="sheetLink" class="primary" style="display:none;text-decoration:none;padding:10px 16px;border-radius:12px" target="_blank" rel="noopener">📊 פתח את גיליון התוצאות בגוגל שיט</a></div><p style="color:#666;font-size:12px">הגיליון מתעדכן אוטומטית בזמן אמת — זה כבר ה"אקספורט" החי שלך, בלי צורך בכפתור ייצוא נפרד. עיצוב (צבעים, גופנים) נשלט מתוך Google Sheets עצמו דרך ה-Apps Script שהתקנת.</p><div class="row filters"><select id="filterStudent" onchange="renderResultsTable()"><option value="">כל התלמידים</option></select><select id="filterPhase" onchange="renderResultsTable()"><option value="">כל השלבים</option><option value="practice">תרגול</option><option value="review_retry">חזרה</option><option value="final_exam">מבחן סופי</option></select></div><p style="color:#666;font-size:12px">לחץ על שורה כדי לראות את המשפט המלא, מה נאמר, ומדדי הדיבור.</p><div id="resultsBody"></div></div></section></main>
 <script>
 var teacherId='ben', teacherPassword='', teachers={}, exercises=[], activeName='';
 document.addEventListener('DOMContentLoaded',()=>{fetch('/api/teachers').then(r=>r.json()).then(d=>{teachers=d;chooseTeacher('ben')});document.getElementById('password').onkeydown=e=>{if(e.key==='Enter')doLogin()}});
@@ -24,17 +39,67 @@ function selectExercise(i){let x=exercises[i];api('/api/set-exercise',{name:x.na
 function useDemoExercise(){api('/api/set-exercise',{name:'תרגול דמו',csv_url:''}).then(()=>{activeName='תרגול דמו';alert('נבחר: תרגול דמו (3 משפטים לדוגמה)');loadStudents()})}
 function addExercise(){let name=document.getElementById('newExName').value.trim();let csv=document.getElementById('newExCsv').value.trim();let msg=document.getElementById('addMsg');msg.style.display='inline-block';msg.textContent='בודק CSV וכותב לגוגל שיט...';api('/api/add-exercise',{name:name,csv_url:csv}).then(d=>{if(!d.ok){msg.textContent=d.error||'שגיאה בהוספה'; if(d.details) console.warn(d.details); return}activeName=d.exercise.name;msg.textContent=(d.exercise&&d.exercise.already_exists?'כבר קיים בגוגל שיט ונבחר: ':'נוסף לגוגל שיט ונבחר: ')+d.sentence_count+' משפטים';loadCatalog();loadStudents();}).catch(()=>{msg.textContent='שגיאה בהוספה'})}
 function fmtTime(ts){if(!ts)return '';let d=new Date(ts*1000);return d.toLocaleString('he-IL',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'});}function loadStudents(){api('/api/teacher-students').then(d=>{activeName=d.active_exercise||activeName;document.getElementById('activeExercise').innerHTML='תרגיל שנבחר עכשיו למורה: <b>'+esc(activeName||'לא נבחר')+'</b><br><span style="color:#666;font-size:12px">כל תלמיד מוצג עם התרגיל שהוא התחיל בפועל, גם אם המורה כבר החליף לתרגיל הבא.</span>';let rows=d.students||[];document.getElementById('students').innerHTML=rows.map(s=>{let needsReview=(s.needs_review||[]).length?'<br><small style="color:#c62828">⚠️ צריך חזרה על '+s.needs_review.length+' משפטים: '+s.needs_review.map(esc).join('; ')+'</small>':'';let mismatch=s.content_mismatch?'<br><small style="color:#c62828">⚠️ לא הצלחנו לטעון את "'+esc(s.exercise||'')+'" מהגיליון — התלמיד קיבל בפועל תרגיל לדוגמה. בדוק את שיתוף הגיליון הזה.</small>':'';return '<div class="item" style="align-items:flex-start"><b>'+esc(s.name)+'<br><small>תרגיל תלמיד: '+esc(s.exercise||'')+'</small><br><small>התחיל: '+fmtTime(s.created_at)+' | פעילות אחרונה: '+fmtTime(s.updated_at)+'</small>'+needsReview+mismatch+'</b><span class="badge">'+s.index+'/'+s.total+'</span><span class="badge">'+(s.done?'סיים':s.phase)+'</span><span class="badge">ניסיון '+(s.sentence_attempts||0)+'/'+(s.max_attempts||'')+'</span></div>'}).join('')||'אין תלמידים פעילים'})}
+var resultsRows=[];
+var PHASE_LABELS={practice:'תרגול',review_retry:'חזרה',final_exam:'מבחן סופי'};
+var MASTERY_LABELS={mastered:'שולט',not_mastered:'לא שולט',review_pass:'עבר בחזרה',needs_review:'צריך חזרה',final_exam_pass:'עבר מבחן',final_exam_fail:'נכשל במבחן'};
+var MASTERY_GOOD={mastered:1,review_pass:1,final_exam_pass:1};
+var FLUENCY_LABELS={fluent_mastery:'שוטף',accurate_needs_fluency:'מדויק - צריך שטף',not_mastered:'לא נשלט'};
 function loadResults(){api('/api/teacher-results').then(d=>{
-  let rows=d.rows||[];
-  if(!rows.length){resultsBody.textContent='אין תוצאות עדיין';return}
-  let cols=['timestamp','student_name','exercise','phase','sentence','spoken','score','passed','attempts','max_attempts','mastery_reps','mastery_status','mastery_score','cloze_passed','recording_duration_ms','silence_ms','words_per_minute','fluency_status','skipped'];
-  let labels={timestamp:'זמן',student_name:'תלמיד',exercise:'תרגיל',phase:'שלב',sentence:'משפט',spoken:'מה נאמר',score:'ציון',passed:'עבר',attempts:'ניסיונות',max_attempts:'מקס׳',mastery_reps:'חזרות Mastery',mastery_status:'סטטוס Mastery',mastery_score:'ציון Mastery',cloze_passed:'קלוז',recording_duration_ms:'משך הקלטה ms',silence_ms:'שקט/היסוס ms',words_per_minute:'מילים לדקה',fluency_status:'שטף',skipped:'דולג'};
-  function cell(k,v){
-    if(k==='passed') return v===true||v==='true'||v==='Yes'?'<span class="pill pill-ok">עבר</span>':'<span class="pill pill-bad">לא עבר</span>';
-    if(k==='mastery_status') return '<span class="pill pill-master">'+esc(v||'')+'</span>';
-    return esc(v);
-  }
-  resultsBody.innerHTML='<div class="hint-card">הטבלה נגללת לרוחב כדי לא לחתוך משפטים. עמודות Mastery נרשמות גם לגוגל שיט: סטטוס, חזרות, ציון ושלב.</div><div class="results-wrap"><table class="results-table"><thead><tr>'+cols.map(k=>'<th>'+labels[k]+'</th>').join('')+'</tr></thead><tbody>'+rows.slice().reverse().map(r=>'<tr>'+cols.map(k=>'<td class="'+(k==='sentence'||k==='spoken'?k:'')+'">'+cell(k,r[k])+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+  resultsRows=d.rows||[];
+  if(!resultsRows.length){resultsBody.textContent='אין תוצאות עדיין';return}
+  let sel=document.getElementById('filterStudent');
+  let current=sel.value;
+  let students=Array.from(new Set(resultsRows.map(r=>r.student_name).filter(Boolean))).sort();
+  sel.innerHTML='<option value="">כל התלמידים</option>'+students.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  sel.value=students.includes(current)?current:'';
+  renderResultsTable();
 })}
+function fmtShortTime(ts){
+  // ts is already "YYYY-MM-DD HH:MM:SS" in Israel local time from the server.
+  if(!ts)return'';
+  let parts=ts.split(' ');if(parts.length<2)return esc(ts);
+  let d=parts[0].split('-');
+  return '<span title="'+esc(ts)+'">'+d[1]+'/'+d[2]+' '+parts[1].slice(0,5)+'</span>';
+}
+function scorePill(r){
+  let ok=r.passed===true||r.passed==='true'||r.passed==='TRUE'||r.passed==='Yes';
+  return '<span class="pill '+(ok?'pill-green':'pill-red')+'">'+esc(r.score)+'% '+(ok?'✓':'✗')+'</span>';
+}
+function masteryPill(v){
+  if(!v)return'';
+  let cls=MASTERY_GOOD[v]?'pill-green':(v==='needs_review'?'pill-amber':'pill-red');
+  return '<span class="pill '+cls+'">'+esc(MASTERY_LABELS[v]||v)+'</span>';
+}
+function phasePill(v){return '<span class="pill pill-gray">'+esc(PHASE_LABELS[v]||v)+'</span>'}
+function renderResultsTable(){
+  let studentF=document.getElementById('filterStudent').value;
+  let phaseF=document.getElementById('filterPhase').value;
+  let rows=resultsRows.filter(r=>(!studentF||r.student_name===studentF)&&(!phaseF||r.phase===phaseF));
+  if(!rows.length){resultsBody.innerHTML='<p style="color:#666">אין תוצאות תואמות לסינון.</p>';return}
+  let ordered=rows.slice().reverse();
+  let body=ordered.map((r,i)=>{
+    let skippedBadge=(r.skipped===true||r.skipped==='true'||r.skipped==='TRUE')?' <span class="pill pill-amber">דולג</span>':'';
+    let mainRow='<tr class="rrow" onclick="toggleResultDetail('+i+')"><td class="caret" id="caret'+i+'">▸</td><td>'+fmtShortTime(r.timestamp)+'</td><td>'+esc(r.student_name)+'</td><td class="ex" title="'+esc(r.exercise||'')+'">'+esc(r.exercise||'')+'</td><td>'+phasePill(r.phase)+'</td><td>'+scorePill(r)+skippedBadge+'</td><td>'+esc(r.attempts)+'/'+esc(r.max_attempts)+'</td><td>'+masteryPill(r.mastery_status)+'</td></tr>';
+    let detail='<tr class="detail-row" id="detail'+i+'" style="display:none"><td colspan="8"><div class="detail-grid">'
+      +'<div><b>משפט:</b> <span dir="ltr">'+esc(r.sentence||'')+'</span></div>'
+      +'<div><b>מה נאמר:</b> <span dir="ltr">'+esc(r.spoken||'')+'</span></div>'
+      +'<div><b>ציון Mastery:</b> '+esc(r.mastery_score)+'</div>'
+      +'<div><b>חזרות Mastery:</b> '+esc(r.mastery_reps)+'</div>'
+      +'<div><b>קלוז:</b> '+esc(r.cloze_passed)+'</div>'
+      +'<div><b>שטף:</b> '+esc(FLUENCY_LABELS[r.fluency_status]||r.fluency_status||'')+'</div>'
+      +'<div><b>משך הקלטה:</b> '+esc(r.recording_duration_ms)+' ms</div>'
+      +'<div><b>שקט/היסוס:</b> '+esc(r.silence_ms)+' ms</div>'
+      +'<div><b>מילים לדקה:</b> '+esc(r.words_per_minute)+'</div>'
+      +'</div></td></tr>';
+    return mainRow+detail;
+  }).join('');
+  resultsBody.innerHTML='<div class="rtable-wrap"><table class="rtable"><thead><tr><th></th><th>זמן</th><th>תלמיד</th><th>תרגיל</th><th>שלב</th><th>ציון</th><th>ניסיונות</th><th>Mastery</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+}
+function toggleResultDetail(i){
+  let row=document.getElementById('detail'+i), caret=document.getElementById('caret'+i);
+  let open=row.style.display!=='none';
+  row.style.display=open?'none':'table-row';
+  caret.textContent=open?'▸':'▾';
+}
 function logout(){location.reload()}function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 </script></body></html>

@@ -1,6 +1,8 @@
 import os, json, time, re, csv, io
 from urllib.parse import urlparse, parse_qs, quote
 from difflib import SequenceMatcher
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from flask import Flask, request, jsonify, Response
 import requests
 
@@ -8,6 +10,15 @@ app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_TTL = 3600
 STATE_FILE = os.path.join(BASE_DIR, "teacher_state.json")
+IL_TZ = ZoneInfo("Asia/Jerusalem")
+
+def now_str():
+    # Render's server clock runs in UTC. Every result timestamp shown to
+    # teachers/students must be in Israel local time (including DST), not
+    # raw server time - previously time.strftime() used the server's local
+    # (UTC) clock directly, so timestamps in the results table were off by
+    # 2-3 hours from the actual wall-clock time in Israel.
+    return datetime.now(IL_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 TEACHERS = {
     "ben": {
@@ -607,7 +618,19 @@ def write_result(row):
                 out.append(row.get(key, ""))
             else:
                 out.append("")
-        ws.append_row(out, value_input_option="USER_ENTERED")
+        # IMPORTANT: do not use ws.append_row() here. It relies on Google Sheets'
+        # own auto-detected "used range" of the ENTIRE tab to decide where the
+        # next row goes - which silently breaks if a teacher adds any other
+        # content anywhere else on the same tab (e.g. a legend/notes table off
+        # to the right) that extends further DOWN than the results table itself.
+        # That happened for real: a two-column legend added past column U, going
+        # down further than the data, made every subsequent append_row() land
+        # new rows starting at the legend's column instead of column A - exactly
+        # the "new rows are written in the old columns" bug a teacher hit.
+        # Writing to an explicit A<row> range anchors every write to column A
+        # regardless of what else exists elsewhere on the tab.
+        next_row = len(ws.get_all_values()) + 1
+        ws.update(f"A{next_row}", [out], value_input_option="USER_ENTERED")
         return True
     except Exception as e:
         print("WRITE RESULT FAILED", e)
@@ -645,7 +668,7 @@ def fluency_from_metrics(spoken, score, metrics=None):
 def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, metrics=None):
     fluency = fluency_from_metrics(spoken, score, metrics)
     row = {
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": now_str(),
         "teacher_id": s["teacher_id"], "student_name": s["student_name"],
         "student_email": s.get("student_email", ""), "exercise": s["exercise_name"],
         "phase": "practice", "sentence": correct, "spoken": spoken, "score": score,
@@ -895,7 +918,7 @@ def answer():
         r_words = word_level(spoken, r_correct)
         fluency = fluency_from_metrics(spoken, r_score, metrics)
         row = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "teacher_id": s["teacher_id"],
+            "timestamp": now_str(), "teacher_id": s["teacher_id"],
             "student_name": s["student_name"], "student_email": s.get("student_email", ""),
             "exercise": s["exercise_name"],
             "phase": "review_retry", "sentence": r_correct, "spoken": spoken, "score": r_score,
@@ -1046,7 +1069,7 @@ def exam_result():
     metrics = data.get("metrics") or {}
     fluency = fluency_from_metrics(data.get("spoken", ""), int(data.get("score", 0) or 0), metrics)
     row = {
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "teacher_id": s["teacher_id"],
+        "timestamp": now_str(), "teacher_id": s["teacher_id"],
         "student_name": s["student_name"], "student_email": s.get("student_email", ""),
         "exercise": s["exercise_name"], "phase": "final_exam",
         "sentence": data.get("sentence", ""), "spoken": data.get("spoken", ""),
