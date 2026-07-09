@@ -7,7 +7,7 @@
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2>📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
-<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div><div id="result" class="result"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
+<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div><div id="result" class="result"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
 <script>
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200;
 var emojis={ben:'👨‍🏫',sara:'👩‍🏫'};
@@ -63,9 +63,16 @@ function loadQuestion(){busy=false;['play','show','skip','mic'].forEach(id=>docu
 function setStation(st,q){
   let phase=document.getElementById('phase');
   let play=document.getElementById('play'), show=document.getElementById('show');
+  let prog=document.getElementById('prog'), he=document.getElementById('he');
+  // Reset the normal top section first; cloze then hides its own share of it
+  // completely, since the cloze widget below repeats the same info with its
+  // own header - leaving it up top too was just redundant clutter.
   play.style.display=''; show.style.display='';
+  prog.style.display=''; phase.style.display=''; he.style.display='';
   if(st==='cloze'){
-    phase.innerHTML='🧩 תחנה 3 — תרגיל קריאה עם השלמת המשפט';
+    prog.style.display='none';
+    phase.style.display='none';
+    he.style.display='none';
     document.getElementById('en').style.opacity='0';
     play.style.display='none'; show.style.display='none';
     document.getElementById('hint').textContent='אמור את המשפט המלא עם המילה החסרה';
@@ -106,6 +113,13 @@ function buildSpeechMetrics(startMs,lastSpeechMs,endMs,spoken){
   let wpm=duration>0?Math.round(words*60000/duration):0;
   return {recording_duration_ms:duration,silence_ms:silence,words_per_minute:wpm};
 }
+function stopRecording(){
+  // Manual end-of-recording button. The silence-timeout auto-stop (from the
+  // teacher's settings, silenceTimeoutMs) stays the default behavior - this
+  // is just an additional way for the student to end it themselves whenever
+  // they're done, instead of waiting for the timeout.
+  if(recognition){try{recognition.stop()}catch(e){}}
+}
 function startRecognition(){
   if(busy||(!currentQ&&!examMode))return;
   let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -115,7 +129,13 @@ function startRecognition(){
   rec.lang='en-US'; rec.continuous=true; rec.interimResults=false; rec.maxAlternatives=1;
   let finalText='',submitted=false,timer=null;
   let startedAt=performance.now(), lastSpeechAt=startedAt;
-  document.getElementById('mic').classList.add('on');
+  // Delay only the VISUAL "recording" cue (mic turning red) by 250ms - the
+  // recognition engine itself starts immediately below (rec.start()), but it
+  // sometimes needs a brief moment before it's actually capturing audio.
+  // Without this delay, students who start speaking the instant the mic
+  // turns red can lose the first word entirely.
+  let micColorTimer=setTimeout(()=>{document.getElementById('mic').classList.add('on')},250);
+  document.getElementById('stopRec').style.display='block';
   // Never let the student play the reference audio into their own mic while
   // recording - that would score 100% without them actually saying anything.
   document.getElementById('play').disabled=true;
@@ -131,7 +151,9 @@ function startRecognition(){
   };
   rec.onend=()=>{
     let endedAt=performance.now();
+    clearTimeout(micColorTimer);
     document.getElementById('mic').classList.remove('on');
+    document.getElementById('stopRec').style.display='none';
     document.getElementById('play').disabled=false;
     document.getElementById('play').classList.remove('hidden-final');
     if(submitted)return;
@@ -143,7 +165,7 @@ function startRecognition(){
     document.getElementById('hint').textContent='מעבד...';
     if(examMode)submitExamAnswer(spoken,metrics);else submitAnswer(spoken,metrics);
   };
-  rec.onerror=()=>{busy=false;submitted=true;document.getElementById('mic').classList.remove('on');document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
+  rec.onerror=()=>{busy=false;submitted=true;clearTimeout(micColorTimer);document.getElementById('mic').classList.remove('on');document.getElementById('stopRec').style.display='none';document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
   rec.start();
 }
 function submitAnswer(spoken,metrics){fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,answer:spoken,metrics:metrics||{}})}).then(r=>r.json()).then(res=>{busy=false;showResult(spoken,res)}).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה בשליחת תשובה'})}
@@ -226,7 +248,7 @@ function showCloze(word,left){let el=document.getElementById('cloze');if(!word||
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';let attemptsLine=(typeof attemptsLeft==='number')?'<p class="small">ניסיונות שנותרו למשפט הזה: '+attemptsLeft+'</p>':'';el.innerHTML='<h3>⭐ מצב שליטה</h3><p>צריך '+target+' חזרות נכונות. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'+attemptsLine}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
-function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';hideCloze();hideMastery();hideNextButton()}
+function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideNextButton()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
 function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>r.sentence).filter(Boolean);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 function showExamQuestion(){let s=examSentences[examIndex];currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';document.getElementById('en').textContent=s;document.getElementById('en').style.opacity='1';document.getElementById('prog').textContent='מבחן: משפט '+(examIndex+1)+' מתוך '+examSentences.length;document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)}
