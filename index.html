@@ -58,7 +58,16 @@ button:active{transform:scale(.95)}
 @media (max-width:759px){
   .gauge-card{padding:6px 8px 3px}
   .gauge-svg{width:110px;max-width:42vw}
-  .mic{width:54px;height:54px;font-size:21px;margin:9px auto}
+  /* The recording area (buttons row -> mic -> hint text) had the most
+     unused vertical air on mobile: the mic circle plus its margins plus the
+     hint <p>'s default browser paragraph margin (~1em top+bottom, invisible
+     in the markup but a real chunk of height) added up to more empty space
+     than the button row above it or the result box below it. */
+  .mic{width:44px;height:44px;font-size:18px;margin:6px auto}
+  .row{gap:6px}
+  .row button{padding:6px 10px;font-size:13px}
+  #hint{margin:3px 0 0;font-size:12.5px}
+  #stopRec{margin-top:5px!important;padding:7px 10px}
   .card{padding:11px}
   .sentence{font-size:19px;margin:6px 0}
 }
