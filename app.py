@@ -601,7 +601,8 @@ RESULT_HEADERS = [
     "Time", "Teacher", "Student", "Student Email", "Exercise", "Phase", "Sentence", "Spoken",
     "Score", "Passed", "Skipped", "Attempts", "Max Attempts",
     "Mastery Repetitions", "Mastery Status", "Mastery Score", "Cloze Passed",
-    "Recording Duration MS", "Silence MS", "Words Per Minute", "Fluency Status"
+    "Recording Duration MS", "Silence MS", "Words Per Minute", "Fluency Status",
+    "STT Confidence"
 ]
 
 RESULT_KEY_ALIASES = {
@@ -616,6 +617,7 @@ RESULT_KEY_ALIASES = {
     "Silence MS": "silence_ms",
     "Words Per Minute": "words_per_minute",
     "Fluency Status": "fluency_status",
+    "STT Confidence": "stt_confidence",
 }
 
 def ensure_results_header(ws):
@@ -708,11 +710,28 @@ def fluency_from_metrics(spoken, score, metrics=None):
         status = "accurate_needs_fluency"
     else:
         status = "not_mastered"
+    # STT confidence instrumentation (documentation-only for now, per explicit
+    # decision): the Web Speech API exposes a per-result confidence score that
+    # the app never read before. The concern this answers is real - the
+    # browser's recognition engine can silently "correct" a mispronunciation
+    # toward the expected sentence before our own scoring ever sees the text,
+    # letting a student pass without actually being understood correctly. But
+    # Chrome's confidence values are independently reported as unreliable/flat
+    # in many cases, so this is captured and surfaced to the teacher (a new
+    # results-sheet column) WITHOUT touching pass/fail scoring - only once the
+    # data shows this signal is actually meaningful in practice should it ever
+    # be used to adjust scoring.
+    stt_confidence = metrics.get("stt_confidence")
+    try:
+        stt_confidence = round(float(stt_confidence), 2) if stt_confidence is not None else ""
+    except Exception:
+        stt_confidence = ""
     return {
         "recording_duration_ms": duration_ms,
         "silence_ms": silence_ms,
         "words_per_minute": wpm,
         "fluency_status": status,
+        "stt_confidence": stt_confidence,
     }
 
 def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, metrics=None):

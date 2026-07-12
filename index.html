@@ -399,9 +399,21 @@ function startRecognition(){
   // browser report the in-progress transcript as it goes, which we now keep
   // as a fallback (interimText) so a genuine attempt is never thrown away
   // just because Chrome never got around to marking it "final".
+  // maxAlternatives stays at 1 (reverted from an experimental 3) - raising it
+  // turned out to be a real regression risk on top of an existing Chrome
+  // continuous-recognition quirk (see the onresult rebuild fix below) and
+  // wasn't worth it just to capture lower-ranked alternatives.
   rec.lang='en-US'; rec.continuous=true; rec.interimResults=true; rec.maxAlternatives=1;
   let finalText='',interimText='',submitted=false,timer=null;
   let startedAt=performance.now(), lastSpeechAt=startedAt;
+  // STT confidence instrumentation (documentation-only - does not affect
+  // scoring). The browser's recognition engine can "correct" a mispronounced
+  // word toward the expected sentence before our own text comparison ever
+  // sees it, letting a student pass without actually being understood
+  // correctly. Chrome's confidence field is known to be unreliable in some
+  // cases, so for now this is only captured and surfaced to the teacher
+  // (a new results-sheet column) - never used to change a score or pass/fail.
+  let confidences=[];
   // Delay only the VISUAL "recording" cue (mic turning red) by 250ms - the
   // recognition engine itself starts immediately below (rec.start()), but it
   // sometimes needs a brief moment before it's actually capturing audio.
@@ -416,11 +428,27 @@ function startRecognition(){
   document.getElementById('hint').textContent='מקשיב...';
   rec.onresult=e=>{
     lastSpeechAt=performance.now();
-    let interim='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) finalText+=(e.results[i][0].transcript+' ');
-      else interim+=e.results[i][0].transcript;
+    // IMPORTANT: rebuild finalText/confidences from scratch by scanning the
+    // ENTIRE e.results array every time, rather than incrementally appending
+    // only e.resultIndex..length on each event. Chrome's continuous-mode
+    // recognizer can re-fire onresult with an index range that re-covers an
+    // already-finalized segment (its endpointer revises/re-segments the
+    // audio it already reported as final) - incremental appending then
+    // duplicates that segment's text every time it gets re-included, which
+    // is exactly the garbled repeated-phrase transcripts ("there is no
+    // electricity in there is no electricity in my house is...") that were
+    // reported. Rebuilding fresh each time is idempotent regardless of how
+    // many times a given index gets re-reported.
+    let built='',interim='',conf=[];
+    for(let i=0;i<e.results.length;i++){
+      let result=e.results[i];
+      if(result.isFinal){
+        built+=(result[0].transcript+' ');
+        if(typeof result[0].confidence==='number') conf.push(result[0].confidence);
+      } else interim+=result[0].transcript;
     }
+    finalText=built;
+    confidences=conf;
     if(interim) interimText=interim;
     if(timer)clearTimeout(timer);
     timer=setTimeout(()=>{if(!submitted)rec.stop()},silenceTimeoutMs);
@@ -441,6 +469,9 @@ function startRecognition(){
     // silence.
     let spoken=(finalText.trim()||interimText.trim());
     let metrics=buildSpeechMetrics(startedAt,lastSpeechAt,endedAt,spoken);
+    // Documentation-only STT signal (see notes above) - never read by any
+    // scoring logic, only written through to the results sheet for teachers.
+    if(confidences.length) metrics.stt_confidence=Math.round((confidences.reduce((a,b)=>a+b,0)/confidences.length)*100)/100;
     lastMetrics=metrics;
     if(!spoken){busy=false;document.getElementById('hint').textContent='לא נקלט דיבור — נסה שוב';return}
     document.getElementById('hint').textContent='מעבד...';
