@@ -56,6 +56,135 @@ FALLBACK_SENTENCES = [
     {"en": "I want to speak English fluently", "he": "אני רוצה לדבר אנגלית בשטף"},
 ]
 
+# --- Built-in default CEFR-leveled curriculum -------------------------------
+# Used only when a teacher has NOT selected a specific exercise (csv_url is
+# empty). Every new/default student starts at A1 and advances automatically
+# (see get_student_level/set_student_level + the auto-advance check in
+# /api/question) as they demonstrate strong, consistent mastery.
+CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+
+LEVEL_NAMES_HE = {
+    "A1": "רמה A1 — מתחילים",
+    "A2": "רמה A2 — בסיסי",
+    "B1": "רמה B1 — בינוני",
+    "B2": "רמה B2 — בינוני-גבוה",
+    "C1": "רמה C1 — מתקדם",
+    "C2": "רמה C2 — שליטה מלאה",
+}
+
+LEVEL_SENTENCES = {
+    "A1": [
+        {"en": "I am a student", "he": "אני תלמיד"},
+        {"en": "This is my book", "he": "זה הספר שלי"},
+        {"en": "She has a red car", "he": "יש לה מכונית אדומה"},
+        {"en": "We live in Tel Aviv", "he": "אנחנו גרים בתל אביב"},
+        {"en": "He likes coffee", "he": "הוא אוהב קפה"},
+        {"en": "The cat is on the table", "he": "החתול על השולחן"},
+        {"en": "I am hungry now", "he": "אני רעב עכשיו"},
+        {"en": "My name is David", "he": "קוראים לי דוד"},
+        {"en": "They are my friends", "he": "הם החברים שלי"},
+        {"en": "Can you help me, please", "he": "אתה יכול לעזור לי, בבקשה"},
+        {"en": "What time is it", "he": "מה השעה"},
+        {"en": "I have two brothers", "he": "יש לי שני אחים"},
+        {"en": "The weather is nice today", "he": "מזג האוויר נעים היום"},
+        {"en": "She works in a bank", "he": "היא עובדת בבנק"},
+        {"en": "We eat breakfast at eight", "he": "אנחנו אוכלים ארוחת בוקר בשמונה"},
+    ],
+    "A2": [
+        {"en": "Yesterday I went to school", "he": "אתמול הלכתי לבית הספר"},
+        {"en": "We will meet at six o'clock", "he": "ניפגש בשעה שש"},
+        {"en": "I bought a new phone last week", "he": "קניתי טלפון חדש בשבוע שעבר"},
+        {"en": "She was very tired after work", "he": "היא הייתה עייפה מאוד אחרי העבודה"},
+        {"en": "Can I have the bill, please", "he": "אפשר לקבל את החשבון, בבקשה"},
+        {"en": "He is going to visit his parents", "he": "הוא הולך לבקר את ההורים שלו"},
+        {"en": "I usually wake up early in the morning", "he": "אני בדרך כלל קם מוקדם בבוקר"},
+        {"en": "They watched a movie last night", "he": "הם צפו בסרט אמש"},
+        {"en": "Do you know where the station is", "he": "אתה יודע איפה התחנה"},
+        {"en": "It was raining all day yesterday", "he": "ירד גשם כל היום אתמול"},
+        {"en": "We are planning a trip to Eilat", "he": "אנחנו מתכננים טיול לאילת"},
+        {"en": "I need to buy some vegetables", "he": "אני צריך לקנות ירקות"},
+        {"en": "My sister is learning to drive", "he": "אחותי לומדת לנהוג"},
+        {"en": "He never eats breakfast", "he": "הוא אף פעם לא אוכל ארוחת בוקר"},
+        {"en": "Please turn off the lights before you leave", "he": "בבקשה כבה את האורות לפני שאתה יוצא"},
+    ],
+    "B1": [
+        {"en": "I have never been to Paris", "he": "מעולם לא הייתי בפריז"},
+        {"en": "If it rains, we will stay home", "he": "אם ירד גשם, נישאר בבית"},
+        {"en": "She has already finished her homework", "he": "היא כבר סיימה את שיעורי הבית שלה"},
+        {"en": "I think this restaurant is too expensive", "he": "אני חושב שהמסעדה הזאת יקרה מדי"},
+        {"en": "Have you ever tried sushi before", "he": "ניסית פעם סושי"},
+        {"en": "We have been living here for five years", "he": "אנחנו גרים כאן כבר חמש שנים"},
+        {"en": "If I had more time, I would travel more", "he": "אם היה לי יותר זמן, הייתי מטייל יותר"},
+        {"en": "He apologized for being late to the meeting", "he": "הוא התנצל על האיחור לפגישה"},
+        {"en": "I'm not sure if I agree with your opinion", "he": "אני לא בטוח שאני מסכים עם הדעה שלך"},
+        {"en": "They have decided to move to a bigger apartment", "he": "הם החליטו לעבור לדירה גדולה יותר"},
+        {"en": "She would like to become a doctor someday", "he": "היא הייתה רוצה להיות רופאה יום אחד"},
+        {"en": "It seems like the traffic is getting worse", "he": "נראה שהתנועה נהיית גרועה יותר"},
+        {"en": "I should have called you earlier", "he": "הייתי צריך להתקשר אליך קודם"},
+        {"en": "We were supposed to meet an hour ago", "he": "היינו אמורים להיפגש לפני שעה"},
+        {"en": "Although it was expensive, we bought the tickets", "he": "למרות שזה היה יקר, קנינו את הכרטיסים"},
+    ],
+    "B2": [
+        {"en": "The report was submitted before the deadline", "he": "הדוח הוגש לפני המועד האחרון"},
+        {"en": "She said that she would call me later", "he": "היא אמרה שהיא תתקשר אליי מאוחר יותר"},
+        {"en": "The building is being renovated this month", "he": "הבניין משופץ בחודש הזה"},
+        {"en": "He mentioned that the project had been delayed", "he": "הוא ציין שהפרויקט התעכב"},
+        {"en": "It's not worth arguing about such a small issue", "he": "זה לא שווה להתווכח על עניין כל כך קטן"},
+        {"en": "The decision was made without consulting the team", "he": "ההחלטה התקבלה בלי להתייעץ עם הצוות"},
+        {"en": "I'm afraid I have to disagree with that statement", "he": "אני חושש שאני צריך לחלוק על ההצהרה הזאת"},
+        {"en": "The company was founded over twenty years ago", "he": "החברה נוסדה לפני יותר מעשרים שנה"},
+        {"en": "Despite the challenges, the team met its goals", "he": "למרות האתגרים, הצוות עמד ביעדים שלו"},
+        {"en": "He was accused of breaking the rules", "he": "הוא הואשם בהפרת הכללים"},
+        {"en": "The manager insisted that changes be made immediately", "he": "המנהל התעקש שהשינויים ייעשו מיד"},
+        {"en": "I wish I had studied harder for the exam", "he": "הלוואי שהייתי לומד יותר בשקידה למבחן"},
+        {"en": "The new policy will be implemented next quarter", "he": "המדיניות החדשה תיושם ברבעון הבא"},
+        {"en": "She's been putting off the decision for weeks", "he": "היא דוחה את ההחלטה כבר שבועות"},
+        {"en": "It turned out that the rumor was completely false", "he": "התברר שהשמועה הייתה שקרית לחלוטין"},
+    ],
+    "C1": [
+        {"en": "Rarely have I seen such dedication to a project", "he": "לעיתים רחוקות ראיתי מסירות כזאת לפרויקט"},
+        {"en": "Had I known earlier, I would have acted differently", "he": "אילו ידעתי מוקדם יותר, הייתי פועל אחרת"},
+        {"en": "Not only did she finish first, but she also broke the record", "he": "היא לא רק סיימה ראשונה, אלא גם שברה את השיא"},
+        {"en": "It is essential that every detail be verified beforehand", "he": "חיוני שכל פרט ייבדק מראש"},
+        {"en": "Little did they know how much the decision would cost them", "he": "הם לא ידעו כמה ההחלטה תעלה להם"},
+        {"en": "The committee recommended that the policy be reconsidered", "he": "הוועדה המליצה שהמדיניות תישקל מחדש"},
+        {"en": "Seldom do we encounter such a compelling argument", "he": "לעיתים רחוקות אנו נתקלים בטיעון משכנע כל כך"},
+        {"en": "Were it not for her guidance, the project would have failed", "he": "לולא ההדרכה שלה, הפרויקט היה נכשל"},
+        {"en": "The findings, though preliminary, suggest a clear trend", "he": "הממצאים, אף שהם ראשוניים, מצביעים על מגמה ברורה"},
+        {"en": "He is said to have influenced an entire generation of writers", "he": "אומרים שהוא השפיע על דור שלם של סופרים"},
+        {"en": "Under no circumstances should this document be shared externally", "he": "בשום פנים ואופן אין לשתף את המסמך הזה מחוץ לארגון"},
+        {"en": "So convincing was her argument that no one objected", "he": "הטיעון שלה היה משכנע עד כדי כך שאיש לא התנגד"},
+        {"en": "The proposal warrants further consideration before approval", "he": "ההצעה מצדיקה שיקול נוסף לפני האישור"},
+        {"en": "Given the circumstances, the outcome was hardly surprising", "he": "לאור הנסיבות, התוצאה בקושי הפתיעה"},
+        {"en": "He acted as though nothing unusual had happened", "he": "הוא נהג כאילו לא קרה שום דבר יוצא דופן"},
+    ],
+    "C2": [
+        {"en": "Notwithstanding the setbacks, the initiative persevered", "he": "חרף הנסיגות, היוזמה התמידה"},
+        {"en": "The ambiguity of the clause warrants further scrutiny", "he": "העמימות של הסעיף מצריכה בחינה נוספת"},
+        {"en": "Her eloquence captivated the entire audience", "he": "הרהיטות שלה ריתקה את כל הקהל"},
+        {"en": "The findings corroborate the initial hypothesis", "he": "הממצאים מאששים את ההשערה הראשונית"},
+        {"en": "He remained impervious to criticism throughout the ordeal", "he": "הוא נותר חסין לביקורת לאורך כל המבחן"},
+        {"en": "The negotiations were fraught with unforeseen complications", "he": "המשא ומתן היה רווי בסיבוכים בלתי צפויים"},
+        {"en": "Such an egregious error cannot go unaddressed", "he": "טעות כה חמורה אינה יכולה להישאר ללא טיפול"},
+        {"en": "The author's prose is renowned for its subtlety and nuance", "he": "הפרוזה של הסופר ידועה בעדינותה וברבדיה"},
+        {"en": "The policy's ramifications are still being assessed", "he": "ההשלכות של המדיניות עדיין נבחנות"},
+        {"en": "Her tenacity in the face of adversity was inspiring", "he": "העקשנות שלה מול קשיים הייתה מעוררת השראה"},
+        {"en": "The evidence, albeit circumstantial, was compelling", "he": "הראיות, אף שהיו נסיבתיות, היו משכנעות"},
+        {"en": "The board's decision was met with unanimous approval", "he": "החלטת הדירקטוריון זכתה לאישור פה אחד"},
+        {"en": "His argument, though cogent, failed to sway the jury", "he": "הטיעון שלו, אף שהיה משכנע, לא הצליח לשכנע את חבר המושבעים"},
+        {"en": "The city's infrastructure is ill-equipped to handle the surge", "he": "התשתית של העיר אינה מצוידת כראוי להתמודד עם הזינוק"},
+        {"en": "It would be remiss of us not to acknowledge her contribution", "he": "זו תהיה רשלנות מצידנו לא להכיר בתרומתה"},
+    ],
+}
+
+def next_cefr_level(level):
+    """Return the next CEFR level, or the same level if already at the top."""
+    try:
+        i = CEFR_LEVELS.index(level)
+    except ValueError:
+        return CEFR_LEVELS[0]
+    return CEFR_LEVELS[i + 1] if i + 1 < len(CEFR_LEVELS) else level
+
 COMMON_VERBS = set("""
 am is are was were have has had do does did go went come came get got make made know think
 say said see saw take took want use find give tell work call need feel try leave put keep run
@@ -488,7 +617,17 @@ def session_payload(s):
 def new_session(student_id, teacher_id, student_name, student_email=""):
     ts = _teacher_state[teacher_id]
     csv_url = ts.get("csv_url", "")
-    sentences, used_fallback = load_sentences_from_csv_ex(csv_url)
+    level_track = None
+    level_exercise_name = None
+    if not csv_url.strip():
+        # No teacher-selected exercise: fall back to the built-in, per-student
+        # CEFR leveled curriculum (starts at A1, advances automatically) instead
+        # of the old 3-sentence generic demo content.
+        sentences, level_track = load_level_track_sentences(teacher_id, student_email)
+        used_fallback = False
+        level_exercise_name = LEVEL_NAMES_HE.get(level_track, "תרגול דמו")
+    else:
+        sentences, used_fallback = load_sentences_from_csv_ex(csv_url)
     # content_mismatch=True means a real exercise was selected (csv_url is set)
     # but its sheet could not be loaded, so generic demo sentences were used
     # instead - the session/exercise NAME still says the real exercise, so the
@@ -523,9 +662,10 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
         "threshold": int(ts["threshold"]),
         "max_attempts": int(ts["max_attempts"]),
         "voice_gender": TEACHERS[teacher_id]["voice_gender"],
-        "exercise_name": ts.get("exercise_name", "תרגול דמו"),
+        "exercise_name": level_exercise_name or ts.get("exercise_name", "תרגול דמו"),
         "csv_url": csv_url,
         "content_mismatch": content_mismatch,
+        "level_track": level_track,
         "sentences": sentences,
         "current": 0,
         "failed_attempts": 0,
@@ -687,6 +827,76 @@ def write_result(row):
     except Exception as e:
         print("WRITE RESULT FAILED", e)
         return False
+
+STUDENT_LEVELS_TAB = "StudentLevels"
+STUDENT_LEVELS_HEADER = ["Student Email", "Current Level", "Updated At"]
+
+def _student_levels_ws(tid):
+    sheet_id = RESULTS_SHEET_IDS.get(tid, RESULTS_SHEET_ID)
+    sh = get_gspread_client().open_by_key(sheet_id)
+    import gspread
+    try:
+        ws = sh.worksheet(STUDENT_LEVELS_TAB)
+    except gspread.WorksheetNotFound:
+        ws = sh.add_worksheet(title=STUDENT_LEVELS_TAB, rows=1000, cols=4)
+        ws.append_row(STUDENT_LEVELS_HEADER, value_input_option="USER_ENTERED")
+    return ws
+
+def get_student_level(tid, email):
+    """Look up a student's current CEFR level for this teacher. Defaults to
+    the first level (A1) whenever there's no record yet, or on any error -
+    a brand-new/never-seen student always starts at the beginning.
+    """
+    email = (email or "").strip().lower()
+    if not email:
+        return CEFR_LEVELS[0]
+    key = f"studentlevel:{tid}:{email}"
+    if key in _cache and time.time() - _cache[key][0] < 300:
+        return _cache[key][1]
+    level = CEFR_LEVELS[0]
+    try:
+        ws = _student_levels_ws(tid)
+        for row in ws.get_all_values()[1:]:
+            if len(row) >= 2 and row[0].strip().lower() == email:
+                candidate = row[1].strip().upper()
+                if candidate in CEFR_LEVELS:
+                    level = candidate
+                break
+    except Exception as e:
+        print("GET STUDENT LEVEL FAILED", e)
+    _cache[key] = (time.time(), level)
+    return level
+
+def set_student_level(tid, email, level):
+    """Persist a student's new CEFR level (e.g. after auto-advancement)."""
+    email = (email or "").strip().lower()
+    if not email or level not in CEFR_LEVELS:
+        return False
+    try:
+        ws = _student_levels_ws(tid)
+        values = ws.get_all_values()
+        row_idx = None
+        for i, row in enumerate(values[1:], start=2):
+            if len(row) >= 1 and row[0].strip().lower() == email:
+                row_idx = i
+                break
+        if row_idx:
+            ws.update(f"A{row_idx}", [[email, level, now_str()]], value_input_option="USER_ENTERED")
+        else:
+            ws.append_row([email, level, now_str()], value_input_option="USER_ENTERED")
+        _cache[f"studentlevel:{tid}:{email}"] = (time.time(), level)
+        return True
+    except Exception as e:
+        print("SET STUDENT LEVEL FAILED", e)
+        return False
+
+def load_level_track_sentences(tid, email):
+    """Return (sentences, level) for the default built-in curriculum, based
+    on the student's current saved CEFR level for this teacher.
+    """
+    level = get_student_level(tid, email)
+    sentences = LEVEL_SENTENCES.get(level, LEVEL_SENTENCES[CEFR_LEVELS[0]])
+    return sentences[:], level
 
 def fluency_from_metrics(spoken, score, metrics=None):
     """Lightweight fluency estimate from browser timing, not acoustic analysis.
@@ -928,7 +1138,26 @@ def question():
         s["completed"] = True
         total = len(s["results"])
         avg = int(sum(r["score"] for r in s["results"]) / total) if total else 0
-        return jsonify(done=True, results=s["results"], avg_score=avg, total=total, exercise=s["exercise_name"])
+        # Auto-advancement: only applies to sessions that used the built-in
+        # default CEFR track (never touches teacher-chosen exercises). A
+        # student levels up only on strong, clean performance across the
+        # whole practice pass - high average score, essentially no sentences
+        # that needed multiple retries, and nothing left unresolved in the
+        # review queue - so a lucky single sentence can't trigger it.
+        leveled_up = False
+        new_level = None
+        if s.get("level_track") and total:
+            avg_attempts = sum(r.get("attempts", 1) or 1 for r in s["results"]) / total
+            strong = avg >= 90 and avg_attempts <= 1.6 and not s.get("review_queue")
+            if strong:
+                nxt = next_cefr_level(s["level_track"])
+                if nxt != s["level_track"]:
+                    if set_student_level(s["teacher_id"], s.get("student_email", ""), nxt):
+                        leveled_up, new_level = True, nxt
+        return jsonify(
+            done=True, results=s["results"], avg_score=avg, total=total, exercise=s["exercise_name"],
+            level_track=s.get("level_track"), leveled_up=leveled_up, new_level=new_level,
+        )
     q = s["sentences"][s["current"]]
     return jsonify({
         "done": False, "he": q["he"], "en": q["en"], "index": s["current"], "total": len(s["sentences"]),

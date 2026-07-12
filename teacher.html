@@ -100,22 +100,4 @@ function renderResultsTable(){
       ['words_per_minute','מילים לדקה', esc(r.words_per_minute)],
       // Instrumentation-only (does not affect scoring) - lets a teacher spot
       // cases where the recognition engine may have "understood"/corrected a
-      // mispronunciation toward the expected sentence rather than genuinely
-      // hearing it clearly. Empty when the browser didn't report a value.
-      ['stt_confidence','ביטחון STT', r.stt_confidence!==undefined&&r.stt_confidence!==''?esc(r.stt_confidence):'—'],
-    ].filter(f=>!hidden.includes(f[0]));
-    let detail='<tr class="detail-row" id="detail'+i+'" style="display:none"><td colspan="8"><div class="detail-grid">'
-      +fields.map(f=>'<div><b>'+f[1]+':</b> '+f[2]+'</div>').join('')
-      +'</div></td></tr>';
-    return mainRow+detail;
-  }).join('');
-  resultsBody.innerHTML='<div class="rtable-wrap"><table class="rtable"><thead><tr><th></th><th>זמן</th><th>תלמיד</th><th>תרגיל</th><th>שלב</th><th>ציון</th><th>ניסיונות</th><th>Mastery</th></tr></thead><tbody>'+body+'</tbody></table></div>';
-}
-function toggleResultDetail(i){
-  let row=document.getElementById('detail'+i), caret=document.getElementById('caret'+i);
-  let open=row.style.display!=='none';
-  row.style.display=open?'none':'table-row';
-  caret.textContent=open?'▸':'▾';
-}
-function logout(){location.reload()}function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
-</script></body></html>
+      // mispronunciation toward the
