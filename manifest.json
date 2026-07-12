@@ -1,0 +1,24 @@
+{
+  "short_name": "SpeakMaster",
+  "name": "SpeakMaster — תרגול דיבור באנגלית",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "background_color": "#f5f4ff",
+  "theme_color": "#4318D1",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "he",
+  "dir": "rtl"
+}
