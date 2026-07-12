@@ -428,28 +428,32 @@ function startRecognition(){
   document.getElementById('hint').textContent='מקשיב...';
   rec.onresult=e=>{
     lastSpeechAt=performance.now();
-    // IMPORTANT: rebuild finalText/confidences from scratch by scanning the
-    // ENTIRE e.results array every time, rather than incrementally appending
-    // only e.resultIndex..length on each event. Chrome's continuous-mode
-    // recognizer can re-fire onresult with an index range that re-covers an
-    // already-finalized segment (its endpointer revises/re-segments the
-    // audio it already reported as final) - incremental appending then
-    // duplicates that segment's text every time it gets re-included, which
-    // is exactly the garbled repeated-phrase transcripts ("there is no
-    // electricity in there is no electricity in my house is...") that were
-    // reported. Rebuilding fresh each time is idempotent regardless of how
-    // many times a given index gets re-reported.
-    let built='',interim='',conf=[];
-    for(let i=0;i<e.results.length;i++){
-      let result=e.results[i];
-      if(result.isFinal){
-        built+=(result[0].transcript+' ');
-        if(typeof result[0].confidence==='number') conf.push(result[0].confidence);
-      } else interim+=result[0].transcript;
+    // Root cause found after the first fix attempt (summing all final
+    // segments, freshly rebuilt each event) still produced growing/repeating
+    // text ("so / so so / so so so you know / ...Alexis in my so you know
+    // Alexis in my house"): that growth pattern means each individual result
+    // entry Chrome hands back is ALREADY cumulative (result N's transcript
+    // already contains everything from result 1..N-1), not an independent
+    // new segment. Summing several already-cumulative strings together is
+    // what was actually multiplying the text - rebuilding didn't help
+    // because the bug wasn't re-processing an old index, it was adding
+    // multiple cumulative snapshots together in the first place.
+    // Fix: never sum across result entries. Only ever trust the SINGLE most
+    // recent entry in e.results as "everything said so far" and overwrite
+    // with it - this is correct whether Chrome treats the whole recording as
+    // one growing result (the observed behavior) or as separate segments
+    // (in which case the most recent entry is still the most complete one
+    // for this app's single-sentence-per-recording use case).
+    let last=e.results[e.results.length-1];
+    if(last){
+      let text=last[0].transcript;
+      if(last.isFinal){
+        finalText=text;
+        confidences=(typeof last[0].confidence==='number')?[last[0].confidence]:[];
+      } else {
+        interimText=text;
+      }
     }
-    finalText=built;
-    confidences=conf;
-    if(interim) interimText=interim;
     if(timer)clearTimeout(timer);
     timer=setTimeout(()=>{if(!submitted)rec.stop()},silenceTimeoutMs);
   };
