@@ -1015,6 +1015,20 @@ def icon_192():
 def icon_512():
     return Response(open(os.path.join(BASE_DIR, "icon-512.png"), "rb").read(), content_type="image/png")
 
+@app.route("/favicon-32.png")
+def favicon_32():
+    return Response(open(os.path.join(BASE_DIR, "favicon-32.png"), "rb").read(), content_type="image/png")
+
+@app.route("/favicon-16.png")
+def favicon_16():
+    return Response(open(os.path.join(BASE_DIR, "favicon-16.png"), "rb").read(), content_type="image/png")
+
+@app.route("/favicon.ico")
+def favicon_ico():
+    # Some browsers request /favicon.ico regardless of the <link> tags above -
+    # serve the 32px PNG for that path too rather than let it 404.
+    return Response(open(os.path.join(BASE_DIR, "favicon-32.png"), "rb").read(), content_type="image/png")
+
 @app.get("/api/teachers")
 def api_teachers():
     return jsonify({tid: teacher_public(tid) for tid in TEACHERS})
