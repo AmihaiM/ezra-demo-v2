@@ -126,7 +126,7 @@ function pick(a){return a[Math.floor(Math.random()*a.length)]}
 // data rather than data the teacher needs to see - the real results (score,
 // pass/fail, mastery) still go through the server/Google Sheet exactly as before.
 var muted=localStorage.getItem('ezra_muted')==='1';
-var xp=0, streakCount=0, sentenceAttemptCount=0, threeStarStreak=0;
+var xp=0, streakCount=0, sentenceAttemptCount=0, sentenceFailCount=0, threeStarStreak=0;
 var audioCtx=null;
 function getAudioCtx(){if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){return null}}return audioCtx}
 function playTone(freq,startTime,duration,type,gainPeak){
@@ -220,7 +220,11 @@ function showLevelUpToast(level){
   setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),500)},4200);
 }
 
-function starsForAttempts(n){if(n<=1)return 3;if(n<=3)return 2;return 1}
+// Stars are earned by ACCURACY, not by how many stations/repeats a sentence
+// needed. n = number of real wrong submissions for this sentence (mastery's
+// required correct repeats are not mistakes, so they never count against
+// the student here) - 0 real mistakes across the whole sentence = 3 stars.
+function starsForAttempts(n){if(n<=0)return 3;if(n<=2)return 2;return 1}
 function starsHtml(n){let s=starsForAttempts(n);return [1,2,3].map(i=>'<span class="star'+(i<=s?' lit':'')+'">⭐</span>').join('')}
 
 function fireConfetti(count){
@@ -300,17 +304,18 @@ function handleSentenceComplete(res){
   // that's a real pass or a cap-reached skip. Real completions earn XP/stars/
   // badges/confetti; skipped ones and the single-attempt review round get a
   // smaller, quieter acknowledgement instead - they were not a clean success.
-  let attempts=sentenceAttemptCount||1;
+  let fails=sentenceFailCount;
   let actuallyPassed=!!res.passed && !res.skipped;
   if(res.station==='review'){
     if(actuallyPassed)addXp(5);
     sentenceAttemptCount=0;
+    sentenceFailCount=0;
     return;
   }
   if(actuallyPassed){
     let box=document.getElementById('result');
-    if(box)box.innerHTML+='<div class="stars-row">'+starsHtml(attempts)+'</div>';
-    let stars=starsForAttempts(attempts);
+    if(box)box.innerHTML+='<div class="stars-row">'+starsHtml(fails)+'</div>';
+    let stars=starsForAttempts(fails);
     let base=10, bonus=stars===3?10:(stars===2?4:0);
     let mic=document.getElementById('mic'), r=mic?mic.getBoundingClientRect():null;
     addXp(base+bonus, r?r.left+r.width/2:undefined, r?r.top:undefined);
@@ -321,6 +326,7 @@ function handleSentenceComplete(res){
     if(stars===3) fireConfetti(14);
   }
   sentenceAttemptCount=0;
+  sentenceFailCount=0;
 }
 document.addEventListener('DOMContentLoaded',init);
 function init(){fetch('/api/teachers').then(r=>r.json()).then(d=>{teacherData=d;Object.keys(d).forEach(id=>{let c=document.getElementById('tc-'+id),t=d[id];if(c){c.querySelector('h2').textContent=t.name;c.querySelector('.avatar').style.background=t.color_light;c.querySelector('.avatar').style.color=t.color}})}).catch(e=>alert('יש להריץ דרך Flask: http://127.0.0.1:5000'));
@@ -564,6 +570,11 @@ function showResult(spoken,res){
     return;
   }
   let passed=!!res.passed;
+  // Tally real mistakes only - a correct repeat that's still part of the
+  // required mastery/cloze sequence has passed=true for that submission, so
+  // it never lands here. Only an actually-wrong (or cap-exhausted) submission
+  // counts against the star rating.
+  if(!passed) sentenceFailCount++;
   let isCloze=res.station==='cloze';
   // When the teacher's max-attempts cap is hit on a FAILED try, the server
   // sets skipped+cap_reached and moves straight to the next sentence - there
@@ -659,6 +670,11 @@ function hideCapChoice(){document.getElementById('capChoice').style.display='non
 function capContinue(){
   hideCapChoice();
   document.getElementById('hint').textContent='עובר למשפט הבא...';
+  // This sentence is being abandoned (cap reached, moving on without a real
+  // pass) - its attempt/fail tally must not bleed into the NEXT sentence's
+  // star rating.
+  sentenceAttemptCount=0;
+  sentenceFailCount=0;
   fetch('/api/cap-continue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion());
 }
 function capRetry(){
