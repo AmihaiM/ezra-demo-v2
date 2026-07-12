@@ -496,8 +496,11 @@ function showResult(spoken,res){
   }
 
   if(res.mastery_mode||res.mastery_target>0){setStation('practice', currentQ||{threshold:res.threshold});showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken,res.attempts_left)}else if(!res.cloze_mode)hideMastery();
-  // Live mastery gauge: stations 2 (Bloom/mastery) and 3 (cloze) only.
-  if(res.mastery_mode||res.mastery_target>0||isCloze||res.cloze_mode||res.cloze_active){
+  // Live mastery gauge: shown on every real attempt (stations 1-3), so even a
+  // first failed try gets the same engaging visual feedback instead of just a
+  // plain red box - not shown for the single-attempt review round, which uses
+  // its own compact pass/fail message.
+  if(res.station!=='review'){
     updateMasteryGauge(res.score,lastMetrics);
   } else {
     hideMasteryGauge();
