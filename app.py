@@ -994,6 +994,27 @@ def home():
 def teacher():
     return Response(open(os.path.join(BASE_DIR, "teacher.html"), "rb").read(), content_type="text/html; charset=utf-8")
 
+@app.route("/manifest.json")
+def manifest():
+    return Response(open(os.path.join(BASE_DIR, "manifest.json"), "rb").read(), content_type="application/manifest+json")
+
+@app.route("/sw.js")
+def service_worker():
+    resp = Response(open(os.path.join(BASE_DIR, "sw.js"), "rb").read(), content_type="application/javascript")
+    # Without this header a service worker served from a subpath would only
+    # ever be allowed to control that subpath - it needs to control "/" (the
+    # student app) even though it's not served from inside a static/ folder.
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
+
+@app.route("/icon-192.png")
+def icon_192():
+    return Response(open(os.path.join(BASE_DIR, "icon-192.png"), "rb").read(), content_type="image/png")
+
+@app.route("/icon-512.png")
+def icon_512():
+    return Response(open(os.path.join(BASE_DIR, "icon-512.png"), "rb").read(), content_type="image/png")
+
 @app.get("/api/teachers")
 def api_teachers():
     return jsonify({tid: teacher_public(tid) for tid in TEACHERS})
