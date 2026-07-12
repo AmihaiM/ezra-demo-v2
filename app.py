@@ -436,6 +436,7 @@ def session_payload(s):
         "cloze_attempts_left": max(0, cap - s.get("cloze_attempts", 0)),
         "attempts_used": used,
         "attempts_left": left,
+        "mastery_score": s.get("mastery_score", 0),
     }
 
 def new_session(student_id, teacher_id, student_name, student_email=""):

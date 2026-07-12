@@ -30,12 +30,14 @@ button:active{transform:scale(.95)}
 .gauge-title{font-weight:800;color:#4318D1;font-size:14px;margin-bottom:2px}
 .gauge-svg{width:200px;max-width:80%;height:auto}
 .gauge-label{font-weight:800;font-size:15px;margin-top:-6px}
+.gauge-breakdown{font-size:12px;color:#666;margin:4px 0 8px;line-height:1.5}
 .gauge-needle{transform-origin:100px 100px;transition:transform .6s cubic-bezier(.34,1.56,.64,1)}
 </style></head><body>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2>📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
-<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div>
+<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div>
+<div id="result" class="result"></div>
 <div id="masteryGauge" class="gauge-card">
   <div class="gauge-title">🎯 מד ביצוע חי — דיוק, שטף וקצב</div>
   <svg viewBox="0 0 200 115" class="gauge-svg">
@@ -48,8 +50,10 @@ button:active{transform:scale(.95)}
     <circle cx="100" cy="100" r="7" fill="#1a1033"/>
   </svg>
   <div id="gaugeLabel" class="gauge-label">—</div>
+  <div id="gaugeBreakdown" class="gauge-breakdown"></div>
 </div>
-<div id="result" class="result"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
+<div id="mastery" class="banner mastery"></div>
+<button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
 <script>
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200;
 var emojis={ben:'👨‍🏫',sara:'👩‍🏫'};
@@ -174,16 +178,22 @@ function fireConfetti(count){
 // already computes those in buildSpeechMetrics() before every submit, so no
 // server changes are needed - just remember the last computed metrics object.
 var lastMetrics={recording_duration_ms:0,silence_ms:0,words_per_minute:0};
-function computeGaugeLevel(score,metrics){
+function computeGaugeBreakdown(score,metrics){
   let m=metrics||{};
   let wpm=Number(m.words_per_minute)||0;
   let silence=Number(m.silence_ms)||0;
   // 80 wpm ~ comfortably fluent conversational pace for these short sentences;
   // 2000ms+ trailing silence/hesitation is treated as the low end of the scale.
+  let accuracyPct=Math.max(0,Math.min(100,Number(score)||0));
   let fluencyPct=Math.max(0,Math.min(100, wpm/80*100));
   let hesitationPct=Math.max(0,Math.min(100, 100-(silence/2000*100)));
-  let level=Math.round(0.5*(Number(score)||0) + 0.25*fluencyPct + 0.25*hesitationPct);
-  return Math.max(0,Math.min(100,level));
+  let level=Math.round(0.5*accuracyPct + 0.25*fluencyPct + 0.25*hesitationPct);
+  return {
+    level: Math.max(0,Math.min(100,level)),
+    accuracyPct: Math.round(accuracyPct),
+    fluencyPct: Math.round(fluencyPct),
+    hesitationPct: Math.round(hesitationPct),
+  };
 }
 function gaugeLabelFor(level){
   if(level>=85)return '🌟 מצוין — מדויק ושוטף';
@@ -191,13 +201,31 @@ function gaugeLabelFor(level){
   if(level>=40)return '📈 בתהליך';
   return '🔄 עדיין מתחיל';
 }
+function gaugeDiagnosis(bd){
+  // A compliment alone when the gauge isn't 100% is not enough feedback - name
+  // the specific weakest component so the student knows exactly what to work
+  // on next time, instead of just seeing a number drop with no explanation.
+  if(bd.level>=99)return '';
+  let items=[
+    {pct:bd.accuracyPct, msg:'יש טעויות במילים שנאמרו - ראו את הפירוט למעלה'},
+    {pct:bd.fluencyPct, msg:'קצב הדיבור היה איטי מהרצוי - נסו לדבר ברצף טבעי בלי לעצור'},
+    {pct:bd.hesitationPct, msg:'הייתה הפסקה/היסוס ארוך במהלך הדיבור'},
+  ];
+  items.sort((a,b)=>a.pct-b.pct);
+  return items[0].pct<95 ? '💡 '+items[0].msg : '';
+}
 function updateMasteryGauge(score,metrics){
   let card=document.getElementById('masteryGauge'); if(!card)return;
-  let level=computeGaugeLevel(score,metrics);
+  let bd=computeGaugeBreakdown(score,metrics);
   card.style.display='block';
   let needle=document.getElementById('gaugeNeedle');
-  if(needle)needle.style.transform='rotate('+((180*level/100)-90)+'deg)';
-  let lbl=document.getElementById('gaugeLabel'); if(lbl)lbl.textContent=level+'% · '+gaugeLabelFor(level);
+  if(needle)needle.style.transform='rotate('+((180*bd.level/100)-90)+'deg)';
+  let lbl=document.getElementById('gaugeLabel'); if(lbl)lbl.textContent=bd.level+'% · '+gaugeLabelFor(bd.level);
+  let sub=document.getElementById('gaugeBreakdown');
+  if(sub){
+    let diag=gaugeDiagnosis(bd);
+    sub.innerHTML='דיוק '+bd.accuracyPct+'% · קצב '+bd.fluencyPct+'% · רציפות '+bd.hesitationPct+'%'+(diag?'<br>'+esc(diag):'');
+  }
 }
 function hideMasteryGauge(){let card=document.getElementById('masteryGauge'); if(card)card.style.display='none'}
 
@@ -264,9 +292,15 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip',
   } else if(q.cloze_active){
     setStation('cloze', q);
     showCloze(q.cloze_word,q.cloze_attempts_left);
+    // Show the gauge immediately when this station renders, not only after the
+    // student's next submitted attempt - use their last known accuracy for this
+    // sentence (mastery_score) with a neutral fluency/hesitation baseline until
+    // a fresh attempt provides real pace/silence numbers.
+    updateMasteryGauge(q.mastery_score||0, {words_per_minute:80, silence_ms:0});
   } else if(q.mastery_target>0){
     setStation('practice', q);
     showMastery(q.mastery_consecutive,q.mastery_target,false,q.attempts_left);
+    updateMasteryGauge(q.mastery_score||0, {words_per_minute:80, silence_ms:0});
     document.getElementById('en').style.opacity='1';
     setTimeout(playSentence,350);
   } else {
@@ -492,7 +526,7 @@ function showCloze(word,left){let el=document.getElementById('cloze');if(!word||
   let resultBox=document.getElementById('result');resultBox.style.display='none';resultBox.innerHTML='';
   let blank=currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
-function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';let attemptsLine=(typeof attemptsLeft==='number')?'<p class="small">ניסיונות שנותרו למשפט הזה: '+attemptsLeft+'</p>':'';el.innerHTML='<h3>⭐ מצב שליטה</h3><p>צריך '+target+' חזרות נכונות. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'+attemptsLine}
+function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';let attemptsLine=(typeof attemptsLeft==='number')?'<p class="small">ניסיונות שנותרו למשפט הזה: '+attemptsLeft+'</p>':'';el.innerHTML='<h3>⭐ מצב שליטה (Mastery)</h3><p>צריך '+target+' חזרות נכונות. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'+attemptsLine}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
 function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
