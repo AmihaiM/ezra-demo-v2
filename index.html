@@ -71,6 +71,19 @@ button:active{transform:scale(.95)}
   .card{padding:11px}
   .sentence{font-size:19px;margin:6px 0}
 }
+/* "הבא" (and the continue/retry choice) pinned to the bottom of the viewport
+   instead of living at the end of the content flow - no amount of shrinking
+   the content above guarantees it fits every phone/font-size combination, so
+   instead the primary action is simply always reachable without scrolling at
+   all, the same pattern most language-learning apps use for their main CTA.
+   The content above can be however tall it needs to be and scrolls normally
+   underneath this bar. */
+.wrap{padding-bottom:86px}
+#nextBtn,#capChoice{
+  position:fixed!important;left:12px;right:12px;bottom:12px;
+  width:auto!important;margin:0!important;z-index:60;
+  box-shadow:0 -6px 24px #0003;
+}
 </style></head><body>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
