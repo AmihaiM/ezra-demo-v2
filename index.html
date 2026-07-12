@@ -32,11 +32,33 @@ button:active{transform:scale(.95)}
 .gauge-label{font-weight:800;font-size:13px;margin-top:-4px}
 .gauge-breakdown{font-size:11px;color:#666;margin:2px 0 4px;line-height:1.4}
 .gauge-needle{transform-origin:100px 100px;transition:transform .6s cubic-bezier(.34,1.56,.64,1)}
+/* Practice screen layout: single column (mobile) by default so everything -
+   sentence, mic, result, gauge - stacks in reading order and fits a phone
+   viewport without excess height. On wide screens the same markup switches
+   to two side-by-side columns (prompt/mic on the right in RTL, feedback/gauge
+   on the left) so the whole practice screen is visible at once instead of
+   leaving large empty margins on the sides while the content overflows
+   vertically - exactly the desktop layout problem reported. */
+.practice-grid{display:block}
+.col-a,.col-b{min-width:0}
+@media (min-width:760px){
+  .practice-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;align-items:start}
+}
+/* Extra mobile compaction - station 3 (cloze) in particular tends to run the
+   tallest, so trim a bit more only below the breakpoint where every pixel of
+   viewport height matters. */
+@media (max-width:759px){
+  .gauge-card{padding:6px 8px 3px}
+  .gauge-svg{width:110px;max-width:42vw}
+  .mic{width:54px;height:54px;font-size:21px;margin:9px auto}
+  .card{padding:11px}
+  .sentence{font-size:19px;margin:6px 0}
+}
 </style></head><body>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2>📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
-<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div>
+<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div></div><div class="col-b">
 <div id="result" class="result"></div>
 <div id="masteryGauge" class="gauge-card">
   <div class="gauge-title">🎯 מד ביצוע חי — דיוק, שטף וקצב</div>
@@ -53,7 +75,7 @@ button:active{transform:scale(.95)}
   <div id="gaugeBreakdown" class="gauge-breakdown"></div>
 </div>
 <div id="mastery" class="banner mastery"></div>
-<button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div></div></section>
+</div></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div></div></section>
 <script>
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200;
 var emojis={ben:'👨‍🏫',sara:'👩‍🏫'};
