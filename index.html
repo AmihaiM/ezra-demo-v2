@@ -631,6 +631,14 @@ function showResult(spoken,res){
     hideCapChoice();
   }
   if(res.advance){document.getElementById('en').style.opacity='1';handleSentenceComplete(res);showNextButton(loadQuestion)}
+  // Auto-scroll so the fresh feedback is immediately in view - not "scroll to
+  // the bottom of the page" (the next/continue button is pinned there now
+  // regardless, via position:fixed, so that's never actually the problem),
+  // but making sure the student doesn't have to hunt for their score/word
+  // breakdown if they were scrolled down (e.g. toward the mic) while recording.
+  if(box.style.display==='block'){
+    setTimeout(()=>{box.scrollIntoView({behavior:'smooth',block:'start'})},60);
+  }
 }
 function showCapChoice(){document.getElementById('mic').classList.add('hidden-final');document.getElementById('play').classList.add('hidden-final');document.getElementById('capChoice').style.display='flex'}
 function hideCapChoice(){document.getElementById('capChoice').style.display='none';document.getElementById('play').classList.remove('hidden-final')}
