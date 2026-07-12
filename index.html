@@ -1,6 +1,6 @@
 <!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EZRA — תרגול דיבור</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}button,input{font:inherit}button{border:0;border-radius:12px;padding:11px 16px;font-weight:700;cursor:pointer}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:24px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:22px;padding:24px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:14px 20px;display:flex;gap:12px;align-items:center}.student{background:#fff2;border-radius:20px;padding:6px 12px}.wrap{max-width:850px;margin:0 auto;padding:18px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:28px;font-weight:800;margin:16px 0}.en{direction:ltr;text-align:left;font-size:22px;color:#4318D1;opacity:0;transition:.25s}.row{display:flex;gap:10px;flex-wrap:wrap}.mic{width:78px;height:78px;border-radius:50%;font-size:30px;display:block;margin:22px auto}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:14px;padding:14px;margin:12px 0}.result{background:#f8fafc;border:2px solid #e0d9ff}.pass{background:#e8f5e9;border-color:#4CAF50}.fail{background:#ffebee;border-color:#ef5350}.cloze{background:#e0f2fe;border:2px solid #0284c7}.mastery{background:#fff3e0;border:2px solid #FF9800}.exam{background:#fff7ed;border:2px solid #fed7aa}.words{direction:ltr;text-align:left;line-height:2}.w{display:inline-block;padding:2px 7px;margin:2px;border-radius:7px}.w.correct{background:#e8f5e9;color:#2e7d32}.w.wrong,.w.missing{background:#ffebee;color:#c62828;text-decoration:line-through}.w.extra{background:#fff3e0;color:#e65100}.ok{color:#16a34a}.bad{color:#dc2626}.dots{display:flex;gap:7px}.dot{width:20px;height:20px;border-radius:50%;border:2px solid #FF9800;background:#ffe0b2}.dot.done{background:#FF9800}.small{font-size:13px;color:#666}
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}button,input{font:inherit}button{border:0;border-radius:12px;padding:9px 14px;font-weight:700;cursor:pointer}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:16px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:18px;padding:14px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center}.student{background:#fff2;border-radius:20px;padding:6px 12px}.wrap{max-width:850px;margin:0 auto;padding:10px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:21px;font-weight:800;margin:8px 0}.en{direction:ltr;text-align:left;font-size:17px;color:#4318D1;opacity:0;transition:.25s}.row{display:flex;gap:8px;flex-wrap:wrap}.mic{width:60px;height:60px;border-radius:50%;font-size:24px;display:block;margin:12px auto}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:12px;padding:9px 11px;margin:7px 0;font-size:14px}.result{background:#f8fafc;border:2px solid #e0d9ff}.pass{background:#e8f5e9;border-color:#4CAF50}.fail{background:#ffebee;border-color:#ef5350}.cloze{background:#e0f2fe;border:2px solid #0284c7}.mastery{background:#fff3e0;border:2px solid #FF9800}.exam{background:#fff7ed;border:2px solid #fed7aa}.words{direction:ltr;text-align:left;line-height:1.6;font-size:13px}.w{display:inline-block;padding:1px 6px;margin:1px;border-radius:6px}.w.correct{background:#e8f5e9;color:#2e7d32}.w.wrong,.w.missing{background:#ffebee;color:#c62828;text-decoration:line-through}.w.extra{background:#fff3e0;color:#e65100}.ok{color:#16a34a}.bad{color:#dc2626}.dots{display:flex;gap:5px}.dot{width:15px;height:15px;border-radius:50%;border:2px solid #FF9800;background:#ffe0b2}.dot.done{background:#FF9800}.small{font-size:13px;color:#666}
 
 .summary-hero{background:linear-gradient(135deg,#4318D1,#be185d);color:#fff;border-radius:24px;padding:26px;margin-bottom:20px;text-align:center;box-shadow:0 18px 44px #4318d133}.summary-hero h2{font-size:34px;margin:0 0 8px}.score-circle{width:140px;height:140px;border-radius:50%;background:conic-gradient(#22c55e var(--score-deg),rgba(255,255,255,.25) 0);display:grid;place-items:center;margin:18px auto;border:8px solid rgba(255,255,255,.25)}.score-circle b{font-size:34px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}.summary-card{background:#fff;border:1px solid #ede7ff;border-radius:18px;padding:16px;box-shadow:0 8px 24px #4318d112;text-align:center}.summary-card .num{font-size:28px;font-weight:900;color:var(--tc,#4318D1)}.summary-list{display:grid;gap:12px;margin-top:16px}.summary-row{background:#fff;border:1px solid #ede7ff;border-radius:16px;padding:14px;box-shadow:0 6px 18px #4318d10d;direction:ltr;text-align:left}.summary-row.pass{border-inline-start:7px solid #22c55e}.summary-row.fail{border-inline-start:7px solid #ef4444}.summary-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}.hidden-final{display:none!important}
 
@@ -26,11 +26,11 @@ button:active{transform:scale(.95)}
 #select .card.teacher{transition:transform .2s,box-shadow .2s}
 .progress{position:relative;overflow:hidden}
 .bar{background:linear-gradient(90deg,var(--tc,#4318D1),#be185d)}
-.gauge-card{display:none;background:#fff;border:2px solid #ede7ff;border-radius:16px;padding:12px 14px 6px;margin:12px 0;text-align:center}
-.gauge-title{font-weight:800;color:#4318D1;font-size:14px;margin-bottom:2px}
-.gauge-svg{width:200px;max-width:80%;height:auto}
-.gauge-label{font-weight:800;font-size:15px;margin-top:-6px}
-.gauge-breakdown{font-size:12px;color:#666;margin:4px 0 8px;line-height:1.5}
+.gauge-card{display:none;background:#fff;border:2px solid #ede7ff;border-radius:14px;padding:7px 10px 4px;margin:7px 0;text-align:center}
+.gauge-title{font-weight:800;color:#4318D1;font-size:12px;margin-bottom:1px}
+.gauge-svg{width:130px;max-width:50%;height:auto}
+.gauge-label{font-weight:800;font-size:13px;margin-top:-4px}
+.gauge-breakdown{font-size:11px;color:#666;margin:2px 0 4px;line-height:1.4}
 .gauge-needle{transform-origin:100px 100px;transition:transform .6s cubic-bezier(.34,1.56,.64,1)}
 </style></head><body>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
@@ -53,7 +53,7 @@ button:active{transform:scale(.95)}
   <div id="gaugeBreakdown" class="gauge-breakdown"></div>
 </div>
 <div id="mastery" class="banner mastery"></div>
-<button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
+<button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div></div></section>
 <script>
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200;
 var emojis={ben:'👨‍🏫',sara:'👩‍🏫'};
@@ -340,17 +340,33 @@ function playSentence(){
   if(!currentQ)return;
   let text=currentQ.en;
   speechSynthesis.cancel();
-  // Chrome/Edge's speech engine sometimes hasn't fully reset by the time
-  // speak() runs right after cancel(), so the first syllable of the new
-  // utterance gets clipped - happens on both the first playback and every
-  // "שמע שוב" repeat. A short delay before actually speaking lets the engine
-  // settle first, consistently fixing the dropped-first-syllable complaint.
+  let playBtn=document.getElementById('play');
+  // Guard against double-clicking "שמע שוב" while the engine is still
+  // settling from cancel() above - a second overlapping speak() call while
+  // the first hasn't started yet is exactly what was still clipping the
+  // start of the sentence on repeat plays even with the delay below.
+  if(playBtn)playBtn.disabled=true;
   setTimeout(()=>{
     speechSynthesis.resume();
-    let u=new SpeechSynthesisUtterance(text);
-    u.lang='en-US';u.rate=.88;
-    let v=pickVoice();if(v)u.voice=v;
-    speechSynthesis.speak(u);
+    // Chrome/Edge's speech engine sometimes hasn't fully reset by the time
+    // speak() runs right after cancel(), so the first syllable of the real
+    // utterance gets clipped - happens on both the first playback and every
+    // "שמע שוב" repeat. Speaking a near-silent primer utterance FIRST lets
+    // the engine's clipping "land" on that throwaway sound instead of on the
+    // first real word - onend of the primer only then triggers the real
+    // sentence, by which point the engine is reliably warmed up.
+    let primer=new SpeechSynthesisUtterance('.');
+    primer.volume=0.01; primer.rate=2; primer.lang='en-US';
+    let speakReal=()=>{
+      let u=new SpeechSynthesisUtterance(text);
+      u.lang='en-US';u.rate=.88;
+      let v=pickVoice();if(v)u.voice=v;
+      let reenable=()=>{if(playBtn)playBtn.disabled=false};
+      u.onend=reenable; u.onerror=reenable;
+      speechSynthesis.speak(u);
+    };
+    primer.onend=speakReal; primer.onerror=speakReal;
+    speechSynthesis.speak(primer);
   },200);
 }
 function toggleEnglish(){let e=document.getElementById('en');e.style.opacity=e.style.opacity==='1'?'0':'1'}
@@ -454,7 +470,12 @@ function showResult(spoken,res){
   // to directly contradict the "עברנו הלאה" text shown right below it and
   // the "הבא" button, which is exactly the confusing mixed message reported.
   let outOfAttempts=!passed&&!!res.skipped&&!!res.cap_reached;
-  document.getElementById('hint').textContent=passed?'יפה!':(outOfAttempts?'עברנו הלאה':'נסה שוב');
+  // cap_choice: the server no longer force-advances the instant attempts run
+  // out - it pauses and lets the student pick "continue" or "another round"
+  // themselves (see showCapChoice below), instead of silently skipping slow
+  // readers/speakers away from a sentence they might still get right.
+  let capChoice=!!res.cap_choice;
+  document.getElementById('hint').textContent=passed?'יפה!':(capChoice?'נגמרו הניסיונות למשפט הזה':(outOfAttempts?'עברנו הלאה':'נסה שוב'));
   if(passed)sndCorrect();else if(!outOfAttempts)sndWrong();
 
   let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
@@ -476,7 +497,7 @@ function showResult(spoken,res){
     // see exactly what they got wrong instead of guessing blindly.
     box.style.display='block';
     box.className='result '+(passed?'pass':'fail');
-    let clozeTitle=passed?'✅ מצוין! 🎉':(outOfAttempts?'⏭️ עברנו הלאה':'💪 עדיין לא בדיוק');
+    let clozeTitle=passed?'✅ מצוין! 🎉':(capChoice?'⏸️ נגמרו הניסיונות הפעם':(outOfAttempts?'⏭️ עברנו הלאה':'💪 עדיין לא בדיוק'));
     box.innerHTML='<h3>'+clozeTitle+'</h3><div>המשפט המלא: <span dir="ltr">'+esc(res.correct||'')+'</span></div><div>אמרת: <span dir="ltr">'+esc(spoken)+'</span></div>';
     if(!passed && res.cloze_mode){
       // Let the student request to hear the full correct sentence as a hint
@@ -487,8 +508,8 @@ function showResult(spoken,res){
   } else {
     box.style.display='block';
     box.className='result '+(passed?'pass':'fail');
-    let msg=passed?pick(MSG_PASS):(outOfAttempts?'לא הצלחנו הפעם':pick(MSG_FAIL));
-    let icon=passed?'✅ ':(outOfAttempts?'⏭️ ':'💪 ');
+    let msg=passed?pick(MSG_PASS):(capChoice?'נגמרו הניסיונות הפעם':(outOfAttempts?'לא הצלחנו הפעם':pick(MSG_FAIL)));
+    let icon=passed?'✅ ':(capChoice?'⏸️ ':(outOfAttempts?'⏭️ ':'💪 '));
     let words=(res.words||[]).map(w=>'<span class="w '+esc(w.status)+'">'+esc(w.word)+'</span>').join(' ');
     let attempts = (typeof res.attempts_used==='number' && typeof res.max_attempts==='number')
       ? '<div class="small">ניסיון '+res.attempts_used+' מתוך '+res.max_attempts+'</div>' : '';
@@ -511,12 +532,32 @@ function showResult(spoken,res){
     box.innerHTML+='<p>'+msg+'</p>';
   }
   if(res.cap_reached && res.passed){box.innerHTML+='<p>הגענו למספר הניסיונות המקסימלי — המשפט עבר, ממשיכים הלאה.</p>'}
-  if(res.skipped){box.innerHTML+='<p>עברנו הלאה — המשפט סומן לחזרה בהמשך התרגול.</p>'}
+  if(res.skipped && !capChoice){box.innerHTML+='<p>עברנו הלאה — המשפט סומן לחזרה בהמשך התרגול.</p>'}
   if(res.station==='review'){
     box.style.display='block'; box.className='result '+(passed?'pass':'fail');
     box.innerHTML=passed?'<h3>✅ מצוין!</h3>':'<h3>💪 עדיין לא — סומן למורה להמשך תרגול</h3>';
   }
+  if(capChoice){
+    box.innerHTML+='<p>אפשר להמשיך למשפט הבא, או לבקש עוד סיבוב אם את/ה מרגיש/ה קרוב/ה לתשובה הנכונה.</p>';
+    showCapChoice();
+  } else {
+    hideCapChoice();
+  }
   if(res.advance){document.getElementById('en').style.opacity='1';handleSentenceComplete(res);showNextButton(loadQuestion)}
+}
+function showCapChoice(){document.getElementById('mic').classList.add('hidden-final');document.getElementById('play').classList.add('hidden-final');document.getElementById('capChoice').style.display='flex'}
+function hideCapChoice(){document.getElementById('capChoice').style.display='none';document.getElementById('play').classList.remove('hidden-final')}
+function capContinue(){
+  hideCapChoice();
+  document.getElementById('hint').textContent='עובר למשפט הבא...';
+  fetch('/api/cap-continue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion());
+}
+function capRetry(){
+  fetch('/api/cap-retry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(r=>r.json()).then(()=>{
+    hideCapChoice();
+    document.getElementById('mic').classList.remove('hidden-final');
+    document.getElementById('hint').textContent='עוד סיבוב — לחץ על המיקרופון ונסה שוב';
+  });
 }
 function showNextButton(action){nextAction=action;document.getElementById('mic').classList.add('hidden-final');document.getElementById('nextBtn').style.display='block'}
 function hideNextButton(){document.getElementById('nextBtn').style.display='none';nextAction=null;document.getElementById('mic').classList.remove('hidden-final')}
@@ -536,7 +577,7 @@ function showCloze(word,left,display){let el=document.getElementById('cloze');if
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';let attemptsLine=(typeof attemptsLeft==='number')?'<p class="small">ניסיונות שנותרו למשפט הזה: '+attemptsLeft+'</p>':'';el.innerHTML='<h3>⭐ מצב שליטה (Mastery)</h3><p>צריך '+target+' חזרות נכונות. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'+attemptsLine}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
-function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton()}
+function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
 function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentence;currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';

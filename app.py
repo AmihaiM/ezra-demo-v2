@@ -460,7 +460,11 @@ def session_payload(s):
     # meant station 1's failures could silently eat into station 2's budget and
     # station 3 (cloze) would then never get a turn. attempts_used/attempts_left
     # here always reflect whichever station is currently active.
-    cap = s.get("max_attempts", 5)
+    # bonus_attempts is granted on-demand via /api/cap-retry when a student
+    # chooses "another round" instead of being auto-advanced after running out
+    # of attempts - it raises the effective cap for the CURRENT sentence only
+    # and is reset back to 0 the moment that sentence is actually recorded.
+    cap = s.get("max_attempts", 5) + s.get("bonus_attempts", 0)
     if s["cloze_active"]:
         used, left = s.get("cloze_attempts", 0), max(0, cap - s.get("cloze_attempts", 0))
     elif s["mastery_target"] > 0:
@@ -535,6 +539,8 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
         "cloze_display": "",
         "cloze_attempts": 0,
         "cloze_passed": False,
+        "bonus_attempts": 0,
+        "cap_pending": None,
         "last_mastery_target": 0,
         "review_queue": [],
         "in_review": False,
@@ -737,6 +743,10 @@ def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, me
     s["failed_attempts"] = 0
     s["sentence_attempts"] = 0
     s["stage2_attempts"] = 0
+    # Any bonus attempts granted via /api/cap-retry only ever apply to the
+    # sentence they were granted for - never let them silently carry over and
+    # inflate the cap for every sentence for the rest of the session.
+    s["bonus_attempts"] = 0
     s["last_mastery_target"] = s.get("mastery_target", 0)
     s["mastery_target"] = 0
     s["mastery_consecutive"] = 0
@@ -908,39 +918,69 @@ def question():
         "content_mismatch": s.get("content_mismatch", False), **session_payload(s)
     })
 
-def cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=None, sentence_obj=None, attempts_used=None):
-    """Hard safety valve: no sentence can consume more than max_attempts submissions.
-    If the student got a passing score on the last allowed try, move on as passed;
-    otherwise skip/move on so the exercise never loops forever.
-    A sentence that had to be skipped this way gets one more single-attempt
-    chance in a review round before the final exam (unless we're already in
-    that review round, in which case it's simply flagged for the teacher).
+def cap_choice(s, correct, spoken, score, base, metrics=None, sentence_obj=None, attempts_used=None):
+    """Hard safety valve: no sentence auto-loops forever. But instead of forcibly
+    skipping to the next sentence the instant max_attempts is hit (the old
+    cap_and_advance behavior), PAUSE here and let the student choose: move on
+    now, or ask for a few bonus attempts and keep trying the same sentence.
+    This directly answers reports that slow readers/speakers were being
+    silently auto-advanced away before they felt ready or felt close to a
+    correct answer. Nothing is recorded/advanced until the student actually
+    picks one of the two options via /api/cap-continue or /api/cap-retry.
     """
-    # attempts_used must be captured by the caller BEFORE this function runs,
-    # from whichever per-station counter (sentence_attempts/stage2_attempts/
-    # cloze_attempts) actually hit the cap. record_and_advance() below resets
-    # ALL of those counters to 0 to prepare the (now-advanced) session for the
-    # next sentence, and session_payload(s) - spread in below - reports
-    # whatever counter is live for the session's new state. Without capturing
-    # the real value first, the response was showing the next sentence's
-    # fresh "0 attempts used" instead of the capped station's true count
-    # (e.g. "ניסיון 0 מתוך 5" right after actually using all 5).
-    record_and_advance(s, correct, spoken, score, bool(passed), skipped=not bool(passed), metrics=metrics)
-    if not passed and sentence_obj and not s.get("in_review"):
-        s["review_queue"].append(dict(sentence_obj))
+    s["cap_pending"] = {
+        "correct": correct, "spoken": spoken, "score": score,
+        "metrics": metrics or {}, "sentence_obj": dict(sentence_obj) if sentence_obj else None,
+    }
     payload = {
         **base,
-        "passed": bool(passed),
-        "skipped": not bool(passed),
-        "advance": True,
+        "passed": False,
+        "skipped": False,
+        "advance": False,
         "cap_reached": True,
-        "message": "עברנו הלאה אחרי מספר הניסיונות שהוגדר למורה.",
+        "cap_choice": True,
+        "message": "השתמשת בכל הניסיונות למשפט הזה. אפשר להמשיך למשפט הבא, או לבקש עוד סיבוב.",
         **session_payload(s),
     }
     if attempts_used is not None:
         payload["attempts_used"] = attempts_used
         payload["attempts_left"] = 0
     return jsonify(payload)
+
+@app.post("/api/cap-continue")
+def cap_continue():
+    """Student chose to move on after exhausting attempts on this sentence -
+    equivalent to what used to happen automatically. Records the last attempt
+    as a skip/fail, queues the sentence for the pre-exam review round, and
+    advances to the next sentence."""
+    data = request.get_json(force=True)
+    s = _sessions.get(data.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    pc = s.get("cap_pending")
+    if not pc:
+        return jsonify(error="no pending decision"), 400
+    s["cap_pending"] = None
+    s["bonus_attempts"] = 0
+    record_and_advance(s, pc["correct"], pc["spoken"], pc["score"], False, skipped=True, metrics=pc.get("metrics"))
+    if pc.get("sentence_obj") and not s.get("in_review"):
+        s["review_queue"].append(pc["sentence_obj"])
+    return jsonify(ok=True)
+
+@app.post("/api/cap-retry")
+def cap_retry():
+    """Student chose "another round" instead of moving on - grant a small
+    batch of bonus attempts on the SAME sentence/station instead of forcing an
+    advance, for cases where they feel close to a correct answer."""
+    data = request.get_json(force=True)
+    s = _sessions.get(data.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    if not s.get("cap_pending"):
+        return jsonify(error="no pending decision"), 400
+    s["cap_pending"] = None
+    s["bonus_attempts"] = int(s.get("bonus_attempts", 0)) + 3
+    return jsonify(ok=True, **session_payload(s))
 
 @app.post("/api/answer")
 def answer():
@@ -1005,7 +1045,10 @@ def answer():
         "correct": correct, "spoken": spoken, "score": score, "passed": passed,
         "debug_expected": correct,
         "words": words, "threshold": s["threshold"], "advance": False,
-        "max_attempts": s["max_attempts"],
+        # Include any bonus attempts granted via /api/cap-retry so the
+        # attempts-used/max-attempts display students see (e.g. "6 of 8")
+        # never looks contradictory after they've asked for another round.
+        "max_attempts": s["max_attempts"] + s.get("bonus_attempts", 0),
     }
 
     # IMPORTANT: each station (1 = initial read, 2 = Bloom mastery, 3 = cloze) has
@@ -1029,14 +1072,14 @@ def answer():
             return jsonify({**base, "station": "cloze", "cloze_done": True, "advance": True, **session_payload(s)})
 
         s["cloze_attempts"] += 1
-        if s["cloze_attempts"] >= s["max_attempts"]:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, passed=False, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["cloze_attempts"])
+        if s["cloze_attempts"] >= s["max_attempts"] + s.get("bonus_attempts", 0):
+            return cap_choice(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["cloze_attempts"])
         return jsonify({**base, "station": "cloze", "cloze_mode": True, **session_payload(s)})
 
     # Station 2: Bloom practice/mastery. The cloze station is NOT shown yet.
     if s["mastery_target"] > 0:
         s["stage2_attempts"] = int(s.get("stage2_attempts", 0)) + 1
-        stage2_cap_reached = s["stage2_attempts"] >= s["max_attempts"]
+        stage2_cap_reached = s["stage2_attempts"] >= s["max_attempts"] + s.get("bonus_attempts", 0)
         if passed:
             s["mastery_consecutive"] += 1
             s["mastery_score"] = max(s.get("mastery_score", 0), score)
@@ -1063,13 +1106,13 @@ def answer():
         # correct repetitions. Only running out of station 2's own attempt budget
         # ends the loop (handled below) - this never borrows from station 1 or 3.
         if stage2_cap_reached:
-            return cap_and_advance(s, correct, spoken, score, {**base, "station": "practice"}, passed=False, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["stage2_attempts"])
+            return cap_choice(s, correct, spoken, score, {**base, "station": "practice"}, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["stage2_attempts"])
         return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": True, **session_payload(s)})
 
     # Station 1: normal practice / initial read. A passing first read enters either
     # Bloom repetition mode (if there were failures) or the separate cloze check.
     s["sentence_attempts"] = int(s.get("sentence_attempts", 0)) + 1
-    cap_reached = s["sentence_attempts"] >= s["max_attempts"]
+    cap_reached = s["sentence_attempts"] >= s["max_attempts"] + s.get("bonus_attempts", 0)
     if passed:
         target = mastery_target_for(s["failed_attempts"])
         s["mastery_score"] = score
@@ -1093,7 +1136,7 @@ def answer():
 
     s["failed_attempts"] += 1
     if cap_reached:
-        return cap_and_advance(s, correct, spoken, score, base, passed=False, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["sentence_attempts"])
+        return cap_choice(s, correct, spoken, score, base, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["sentence_attempts"])
     return jsonify({**base, **session_payload(s)})
 
 @app.post("/api/skip")
