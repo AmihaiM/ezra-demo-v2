@@ -43,6 +43,14 @@ button:active{transform:scale(.95)}
 .col-a,.col-b{min-width:0}
 @media (min-width:760px){
   .practice-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;align-items:start}
+  /* col-b (result/gauge/mastery) was still taller than col-a on its own and
+     ran past the bottom of the viewport - shrink its internals specifically
+     rather than the whole app, since col-b is the narrower column here and
+     doesn't need the same gauge size as the old single-column layout. */
+  .col-b .gauge-card{padding:4px 8px 2px;margin:5px 0}
+  .col-b .gauge-svg{width:96px;max-width:36%}
+  .col-b .gauge-title{font-size:11px}
+  .col-b .result,.col-b .banner{margin:5px 0;padding:8px 10px}
 }
 /* Extra mobile compaction - station 3 (cloze) in particular tends to run the
    tallest, so trim a bit more only below the breakpoint where every pixel of
@@ -632,7 +640,12 @@ function showCloze(word,left,display){let el=document.getElementById('cloze');if
   let blank=display?display:currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');
   setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
-function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';let attemptsLine=(typeof attemptsLeft==='number')?'<p class="small">ניסיונות שנותרו למשפט הזה: '+attemptsLeft+'</p>':'';el.innerHTML='<h3>⭐ מצב שליטה (Mastery)</h3><p>צריך '+target+' חזרות נכונות. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'+attemptsLine}
+function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';
+  // Combined onto one line (was a separate paragraph below the dots) - purely
+  // a height-saving change, same information. This line was specifically the
+  // part getting cut off below the fold in the two-column desktop layout.
+  let attemptsLine=(typeof attemptsLeft==='number')?' · ניסיונות שנותרו: '+attemptsLeft:'';
+  el.innerHTML='<h3>⭐ מצב שליטה (Mastery)</h3><p>צריך '+target+' חזרות נכונות ('+consecutive+'/'+target+')'+attemptsLine+'</p><div class="dots">'+dots+'</div>'}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
 function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
