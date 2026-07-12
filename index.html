@@ -1,19 +1,233 @@
 <!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EZRA — תרגול דיבור</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}button,input{font:inherit}button{border:0;border-radius:12px;padding:11px 16px;font-weight:700;cursor:pointer}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:24px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:22px;padding:24px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:14px 20px;display:flex;gap:12px;align-items:center}.student{margin-right:auto;background:#fff2;border-radius:20px;padding:6px 12px}.wrap{max-width:850px;margin:0 auto;padding:18px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:28px;font-weight:800;margin:16px 0}.en{direction:ltr;text-align:left;font-size:22px;color:#4318D1;opacity:0;transition:.25s}.row{display:flex;gap:10px;flex-wrap:wrap}.mic{width:78px;height:78px;border-radius:50%;font-size:30px;display:block;margin:22px auto}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:14px;padding:14px;margin:12px 0}.result{background:#f8fafc;border:2px solid #e0d9ff}.pass{background:#e8f5e9;border-color:#4CAF50}.fail{background:#ffebee;border-color:#ef5350}.cloze{background:#e0f2fe;border:2px solid #0284c7}.mastery{background:#fff3e0;border:2px solid #FF9800}.exam{background:#fff7ed;border:2px solid #fed7aa}.words{direction:ltr;text-align:left;line-height:2}.w{display:inline-block;padding:2px 7px;margin:2px;border-radius:7px}.w.correct{background:#e8f5e9;color:#2e7d32}.w.wrong,.w.missing{background:#ffebee;color:#c62828;text-decoration:line-through}.w.extra{background:#fff3e0;color:#e65100}.ok{color:#16a34a}.bad{color:#dc2626}.dots{display:flex;gap:7px}.dot{width:20px;height:20px;border-radius:50%;border:2px solid #FF9800;background:#ffe0b2}.dot.done{background:#FF9800}.small{font-size:13px;color:#666}
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}button,input{font:inherit}button{border:0;border-radius:12px;padding:11px 16px;font-weight:700;cursor:pointer}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:24px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:22px;padding:24px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:14px 20px;display:flex;gap:12px;align-items:center}.student{background:#fff2;border-radius:20px;padding:6px 12px}.wrap{max-width:850px;margin:0 auto;padding:18px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:28px;font-weight:800;margin:16px 0}.en{direction:ltr;text-align:left;font-size:22px;color:#4318D1;opacity:0;transition:.25s}.row{display:flex;gap:10px;flex-wrap:wrap}.mic{width:78px;height:78px;border-radius:50%;font-size:30px;display:block;margin:22px auto}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:14px;padding:14px;margin:12px 0}.result{background:#f8fafc;border:2px solid #e0d9ff}.pass{background:#e8f5e9;border-color:#4CAF50}.fail{background:#ffebee;border-color:#ef5350}.cloze{background:#e0f2fe;border:2px solid #0284c7}.mastery{background:#fff3e0;border:2px solid #FF9800}.exam{background:#fff7ed;border:2px solid #fed7aa}.words{direction:ltr;text-align:left;line-height:2}.w{display:inline-block;padding:2px 7px;margin:2px;border-radius:7px}.w.correct{background:#e8f5e9;color:#2e7d32}.w.wrong,.w.missing{background:#ffebee;color:#c62828;text-decoration:line-through}.w.extra{background:#fff3e0;color:#e65100}.ok{color:#16a34a}.bad{color:#dc2626}.dots{display:flex;gap:7px}.dot{width:20px;height:20px;border-radius:50%;border:2px solid #FF9800;background:#ffe0b2}.dot.done{background:#FF9800}.small{font-size:13px;color:#666}
 
 .summary-hero{background:linear-gradient(135deg,#4318D1,#be185d);color:#fff;border-radius:24px;padding:26px;margin-bottom:20px;text-align:center;box-shadow:0 18px 44px #4318d133}.summary-hero h2{font-size:34px;margin:0 0 8px}.score-circle{width:140px;height:140px;border-radius:50%;background:conic-gradient(#22c55e var(--score-deg),rgba(255,255,255,.25) 0);display:grid;place-items:center;margin:18px auto;border:8px solid rgba(255,255,255,.25)}.score-circle b{font-size:34px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}.summary-card{background:#fff;border:1px solid #ede7ff;border-radius:18px;padding:16px;box-shadow:0 8px 24px #4318d112;text-align:center}.summary-card .num{font-size:28px;font-weight:900;color:var(--tc,#4318D1)}.summary-list{display:grid;gap:12px;margin-top:16px}.summary-row{background:#fff;border:1px solid #ede7ff;border-radius:16px;padding:14px;box-shadow:0 6px 18px #4318d10d;direction:ltr;text-align:left}.summary-row.pass{border-inline-start:7px solid #22c55e}.summary-row.fail{border-inline-start:7px solid #ef4444}.summary-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}.hidden-final{display:none!important}
+
+/* Gamification layer: XP/streak/mute pills, star ratings, badge toasts, confetti. */
+.stats-row{display:flex;gap:8px;align-items:center}
+.stat-pill{background:#fff2;border-radius:20px;padding:6px 12px;font-weight:800;font-size:14px;white-space:nowrap;transition:transform .25s}
+.stat-pill.pop{animation:statpop .35s ease}
+@keyframes statpop{0%{transform:scale(1)}45%{transform:scale(1.22)}100%{transform:scale(1)}}
+.mute-btn{background:#fff2;border-radius:50%;width:36px;height:36px;padding:0;font-size:15px;color:#fff;line-height:1}
+.xp-float{position:fixed;pointer-events:none;font-weight:900;color:#22c55e;font-size:19px;z-index:80;animation:xpfloat 1.1s ease forwards}
+@keyframes xpfloat{0%{opacity:0;transform:translateY(0) scale(.8)}18%{opacity:1;transform:translateY(-6px) scale(1)}100%{opacity:0;transform:translateY(-54px) scale(1)}}
+.stars-row{font-size:30px;letter-spacing:6px;text-align:center;margin:10px 0}
+.star{display:inline-block;filter:grayscale(1);opacity:.3;transform:scale(.75);transition:transform .3s,opacity .3s,filter .3s}
+.star.lit{filter:none;opacity:1;transform:scale(1)}
+.badge-toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-140%);background:#1a1033;color:#fff;border-radius:16px;padding:14px 22px;display:flex;align-items:center;gap:12px;box-shadow:0 14px 32px #0004;z-index:90;transition:transform .45s cubic-bezier(.34,1.56,.64,1);max-width:min(420px,90vw)}
+.badge-toast.show{transform:translateX(-50%) translateY(0)}
+.badge-toast .bicon{font-size:30px}
+.confetti-piece{position:fixed;top:-20px;width:9px;height:13px;z-index:85;pointer-events:none;animation:confetti-fall linear forwards}
+@keyframes confetti-fall{to{transform:translateY(110vh) rotate(560deg)}}
+button{transition:transform .12s}
+button:active{transform:scale(.95)}
+.mic{transition:transform .15s,background .2s}
+#select .card.teacher{transition:transform .2s,box-shadow .2s}
+.progress{position:relative;overflow:hidden}
+.bar{background:linear-gradient(90deg,var(--tc,#4318D1),#be185d)}
+.gauge-card{display:none;background:#fff;border:2px solid #ede7ff;border-radius:16px;padding:12px 14px 6px;margin:12px 0;text-align:center}
+.gauge-title{font-weight:800;color:#4318D1;font-size:14px;margin-bottom:2px}
+.gauge-svg{width:200px;max-width:80%;height:auto}
+.gauge-label{font-weight:800;font-size:15px;margin-top:-6px}
+.gauge-needle{transform-origin:100px 100px;transition:transform .6s cubic-bezier(.34,1.56,.64,1)}
 </style></head><body>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2>📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
-<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div><div id="result" class="result"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
+<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><div id="mastery" class="banner mastery"></div>
+<div id="masteryGauge" class="gauge-card">
+  <div class="gauge-title">🎯 מד ביצוע חי — דיוק, שטף וקצב</div>
+  <svg viewBox="0 0 200 115" class="gauge-svg">
+    <path d="M180,100 A80,80 0 0,1 164.7,53" stroke="#166534" stroke-width="18" fill="none" stroke-linecap="round"/>
+    <path d="M164.7,53 A80,80 0 0,1 124.7,23.9" stroke="#22c55e" stroke-width="18" fill="none" stroke-linecap="round"/>
+    <path d="M124.7,23.9 A80,80 0 0,1 75.3,23.9" stroke="#eab308" stroke-width="18" fill="none" stroke-linecap="round"/>
+    <path d="M75.3,23.9 A80,80 0 0,1 35.3,53" stroke="#f97316" stroke-width="18" fill="none" stroke-linecap="round"/>
+    <path d="M35.3,53 A80,80 0 0,1 20,100" stroke="#ef4444" stroke-width="18" fill="none" stroke-linecap="round"/>
+    <line id="gaugeNeedle" class="gauge-needle" x1="100" y1="100" x2="100" y2="24" stroke="#1a1033" stroke-width="4" stroke-linecap="round" style="transform:rotate(-90deg)"/>
+    <circle cx="100" cy="100" r="7" fill="#1a1033"/>
+  </svg>
+  <div id="gaugeLabel" class="gauge-label">—</div>
+</div>
+<div id="result" class="result"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button></div></div></section>
 <script>
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200;
 var emojis={ben:'👨‍🏫',sara:'👩‍🏫'};
 var MSG_PASS=['מצוין! 🎉','כל הכבוד! ⭐','יפה מאוד! 💫','נהדר! 🎯'];
 var MSG_FAIL=['כמעט! נסה שוב 💪','אתה יכול! 🌟','עוד קצת! 😊','נסה שוב — אתה קרוב'];
 function pick(a){return a[Math.floor(Math.random()*a.length)]}
+
+// ---------------------------------------------------------------------------
+// Gamification layer: XP/levels, daily streak, per-sentence star ratings,
+// achievement badges, confetti, and short Web-Audio sound effects (no external
+// audio files or CDNs needed). Everything is persisted client-side in
+// localStorage, keyed by the student's email, since it's presentation/motivation
+// data rather than data the teacher needs to see - the real results (score,
+// pass/fail, mastery) still go through the server/Google Sheet exactly as before.
+var muted=localStorage.getItem('ezra_muted')==='1';
+var xp=0, streakCount=0, sentenceAttemptCount=0, threeStarStreak=0;
+var audioCtx=null;
+function getAudioCtx(){if(!audioCtx){try{audioCtx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){return null}}return audioCtx}
+function playTone(freq,startTime,duration,type,gainPeak){
+  let ctx=getAudioCtx(); if(!ctx||muted)return;
+  if(ctx.state==='suspended')ctx.resume();
+  let osc=ctx.createOscillator(), gain=ctx.createGain();
+  osc.type=type||'sine'; osc.frequency.value=freq;
+  osc.connect(gain); gain.connect(ctx.destination);
+  let t=ctx.currentTime+startTime;
+  gain.gain.setValueAtTime(0,t);
+  gain.gain.linearRampToValueAtTime(gainPeak||0.15,t+0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001,t+duration);
+  osc.start(t); osc.stop(t+duration+0.03);
+}
+function sndCorrect(){playTone(660,0,.14,'sine',.16);playTone(880,.1,.18,'sine',.14)}
+function sndWrong(){playTone(180,0,.22,'sine',.12)}
+function sndAdvance(){playTone(523,0,.12,'sine',.15);playTone(659,.09,.12,'sine',.15);playTone(784,.18,.22,'sine',.16)}
+function sndAchievement(){playTone(523,0,.12,'triangle',.16);playTone(659,.12,.12,'triangle',.16);playTone(784,.24,.12,'triangle',.16);playTone(1047,.36,.3,'triangle',.18)}
+function toggleMute(){muted=!muted;localStorage.setItem('ezra_muted',muted?'1':'0');let b=document.getElementById('muteBtn');if(b)b.textContent=muted?'🔇':'🔊';if(!muted)playTone(660,0,.1,'sine',.12)}
+
+function xpKey(){return 'ezra_xp_'+(studentEmail||'guest')}
+function loadXp(){xp=parseInt(localStorage.getItem(xpKey())||'0',10)||0;updateXpUI(false)}
+function levelOf(x){return Math.floor(x/100)+1}
+function updateXpUI(animate){
+  let el=document.getElementById('xpVal'); if(!el)return;
+  el.textContent=xp+' (רמה '+levelOf(xp)+')';
+  if(animate){let pill=document.getElementById('xpPill');if(pill){pill.classList.remove('pop');void pill.offsetWidth;pill.classList.add('pop')}}
+}
+function addXp(amount,x,y){
+  let prevLevel=levelOf(xp);
+  xp+=amount; localStorage.setItem(xpKey(),String(xp)); updateXpUI(true);
+  if(typeof x==='number'&&typeof y==='number'){
+    let f=document.createElement('div'); f.className='xp-float'; f.textContent='+'+amount+' XP';
+    f.style.left=(x-24)+'px'; f.style.top=(y-10)+'px'; document.body.appendChild(f);
+    setTimeout(()=>f.remove(),1150);
+  }
+  if(levelOf(xp)>prevLevel){sndAchievement();fireConfetti(16)}
+}
+
+function streakKey(){return 'ezra_streak_'+(studentEmail||'guest')}
+function dateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function updateStreak(){
+  let raw=localStorage.getItem(streakKey());
+  let data=raw?JSON.parse(raw):{count:0,last:''};
+  let today=dateStr(new Date());
+  if(data.last!==today){
+    let y=new Date(); y.setDate(y.getDate()-1);
+    data.count=(data.last===dateStr(y))?(data.count+1):1;
+    data.last=today;
+    localStorage.setItem(streakKey(),JSON.stringify(data));
+  }
+  streakCount=data.count;
+  let el=document.getElementById('streakVal'); if(el)el.textContent=streakCount;
+  checkBadge('streak_3',streakCount>=3);
+  checkBadge('streak_7',streakCount>=7);
+}
+
+var BADGES={
+  first_sentence:{icon:'🥉',name:'צעד ראשון',desc:'השלמת את המשפט הראשון שלך'},
+  exercise_complete:{icon:'🏁',name:'סיימת תרגיל!',desc:'השלמת תרגיל שלם עד הסוף'},
+  streak_3:{icon:'🔥',name:'3 ימים ברצף',desc:'תרגלת 3 ימים ברציפות'},
+  streak_7:{icon:'🔥',name:'שבוע שלם!',desc:'תרגלת 7 ימים ברציפות'},
+  perfect_exam:{icon:'🏆',name:'ציון מושלם',desc:'100% במבחן הסיום'},
+  three_star_run:{icon:'⭐',name:'שליטה מלאה',desc:'5 משפטים ברצף עם 3 כוכבים'}
+};
+function badgeKey(){return 'ezra_badges_'+(studentEmail||'guest')}
+function getEarnedBadges(){try{return JSON.parse(localStorage.getItem(badgeKey())||'[]')}catch(e){return[]}}
+function checkBadge(id,condition){
+  if(!condition)return;
+  let earned=getEarnedBadges();
+  if(earned.includes(id))return;
+  earned.push(id); localStorage.setItem(badgeKey(),JSON.stringify(earned));
+  showBadgeToast(id);
+}
+function showBadgeToast(id){
+  let b=BADGES[id]; if(!b)return;
+  sndAchievement(); fireConfetti(18);
+  let t=document.createElement('div'); t.className='badge-toast';
+  t.innerHTML='<span class="bicon">'+b.icon+'</span><div><b>הישג חדש: '+esc(b.name)+'</b><br><span style="font-size:13px;opacity:.85">'+esc(b.desc)+'</span></div>';
+  document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),30);
+  setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),500)},3600);
+}
+
+function starsForAttempts(n){if(n<=1)return 3;if(n<=3)return 2;return 1}
+function starsHtml(n){let s=starsForAttempts(n);return [1,2,3].map(i=>'<span class="star'+(i<=s?' lit':'')+'">⭐</span>').join('')}
+
+function fireConfetti(count){
+  let colors=['#4318D1','#be185d','#22c55e','#f59e0b','#0284c7'];
+  for(let i=0;i<(count||30);i++){
+    let p=document.createElement('div'); p.className='confetti-piece';
+    p.style.left=(Math.random()*100)+'vw';
+    p.style.background=colors[Math.floor(Math.random()*colors.length)];
+    p.style.animationDuration=(1.6+Math.random()*1.3)+'s';
+    p.style.opacity=String(.7+Math.random()*.3);
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(),3200);
+  }
+}
+
+// Live "mastery gauge" for stations 2 (Bloom) and 3 (cloze) only. Deliberately
+// NOT based on score history, exam data, or how many Bloom reps were needed -
+// per explicit instruction, it reflects only the CURRENT attempt's live signal:
+// accuracy (score) plus the same fluency/hesitation/pace inputs the server's
+// own fluency_from_metrics() uses (words_per_minute, silence_ms). The client
+// already computes those in buildSpeechMetrics() before every submit, so no
+// server changes are needed - just remember the last computed metrics object.
+var lastMetrics={recording_duration_ms:0,silence_ms:0,words_per_minute:0};
+function computeGaugeLevel(score,metrics){
+  let m=metrics||{};
+  let wpm=Number(m.words_per_minute)||0;
+  let silence=Number(m.silence_ms)||0;
+  // 80 wpm ~ comfortably fluent conversational pace for these short sentences;
+  // 2000ms+ trailing silence/hesitation is treated as the low end of the scale.
+  let fluencyPct=Math.max(0,Math.min(100, wpm/80*100));
+  let hesitationPct=Math.max(0,Math.min(100, 100-(silence/2000*100)));
+  let level=Math.round(0.5*(Number(score)||0) + 0.25*fluencyPct + 0.25*hesitationPct);
+  return Math.max(0,Math.min(100,level));
+}
+function gaugeLabelFor(level){
+  if(level>=85)return '🌟 מצוין — מדויק ושוטף';
+  if(level>=65)return '💪 טוב — כמעט שם';
+  if(level>=40)return '📈 בתהליך';
+  return '🔄 עדיין מתחיל';
+}
+function updateMasteryGauge(score,metrics){
+  let card=document.getElementById('masteryGauge'); if(!card)return;
+  let level=computeGaugeLevel(score,metrics);
+  card.style.display='block';
+  let needle=document.getElementById('gaugeNeedle');
+  if(needle)needle.style.transform='rotate('+((180*level/100)-90)+'deg)';
+  let lbl=document.getElementById('gaugeLabel'); if(lbl)lbl.textContent=level+'% · '+gaugeLabelFor(level);
+}
+function hideMasteryGauge(){let card=document.getElementById('masteryGauge'); if(card)card.style.display='none'}
+
+function handleSentenceComplete(res){
+  // Called once a sentence is fully done (server says advance:true), whether
+  // that's a real pass or a cap-reached skip. Real completions earn XP/stars/
+  // badges/confetti; skipped ones and the single-attempt review round get a
+  // smaller, quieter acknowledgement instead - they were not a clean success.
+  let attempts=sentenceAttemptCount||1;
+  let actuallyPassed=!!res.passed && !res.skipped;
+  if(res.station==='review'){
+    if(actuallyPassed)addXp(5);
+    sentenceAttemptCount=0;
+    return;
+  }
+  if(actuallyPassed){
+    let box=document.getElementById('result');
+    if(box)box.innerHTML+='<div class="stars-row">'+starsHtml(attempts)+'</div>';
+    let stars=starsForAttempts(attempts);
+    let base=10, bonus=stars===3?10:(stars===2?4:0);
+    let mic=document.getElementById('mic'), r=mic?mic.getBoundingClientRect():null;
+    addXp(base+bonus, r?r.left+r.width/2:undefined, r?r.top:undefined);
+    sndAdvance();
+    checkBadge('first_sentence', true);
+    threeStarStreak = stars===3 ? (threeStarStreak+1) : 0;
+    checkBadge('three_star_run', threeStarStreak>=5);
+    if(stars===3) fireConfetti(14);
+  }
+  sentenceAttemptCount=0;
+}
 document.addEventListener('DOMContentLoaded',init);
 function init(){fetch('/api/teachers').then(r=>r.json()).then(d=>{teacherData=d;Object.keys(d).forEach(id=>{let c=document.getElementById('tc-'+id),t=d[id];if(c){c.querySelector('h2').textContent=t.name;c.querySelector('.avatar').style.background=t.color_light;c.querySelector('.avatar').style.color=t.color}})}).catch(e=>alert('יש להריץ דרך Flask: http://127.0.0.1:5000'));
 document.getElementById('tc-ben').onclick=()=>selectTeacher('ben');document.getElementById('tc-sara').onclick=()=>selectTeacher('sara');document.getElementById('name').onkeydown=e=>{if(e.key==='Enter')document.getElementById('pass').focus()};document.getElementById('pass').onkeydown=e=>{if(e.key==='Enter')submitLogin()};if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices()}}
@@ -40,8 +254,8 @@ function checkEmailField(name,email){
 }
 function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;fetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;startApp()}).catch(e=>{let el=document.getElementById('loginErr');el.textContent=e.message||'שם/סיסמה לא תקינים';el.style.display='block'})}
 function viewMyHistory(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!checkEmailField(name,email))return;fetch('/api/my-history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{let hErr=document.getElementById('historyErr'),hBody=document.getElementById('historyBody');if(!ok){hErr.textContent=(d&&d.error)||'שגיאה בטעינת תוצאות';hErr.style.display='block';hBody.innerHTML='';document.getElementById('history').classList.add('show');return}hErr.style.display='none';let rows=d.rows||[];if(!rows.length){let dbg=d.debug||{};hBody.innerHTML='<p>עדיין אין תוצאות שמורות לאימייל הזה.</p><p class="small" dir="ltr" style="text-align:left">debug: sheet_configured='+dbg.sheet_configured+', email_column_found='+dbg.email_column_found+', sheet_rows_scanned='+dbg.sheet_rows_scanned+(dbg.sheet_error?', sheet_error='+esc(dbg.sheet_error):'')+'</p>'}else{let summary='<div class="summary-grid"><div class="summary-card"><div class="num">'+d.total+'</div>ניסיונות בסה"כ</div><div class="summary-card"><div class="num">'+(d.exam_avg!=null?d.exam_avg+'%':'—')+'</div>ממוצע מבחן סיום</div><div class="summary-card"><div class="num">'+(d.exercises||[]).length+'</div>תרגילים שונים</div></div>';let list=rows.slice().reverse().map(r=>{let passed=r.passed===true||r.passed==='TRUE'||r.passed==='true';return '<div class="summary-row '+(passed?'pass':'fail')+'"><b dir="rtl">'+esc(r.exercise||'')+'</b> <span class="small">('+esc(r.phase||'')+')</span><br>'+esc(r.sentence||'')+'<br>ציון: <b>'+esc(r.score)+'%</b> · '+esc(r.timestamp||'')+'</div>'}).join('');hBody.innerHTML=summary+'<div class="summary-list">'+list+'</div>'}document.getElementById('history').classList.add('show')}).catch(()=>{let hErr=document.getElementById('historyErr');hErr.textContent='שגיאה בטעינת תוצאות';hErr.style.display='block';document.getElementById('history').classList.add('show')})}
-function startApp(){let t=teacherData[currentTeacher]||{};document.getElementById('teacherName').textContent=emojis[currentTeacher]+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';loadQuestion()}
-function loadQuestion(){busy=false;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];startExam();return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
+function startApp(){let t=teacherData[currentTeacher]||{};document.getElementById('teacherName').textContent=emojis[currentTeacher]+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';loadQuestion()}
+function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];startExam();return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
   let mw=document.getElementById('mismatchWarn');
   if(q.content_mismatch){mw.style.display='block';mw.textContent='⚠️ לא הצלחנו לטעון את התרגיל האמיתי ("'+q.exercise+'") מהגיליון של המורה, ולכן מוצג כרגע תרגיל לדוגמה במקום. בקש מהמורה לבדוק ששיתוף הגיליון הוגדר כ"כל מי שיש לו את הקישור — צפייה".'}else{mw.style.display='none'}
   if(q.review_round){
@@ -177,6 +391,7 @@ function startRecognition(){
     // silence.
     let spoken=(finalText.trim()||interimText.trim());
     let metrics=buildSpeechMetrics(startedAt,lastSpeechAt,endedAt,spoken);
+    lastMetrics=metrics;
     if(!spoken){busy=false;document.getElementById('hint').textContent='לא נקלט דיבור — נסה שוב';return}
     document.getElementById('hint').textContent='מעבד...';
     if(examMode)submitExamAnswer(spoken,metrics);else submitAnswer(spoken,metrics);
@@ -184,7 +399,7 @@ function startRecognition(){
   rec.onerror=()=>{busy=false;submitted=true;clearTimeout(micColorTimer);document.getElementById('mic').classList.remove('on');document.getElementById('stopRec').style.display='none';document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
   rec.start();
 }
-function submitAnswer(spoken,metrics){fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,answer:spoken,metrics:metrics||{}})}).then(r=>r.json()).then(res=>{busy=false;showResult(spoken,res)}).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה בשליחת תשובה'})}
+function submitAnswer(spoken,metrics){sentenceAttemptCount++;fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,answer:spoken,metrics:metrics||{}})}).then(r=>r.json()).then(res=>{busy=false;showResult(spoken,res)}).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה בשליחת תשובה'})}
 function showResult(spoken,res){
   let box=document.getElementById('result');
   if(!res || typeof res.score!=='number'){
@@ -206,6 +421,7 @@ function showResult(spoken,res){
   // the "הבא" button, which is exactly the confusing mixed message reported.
   let outOfAttempts=!passed&&!!res.skipped&&!!res.cap_reached;
   document.getElementById('hint').textContent=passed?'יפה!':(outOfAttempts?'עברנו הלאה':'נסה שוב');
+  if(passed)sndCorrect();else if(!outOfAttempts)sndWrong();
 
   let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
   if(enteringCloze){
@@ -246,6 +462,12 @@ function showResult(spoken,res){
   }
 
   if(res.mastery_mode||res.mastery_target>0){setStation('practice', currentQ||{threshold:res.threshold});showMastery(res.mastery_consecutive||0,res.mastery_target||0,res.streak_broken,res.attempts_left)}else if(!res.cloze_mode)hideMastery();
+  // Live mastery gauge: stations 2 (Bloom/mastery) and 3 (cloze) only.
+  if(res.mastery_mode||res.mastery_target>0||isCloze||res.cloze_mode||res.cloze_active){
+    updateMasteryGauge(res.score,lastMetrics);
+  } else {
+    hideMasteryGauge();
+  }
   if(res.mastery_mode&&res.passed){
     let rem=res.mastery_remaining;
     let msg=(typeof rem!=='number'||rem<=0)?'כמעט שם! ⭐':rem===1?'עוד חזרה אחת ואתה שם! 🔥':'עוד '+rem+' חזרות ואתה שם! 💪';
@@ -257,7 +479,7 @@ function showResult(spoken,res){
     box.style.display='block'; box.className='result '+(passed?'pass':'fail');
     box.innerHTML=passed?'<h3>✅ מצוין!</h3>':'<h3>💪 עדיין לא — סומן למורה להמשך תרגול</h3>';
   }
-  if(res.advance){document.getElementById('en').style.opacity='1';showNextButton(loadQuestion)}
+  if(res.advance){document.getElementById('en').style.opacity='1';handleSentenceComplete(res);showNextButton(loadQuestion)}
 }
 function showNextButton(action){nextAction=action;document.getElementById('mic').classList.add('hidden-final');document.getElementById('nextBtn').style.display='block'}
 function hideNextButton(){document.getElementById('nextBtn').style.display='none';nextAction=null;document.getElementById('mic').classList.remove('hidden-final')}
@@ -272,7 +494,7 @@ function showCloze(word,left){let el=document.getElementById('cloze');if(!word||
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';let attemptsLine=(typeof attemptsLeft==='number')?'<p class="small">ניסיונות שנותרו למשפט הזה: '+attemptsLeft+'</p>':'';el.innerHTML='<h3>⭐ מצב שליטה</h3><p>צריך '+target+' חזרות נכונות. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'+attemptsLine}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
-function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideNextButton()}
+function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
 function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>r.sentence).filter(Boolean);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 function showExamQuestion(){let s=examSentences[examIndex];currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';document.getElementById('en').textContent=s;document.getElementById('en').style.opacity='1';document.getElementById('prog').textContent='מבחן: משפט '+(examIndex+1)+' מתוך '+examSentences.length;document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)}
@@ -283,6 +505,11 @@ function showExamSummary(){
   let avg=total?Math.round(examResults.reduce((a,b)=>a+(Number(b.score)||0),0)/total):0;
   let passed=examResults.filter(r=>r.passed).length;
   let deg=Math.max(0,Math.min(100,avg))*3.6+'deg';
+  sndAchievement();
+  fireConfetti(50);
+  addXp(total*5 + (avg>=90?20:0));
+  checkBadge('exercise_complete', true);
+  checkBadge('perfect_exam', avg>=100);
   document.getElementById('bar').style.width='100%';
   document.getElementById('phase').innerHTML='';
   document.getElementById('he').innerHTML='';
