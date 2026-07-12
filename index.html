@@ -291,7 +291,7 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip',
     setTimeout(playSentence,350);
   } else if(q.cloze_active){
     setStation('cloze', q);
-    showCloze(q.cloze_word,q.cloze_attempts_left);
+    showCloze(q.cloze_word,q.cloze_attempts_left,q.cloze_display);
     // Show the gauge immediately when this station renders, not only after the
     // student's next submitted attempt - use their last known accuracy for this
     // sentence (mastery_score) with a neutral fluency/hesitation baseline until
@@ -460,13 +460,13 @@ function showResult(spoken,res){
   let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
   if(enteringCloze){
     hideMastery();
-    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5)});
+    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5,res.cloze_display)});
   } else if(res.cloze_mode||res.cloze_active){
     // showCloze() below always clears #result first (it removes a stale box
     // left over from the PREVIOUS station) - so the cloze feedback box for
     // THIS attempt must be built after it, not before, or it gets wiped.
     setStation('cloze', currentQ||{});
-    showCloze(res.cloze_word,res.cloze_attempts_left||5);
+    showCloze(res.cloze_word,res.cloze_attempts_left||5,res.cloze_display);
   } else hideCloze();
 
   if(isCloze){
@@ -521,21 +521,32 @@ function showResult(spoken,res){
 function showNextButton(action){nextAction=action;document.getElementById('mic').classList.add('hidden-final');document.getElementById('nextBtn').style.display='block'}
 function hideNextButton(){document.getElementById('nextBtn').style.display='none';nextAction=null;document.getElementById('mic').classList.remove('hidden-final')}
 function goNext(){let action=nextAction;hideNextButton();if(action)action()}
-function showCloze(word,left){let el=document.getElementById('cloze');if(!word||!currentQ)return;
+function showCloze(word,left,display){let el=document.getElementById('cloze');if((!word&&!display)||!currentQ)return;
   // The score/word-breakdown box belongs to the PREVIOUS station (1/2) - once we
   // are actually showing the cloze fill-in-the-blank UI it must never linger
   // underneath it (recurring user report: leftover "✅ מצוין! ציון: 100%..." box
   // stuck below the cloze sentence).
   let resultBox=document.getElementById('result');resultBox.style.display='none';resultBox.innerHTML='';
-  let blank=currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
+  // If the teacher's own source sheet already provided a verbatim fill-in-the-blank
+  // variant (e.g. an articles a/an/the drill with "____" markers), show that exact
+  // text instead of auto-computing a single-word blank - it may mark more than one
+  // word and matches what the teacher actually authored.
+  let blank=display?display:currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');
+  setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';let attemptsLine=(typeof attemptsLeft==='number')?'<p class="small">ניסיונות שנותרו למשפט הזה: '+attemptsLeft+'</p>':'';el.innerHTML='<h3>⭐ מצב שליטה (Mastery)</h3><p>צריך '+target+' חזרות נכונות. עכשיו: '+consecutive+'/'+target+'</p><div class="dots">'+dots+'</div>'+attemptsLine}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
 function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
-function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>r.sentence).filter(Boolean);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
-function showExamQuestion(){let s=examSentences[examIndex];currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';document.getElementById('en').textContent=s;document.getElementById('en').style.opacity='1';document.getElementById('prog').textContent='מבחן: משפט '+(examIndex+1)+' מתוך '+examSentences.length;document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)}
-function submitExamAnswer(spoken,metrics){let correct=examSentences[examIndex];fetch('/api/score-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,spoken:spoken,correct:correct})}).then(r=>r.json()).then(res=>{examResults.push({sentence:correct,spoken:spoken,score:res.score,passed:res.passed});fetch('/api/exam-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,sentence:correct,spoken:spoken,score:res.score,passed:res.passed,metrics:metrics||{}})});examIndex++;busy=false;if(examIndex>=examSentences.length)showExamSummary();else showExamQuestion()})}
+function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
+function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentence;currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';
+  // If the teacher's source sheet defined a fill-in-the-blank variant for this
+  // sentence (e.g. an articles a/an/the drill with "____" markers), show that
+  // exact text instead of the plain full sentence - the exam should reflect the
+  // same completion structure the exercise was actually authored with.
+  document.getElementById('en').textContent=item.completion||s;
+  document.getElementById('en').style.opacity='1';document.getElementById('prog').textContent='מבחן: משפט '+(examIndex+1)+' מתוך '+examSentences.length;document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)}
+function submitExamAnswer(spoken,metrics){let correct=examSentences[examIndex].sentence;fetch('/api/score-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,spoken:spoken,correct:correct})}).then(r=>r.json()).then(res=>{examResults.push({sentence:correct,spoken:spoken,score:res.score,passed:res.passed});fetch('/api/exam-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,sentence:correct,spoken:spoken,score:res.score,passed:res.passed,metrics:metrics||{}})});examIndex++;busy=false;if(examIndex>=examSentences.length)showExamSummary();else showExamQuestion()})}
 function showExamSummary(){
   examMode=false; currentQ=null; busy=true;
   let total=examResults.length;

@@ -225,30 +225,46 @@ def choose_en_he(row):
     else:
         return None
 
+    def is_blanked_variant(c):
+        if "___" in c:
+            return True
+        # Also treat a near-duplicate of the English sentence (just missing a
+        # word or two) as a blanked variant rather than a genuine translation.
+        return looks_english(c) and c != en and similarity(c, en) >= 70
+
+    # Some exercises encode the SPECIFIC grammar point they're testing as a
+    # second English column with an explicit blank (e.g. "I like ____ blue
+    # T-shirt..." to drill articles a/an/the) - this is not noise, it's the
+    # exercise author's own intended fill-in-the-blank, often targeting short
+    # function words (articles, prepositions) that the app's own generic
+    # detect_cloze_word() heuristic would never pick (it only looks for verbs
+    # or long words). Capture it as "completion" so station 1's prompt, the
+    # cloze station, and the final exam can all use the real thing instead of
+    # silently discarding it.
+    completion = ""
+    for i, c in enumerate(cells):
+        if i != en_i and "___" in c:
+            completion = c
+            break
+
     # Prefer a Hebrew cell different from English. If none, use another descriptive cell as prompt.
     he = ""
     other_he = [x for x in hebrew_candidates if x[0] != en_i]
     if other_he:
         _, he, _ = max(other_he, key=lambda x: x[2])
     else:
-        # No real Hebrew translation in this row. Never fall back to a pre-blanked
-        # cloze variant of the sentence (e.g. "I like ____ shirt") - that would show
-        # a spoiler-ish, wrong-language prompt instead of a Hebrew one. The app
-        # already builds its own fill-in-the-blank later (station 3), so a
-        # pre-blanked column in the sheet is redundant and should be ignored here.
-        def is_blanked_variant(c):
-            if "___" in c or "____" in c:
-                return True
-            # Also treat a near-duplicate of the English sentence (just missing a
-            # word or two) as a blanked variant rather than a genuine translation.
-            return looks_english(c) and similarity(c, en) >= 70
+        # No real Hebrew translation in this row. Never fall back to the plain
+        # English answer itself (that would spoil it) - prefer the teacher's
+        # own blanked variant when one exists, since it shows the sentence
+        # structure without giving away the tested word; otherwise fall back
+        # to the English sentence as a last resort (existing behavior).
         others = [c for i, c in enumerate(cells) if i != en_i and not is_blanked_variant(c)]
-        he = others[0] if others else en
+        he = others[0] if others else (completion or en)
 
     # Guard: never let Hebrew prompt become the answer to score against.
     if not looks_english(en) or len(normalize(en).split()) < 1:
         return None
-    return {"en": en, "he": he}
+    return {"en": en, "he": he, "completion": completion}
 
 def extract_csv_url(value):
     """Accept a raw published CSV URL, an EZRA app link with ?link=<csv>,
@@ -338,11 +354,31 @@ def load_sentences_from_csv_ex(csv_url):
 def normalize(text):
     return re.sub(r"[^a-z0-9\s]", "", (text or "").lower()).strip()
 
+def _s_tolerant_word(w):
+    # "phone's" and "phones" are homophones - Chrome's speech recognition can
+    # (and does) transcribe either spelling for the exact same pronunciation,
+    # and apostrophes are already stripped by normalize() above, so "phone's"
+    # already becomes "phones" there. What normalize() can't fix is a genuine
+    # word-count mismatch: a source sentence reading "my phone light" (missing
+    # the possessive marker) vs a spoken/transcribed "my phone's light" -
+    # these are not a real pronunciation mistake, just an ASR/content spelling
+    # technicality, so a single trailing "s" is ignored for comparison purposes.
+    # This is a real, deliberate tradeoff: it also means a genuine singular vs
+    # plural slip (e.g. "cat" vs "cats") will no longer be flagged either -
+    # acceptable here since this is a spoken-fluency app, not a written-grammar
+    # quiz, and ASR cannot reliably distinguish this class of homophone anyway.
+    return w[:-1] if len(w) > 2 and w.endswith("s") else w
+
+def _s_tolerant_match(a_words, b_words):
+    return len(a_words) == len(b_words) and [_s_tolerant_word(w) for w in a_words] == [_s_tolerant_word(w) for w in b_words]
+
 def similarity(spoken, correct):
     a, b = normalize(spoken), normalize(correct)
     if not a or not b:
         return 0
     if a == b:
+        return 100
+    if _s_tolerant_match(a.split(), b.split()):
         return 100
     return int(SequenceMatcher(None, a, b).ratio() * 100)
 
@@ -372,8 +408,13 @@ def word_level(spoken, correct):
     wrong = expected word was replaced; extra = extra spoken word.
     """
     sp, co = normalize(spoken).split(), normalize(correct).split()
+    # Align using the s-tolerant keys (see _s_tolerant_word) so this breakdown
+    # never contradicts similarity()'s score - a sentence that scores 100%
+    # because of the trailing-s tolerance must not still show a word marked
+    # "wrong" here, which would look like a contradiction to the student.
+    sp_key, co_key = [_s_tolerant_word(w) for w in sp], [_s_tolerant_word(w) for w in co]
     result = []
-    for tag, i1, i2, j1, j2 in SequenceMatcher(None, sp, co).get_opcodes():
+    for tag, i1, i2, j1, j2 in SequenceMatcher(None, sp_key, co_key).get_opcodes():
         if tag == "equal":
             for w in co[j1:j2]:
                 result.append({"word": w, "status": "correct"})
@@ -433,6 +474,7 @@ def session_payload(s):
         "failed_attempts": s["failed_attempts"],
         "cloze_active": s["cloze_active"],
         "cloze_word": s["cloze_word"],
+        "cloze_display": s.get("cloze_display", ""),
         "cloze_attempts_left": max(0, cap - s.get("cloze_attempts", 0)),
         "attempts_used": used,
         "attempts_left": left,
@@ -490,6 +532,7 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
         "mastery_score": 0,
         "cloze_active": False,
         "cloze_word": None,
+        "cloze_display": "",
         "cloze_attempts": 0,
         "cloze_passed": False,
         "last_mastery_target": 0,
@@ -668,6 +711,11 @@ def fluency_from_metrics(spoken, score, metrics=None):
 
 def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, metrics=None):
     fluency = fluency_from_metrics(spoken, score, metrics)
+    # Carry the sentence's teacher-authored fill-in-the-blank variant (if any)
+    # through into the stored result row - this is how it survives into the
+    # exam sentence pool later (built from s["results"], not re-fetched from
+    # the CSV), so the final exam can show the same blanked prompt too.
+    current_obj = s["sentences"][s["current"]] if s["current"] < len(s["sentences"]) else {}
     row = {
         "timestamp": now_str(),
         "teacher_id": s["teacher_id"], "student_name": s["student_name"],
@@ -680,6 +728,7 @@ def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, me
         "mastery_status": "mastered" if passed and not skipped else "not_mastered",
         "mastery_score": s.get("mastery_score", score),
         "cloze_passed": bool(s.get("cloze_passed", False)),
+        "completion": current_obj.get("completion", ""),
         **fluency,
     }
     s["results"].append(row)
@@ -694,6 +743,7 @@ def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, me
     s["mastery_score"] = 0
     s["cloze_active"] = False
     s["cloze_word"] = None
+    s["cloze_display"] = ""
     s["cloze_attempts"] = 0
     s["cloze_passed"] = False
 
@@ -925,7 +975,9 @@ def answer():
             "phase": "review_retry", "sentence": r_correct, "spoken": spoken, "score": r_score,
             "passed": bool(r_passed), "skipped": False, "attempts": 1, "max_attempts": 1,
             "mastery_reps": 0, "mastery_status": "review_pass" if r_passed else "needs_review",
-            "mastery_score": r_score, "cloze_passed": "review", **fluency,
+            "mastery_score": r_score, "cloze_passed": "review",
+            "completion": review_sentence.get("completion", ""),
+            **fluency,
         }
         s["results"].append(row)
         write_result(row)
@@ -992,14 +1044,16 @@ def answer():
                 # Practice mastery is complete. Now move to the separate cloze station -
                 # ALWAYS, regardless of how many station-2 attempts that took.
                 cw = detect_cloze_word(correct)
+                completion = sentence_obj.get("completion", "")
                 s["mastery_target"] = 0
                 s["mastery_consecutive"] = 0
                 s["stage2_attempts"] = 0
-                if not cw:
+                if not cw and not completion:
                     record_and_advance(s, correct, spoken, s["mastery_score"] or score, True, metrics=metrics)
                     return jsonify({**base, "station": "practice", "mastery_mode_done": True, "advance": True, **session_payload(s)})
                 s["cloze_active"] = True
                 s["cloze_word"] = cw
+                s["cloze_display"] = completion
                 s["cloze_attempts"] = 0
                 return jsonify({**base, "station": "practice", "mastery_mode_done": True, "cloze_mode": True, **session_payload(s)})
             return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": False, **session_payload(s)})
@@ -1026,9 +1080,11 @@ def answer():
             return jsonify({**base, "station": "practice", "mastery_mode": True, "first_pass": True, **session_payload(s)})
 
         cw = detect_cloze_word(correct)
-        if cw:
+        completion = sentence_obj.get("completion", "")
+        if cw or completion:
             s["cloze_active"] = True
             s["cloze_word"] = cw
+            s["cloze_display"] = completion
             s["cloze_attempts"] = 0
             return jsonify({**base, "station": "practice", "cloze_mode": True, **session_payload(s)})
 
