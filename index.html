@@ -117,6 +117,14 @@ button:active{transform:scale(.95)}
   background:#1a1033;color:#ffffffb3;text-align:center;
   font-size:11.5px;padding:6px 10px;
 }
+/* Mobile: the fixed bottom strip is shared between the next/continue button
+   and the credit line - only one can occupy it at a time. The footer shows
+   by default and hides whenever JS marks the strip as occupied (see
+   syncFooterVisibility). */
+@media (max-width:759px){
+  .app-footer{display:block}
+  body.bottom-occupied .app-footer{display:none}
+}
 @media (min-width:760px){
   #nextBtn,#capChoice{margin-top:12px}
   .wrap{padding-bottom:38px}
@@ -758,8 +766,12 @@ function showResult(spoken,res){
     setTimeout(()=>{box.scrollIntoView({behavior:'smooth',block:'start'})},60);
   }
 }
-function showCapChoice(){document.getElementById('mic').classList.add('hidden-final');document.getElementById('play').classList.add('hidden-final');document.getElementById('capChoice').style.display='flex'}
-function hideCapChoice(){document.getElementById('capChoice').style.display='none';document.getElementById('play').classList.remove('hidden-final')}
+function syncFooterVisibility(){
+  let occupied=document.getElementById('nextBtn').style.display==='block'||document.getElementById('capChoice').style.display==='flex';
+  document.body.classList.toggle('bottom-occupied',occupied);
+}
+function showCapChoice(){document.getElementById('mic').classList.add('hidden-final');document.getElementById('play').classList.add('hidden-final');document.getElementById('capChoice').style.display='flex';syncFooterVisibility()}
+function hideCapChoice(){document.getElementById('capChoice').style.display='none';document.getElementById('play').classList.remove('hidden-final');syncFooterVisibility()}
 function capContinue(){
   hideCapChoice();
   document.getElementById('hint').textContent='עובר למשפט הבא...';
@@ -777,8 +789,8 @@ function capRetry(){
     document.getElementById('hint').textContent='עוד סיבוב — לחץ על המיקרופון ונסה שוב';
   });
 }
-function showNextButton(action){nextAction=action;document.getElementById('mic').classList.add('hidden-final');document.getElementById('nextBtn').style.display='block'}
-function hideNextButton(){document.getElementById('nextBtn').style.display='none';nextAction=null;document.getElementById('mic').classList.remove('hidden-final')}
+function showNextButton(action){nextAction=action;document.getElementById('mic').classList.add('hidden-final');document.getElementById('nextBtn').style.display='block';syncFooterVisibility()}
+function hideNextButton(){document.getElementById('nextBtn').style.display='none';nextAction=null;document.getElementById('mic').classList.remove('hidden-final');syncFooterVisibility()}
 function goNext(){let action=nextAction;hideNextButton();if(action)action()}
 function showCloze(word,left,display){let el=document.getElementById('cloze');if((!word&&!display)||!currentQ)return;
   // The score/word-breakdown box belongs to the PREVIOUS station (1/2) - once we
