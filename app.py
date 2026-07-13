@@ -480,8 +480,25 @@ def load_sentences_from_csv_ex(csv_url):
     _cache[key] = (time.time(), (sentences, used_fallback))
     return [dict(x) for x in sentences], used_fallback
 
+_NUM_WORD_TO_DIGIT = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+    "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
+    "eleven": "11", "twelve": "12", "thirteen": "13", "fourteen": "14", "fifteen": "15",
+    "sixteen": "16", "seventeen": "17", "eighteen": "18", "nineteen": "19",
+    "twenty": "20", "thirty": "30", "forty": "40", "fifty": "50",
+    "sixty": "60", "seventy": "70", "eighty": "80", "ninety": "90",
+    "hundred": "100", "thousand": "1000",
+}
+
 def normalize(text):
-    return re.sub(r"[^a-z0-9\s]", "", (text or "").lower()).strip()
+    text = text or ""
+    # Chrome's speech recognizer frequently auto-formats a spoken number as a
+    # digit, and especially formats spoken times like "eight" (o'clock) as
+    # "8:00" - the ":00" is redundant for an on-the-hour time, so strip it
+    # before the general punctuation strip below turns "8:00" into "800"
+    # (which would then fail to match a sentence that spells out "eight").
+    text = re.sub(r"\b(\d{1,2}):00\b", r"\1", text)
+    return re.sub(r"[^a-z0-9\s]", "", text.lower()).strip()
 
 def _s_tolerant_word(w):
     # "phone's" and "phones" are homophones - Chrome's speech recognition can
@@ -498,8 +515,22 @@ def _s_tolerant_word(w):
     # quiz, and ASR cannot reliably distinguish this class of homophone anyway.
     return w[:-1] if len(w) > 2 and w.endswith("s") else w
 
+def _num_tolerant_word(w):
+    # A single spelled-out number word (e.g. "eight") and its digit form
+    # (e.g. "8", already normalized down from a recognizer-formatted "8:00")
+    # are the same answer, just formatted differently by the speech
+    # recognizer - not a real pronunciation mistake. Only handles single-word
+    # numbers (one..ninety, hundred, thousand); multi-word numbers like
+    # "twenty five" are intentionally out of scope here since collapsing them
+    # would change the word count and break the position-based alignment
+    # below - a rarer case than the plain single-number mismatch reported.
+    return _NUM_WORD_TO_DIGIT.get(w, w)
+
+def _tolerant_key(w):
+    return _s_tolerant_word(_num_tolerant_word(w))
+
 def _s_tolerant_match(a_words, b_words):
-    return len(a_words) == len(b_words) and [_s_tolerant_word(w) for w in a_words] == [_s_tolerant_word(w) for w in b_words]
+    return len(a_words) == len(b_words) and [_tolerant_key(w) for w in a_words] == [_tolerant_key(w) for w in b_words]
 
 def similarity(spoken, correct):
     a, b = normalize(spoken), normalize(correct)
@@ -537,11 +568,12 @@ def word_level(spoken, correct):
     wrong = expected word was replaced; extra = extra spoken word.
     """
     sp, co = normalize(spoken).split(), normalize(correct).split()
-    # Align using the s-tolerant keys (see _s_tolerant_word) so this breakdown
-    # never contradicts similarity()'s score - a sentence that scores 100%
-    # because of the trailing-s tolerance must not still show a word marked
-    # "wrong" here, which would look like a contradiction to the student.
-    sp_key, co_key = [_s_tolerant_word(w) for w in sp], [_s_tolerant_word(w) for w in co]
+    # Align using the tolerant keys (trailing-s + number-word/digit - see
+    # _tolerant_key) so this breakdown never contradicts similarity()'s score -
+    # a sentence that scores 100% because of one of these tolerances must not
+    # still show a word marked "wrong" here, which would look like a
+    # contradiction to the student.
+    sp_key, co_key = [_tolerant_key(w) for w in sp], [_tolerant_key(w) for w in co]
     result = []
     for tag, i1, i2, j1, j2 in SequenceMatcher(None, sp_key, co_key).get_opcodes():
         if tag == "equal":
