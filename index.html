@@ -112,15 +112,15 @@ button:active{transform:scale(.95)}
    button/choice just sits inline, directly under the mic/stop-recording
    controls, and the fixed bottom bar becomes a permanent, quiet footer
    instead - kept because it looks good, repurposed to carry attribution. */
-@media (min-width:760px){
-  #nextBtn,#capChoice{margin-top:12px}
-  .wrap{padding-bottom:38px}
-  .app-footer{display:block}
-}
 .app-footer{
   display:none;position:fixed;left:0;right:0;bottom:0;z-index:50;
   background:#1a1033;color:#ffffffb3;text-align:center;
   font-size:11.5px;padding:6px 10px;
+}
+@media (min-width:760px){
+  #nextBtn,#capChoice{margin-top:12px}
+  .wrap{padding-bottom:38px}
+  .app-footer{display:block}
 }
 </style></head><body>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div></section>
