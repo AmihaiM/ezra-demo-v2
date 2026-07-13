@@ -93,7 +93,7 @@ button:active{transform:scale(.95)}
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>EZRA — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div><a class="link" href="/teacher">כניסת מורה</a></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2>📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
-<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div></div><div class="col-b">
+<section id="app"><div class="top"><b>EZRA</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><div class="row" style="gap:6px;margin-top:4px"><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div></div><div class="col-b">
 <div id="result" class="result"></div>
 <div id="masteryGauge" class="gauge-card">
   <div class="gauge-title">🎯 מד ביצוע חי — דיוק, שטף וקצב</div>
@@ -113,6 +113,11 @@ button:active{transform:scale(.95)}
 </div></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div></div></section>
 <script>
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200;
+// Playback speed and voice choice are per-DEVICE preferences (not tied to any
+// student account) - saved in localStorage so they stick on this phone/PC
+// regardless of who logs in, same as the mute toggle already does.
+var speechRate=parseFloat(localStorage.getItem('ezra_speech_rate')||'0.88')||0.88;
+var preferredVoiceURI=localStorage.getItem('ezra_voice_uri')||'';
 var emojis={ben:'👨‍🏫',sara:'👩‍🏫'};
 var MSG_PASS=['מצוין! 🎉','כל הכבוד! ⭐','יפה מאוד! 💫','נהדר! 🎯'];
 var MSG_FAIL=['כמעט! נסה שוב 💪','אתה יכול! 🌟','עוד קצת! 😊','נסה שוב — אתה קרוב'];
@@ -330,7 +335,7 @@ function handleSentenceComplete(res){
 }
 document.addEventListener('DOMContentLoaded',init);
 function init(){fetch('/api/teachers').then(r=>r.json()).then(d=>{teacherData=d;Object.keys(d).forEach(id=>{let c=document.getElementById('tc-'+id),t=d[id];if(c){c.querySelector('h2').textContent=t.name;c.querySelector('.avatar').style.background=t.color_light;c.querySelector('.avatar').style.color=t.color}})}).catch(e=>alert('יש להריץ דרך Flask: http://127.0.0.1:5000'));
-document.getElementById('tc-ben').onclick=()=>selectTeacher('ben');document.getElementById('tc-sara').onclick=()=>selectTeacher('sara');document.getElementById('name').onkeydown=e=>{if(e.key==='Enter')document.getElementById('pass').focus()};document.getElementById('pass').onkeydown=e=>{if(e.key==='Enter')submitLogin()};if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices()}}
+document.getElementById('tc-ben').onclick=()=>selectTeacher('ben');document.getElementById('tc-sara').onclick=()=>selectTeacher('sara');document.getElementById('name').onkeydown=e=>{if(e.key==='Enter')document.getElementById('pass').focus()};document.getElementById('pass').onkeydown=e=>{if(e.key==='Enter')submitLogin()};if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();populateAudioSettingsUI()}}
 function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#4318D1');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | נדרשת התאמה מלאה (100%) בכל משפט | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';setTimeout(()=>document.getElementById('name').focus(),100)}
 function closeLogin(){document.getElementById('login').classList.remove('show')}
 function looksLikeEmail(v){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)}
@@ -354,7 +359,7 @@ function checkEmailField(name,email){
 }
 function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;fetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;startApp()}).catch(e=>{let el=document.getElementById('loginErr');el.textContent=e.message||'שם/סיסמה לא תקינים';el.style.display='block'})}
 function viewMyHistory(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!checkEmailField(name,email))return;fetch('/api/my-history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{let hErr=document.getElementById('historyErr'),hBody=document.getElementById('historyBody');if(!ok){hErr.textContent=(d&&d.error)||'שגיאה בטעינת תוצאות';hErr.style.display='block';hBody.innerHTML='';document.getElementById('history').classList.add('show');return}hErr.style.display='none';let rows=d.rows||[];if(!rows.length){let dbg=d.debug||{};hBody.innerHTML='<p>עדיין אין תוצאות שמורות לאימייל הזה.</p><p class="small" dir="ltr" style="text-align:left">debug: sheet_configured='+dbg.sheet_configured+', email_column_found='+dbg.email_column_found+', sheet_rows_scanned='+dbg.sheet_rows_scanned+(dbg.sheet_error?', sheet_error='+esc(dbg.sheet_error):'')+'</p>'}else{let summary='<div class="summary-grid"><div class="summary-card"><div class="num">'+d.total+'</div>ניסיונות בסה"כ</div><div class="summary-card"><div class="num">'+(d.exam_avg!=null?d.exam_avg+'%':'—')+'</div>ממוצע מבחן סיום</div><div class="summary-card"><div class="num">'+(d.exercises||[]).length+'</div>תרגילים שונים</div></div>';let list=rows.slice().reverse().map(r=>{let passed=r.passed===true||r.passed==='TRUE'||r.passed==='true';return '<div class="summary-row '+(passed?'pass':'fail')+'"><b dir="rtl">'+esc(r.exercise||'')+'</b> <span class="small">('+esc(r.phase||'')+')</span><br>'+esc(r.sentence||'')+'<br>ציון: <b>'+esc(r.score)+'%</b> · '+esc(r.timestamp||'')+'</div>'}).join('');hBody.innerHTML=summary+'<div class="summary-list">'+list+'</div>'}document.getElementById('history').classList.add('show')}).catch(()=>{let hErr=document.getElementById('historyErr');hErr.textContent='שגיאה בטעינת תוצאות';hErr.style.display='block';document.getElementById('history').classList.add('show')})}
-function startApp(){let t=teacherData[currentTeacher]||{};document.getElementById('teacherName').textContent=emojis[currentTeacher]+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';loadQuestion()}
+function startApp(){let t=teacherData[currentTeacher]||{};document.getElementById('teacherName').textContent=emojis[currentTeacher]+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';populateAudioSettingsUI();loadQuestion()}
 function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
   let mw=document.getElementById('mismatchWarn');
   if(q.content_mismatch){mw.style.display='block';mw.textContent='⚠️ לא הצלחנו לטעון את התרגיל האמיתי ("'+q.exercise+'") מהגיליון של המורה, ולכן מוצג כרגע תרגיל לדוגמה במקום. בקש מהמורה לבדוק ששיתוף הגיליון הוגדר כ"כל מי שיש לו את הקישור — צפייה".'}else{mw.style.display='none'}
@@ -407,7 +412,51 @@ function setStation(st,q){
     document.getElementById('hint').textContent='שמע את המשפט ואז לחץ על המיקרופון לאימון';
   }
 }
-function pickVoice(){let voices=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().startsWith('en'));if(!voices.length)return null;let kw=voiceGender==='male'?['david','mark','daniel','alex','fred','male']:['samantha','zira','victoria','karen','female','woman'];return voices.find(v=>kw.some(k=>v.name.toLowerCase().includes(k)))||voices[0]}
+function pickVoice(){
+  let voices=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().startsWith('en'));
+  if(!voices.length)return null;
+  // An explicit per-device voice choice always wins over the teacher's
+  // male/female default.
+  if(preferredVoiceURI){
+    let chosen=voices.find(v=>v.voiceURI===preferredVoiceURI);
+    if(chosen)return chosen;
+  }
+  // Specific named voices first (mainly desktop: "Microsoft David", "Samantha", etc).
+  let maleKw=['david','mark','daniel','alex','fred','guy'];
+  let femaleKw=['samantha','zira','victoria','karen','susan','moira'];
+  let kw=voiceGender==='male'?maleKw:femaleKw;
+  let byName=voices.find(v=>kw.some(k=>v.name.toLowerCase().includes(k)));
+  if(byName)return byName;
+  // Generic gender-word fallback (mainly Android: "Google UK English Male/Female").
+  // IMPORTANT: "male" is a substring of "female", so a plain .includes('male')
+  // check on mobile was matching Female voices too and always winning the
+  // find() race - that's exactly why every teacher sounded female on phones.
+  // Requiring the opposite word to be ABSENT fixes it.
+  let byGeneric=voices.find(v=>{
+    let n=v.name.toLowerCase();
+    return voiceGender==='male' ? (n.includes('male')&&!n.includes('female')) : n.includes('female');
+  });
+  if(byGeneric)return byGeneric;
+  return voices[0];
+}
+function populateAudioSettingsUI(){
+  let speedSel=document.getElementById('speedSel');
+  if(speedSel && !speedSel.options.length){
+    let presets=[['0.6','🐢 איטי מאוד'],['0.75','איטי'],['0.88','רגיל (ברירת מחדל)'],['1','טבעי'],['1.15','מהיר'],['1.3','🚀 מהיר מאוד']];
+    speedSel.innerHTML=presets.map(p=>'<option value="'+p[0]+'">'+p[1]+'</option>').join('');
+  }
+  if(speedSel)speedSel.value=String(speechRate);
+  let voiceSel=document.getElementById('voiceSel');
+  if(voiceSel){
+    let voices=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().startsWith('en'));
+    if(voices.length){
+      voiceSel.innerHTML='<option value="">🤖 אוטומטי (לפי מורה)</option>'+voices.map(v=>'<option value="'+esc(v.voiceURI)+'">'+esc(v.name)+'</option>').join('');
+      voiceSel.value=voices.some(v=>v.voiceURI===preferredVoiceURI)?preferredVoiceURI:'';
+    }
+  }
+}
+function setSpeechRate(v){speechRate=parseFloat(v)||0.88;localStorage.setItem('ezra_speech_rate',String(speechRate))}
+function setSpeechVoice(uri){preferredVoiceURI=uri||'';localStorage.setItem('ezra_voice_uri',preferredVoiceURI)}
 function playSentence(){
   if(!currentQ)return;
   let text=currentQ.en;
@@ -431,7 +480,7 @@ function playSentence(){
     primer.volume=0.01; primer.rate=2; primer.lang='en-US';
     let speakReal=()=>{
       let u=new SpeechSynthesisUtterance(text);
-      u.lang='en-US';u.rate=.88;
+      u.lang='en-US';u.rate=speechRate;
       let v=pickVoice();if(v)u.voice=v;
       let reenable=()=>{if(playBtn)playBtn.disabled=false};
       u.onend=reenable; u.onerror=reenable;
