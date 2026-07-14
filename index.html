@@ -304,7 +304,17 @@ function computeGaugeBreakdown(score,metrics){
   let accuracyPct=Math.max(0,Math.min(100,Number(score)||0));
   let fluencyPct=Math.max(0,Math.min(100, wpm/80*100));
   let hesitationPct=Math.max(0,Math.min(100, 100-(silence/2000*100)));
-  let level=Math.round(0.5*accuracyPct + 0.25*fluencyPct + 0.25*hesitationPct);
+  // Speed/continuity must NEVER be able to inflate the gauge for a WRONG
+  // sentence - a student who talks fast and without pausing but says the
+  // wrong words entirely used to still get credit here (up to 50% of the
+  // gauge came from fluency+hesitation alone, regardless of accuracy),
+  // which read as the app "lying" about how well they actually did. Fix:
+  // fluency/hesitation only ever act as a bonus ON TOP OF an already-fully-
+  // correct sentence. Anything short of 100% accuracy shows the accuracy
+  // itself and nothing else - no amount of speed can raise it.
+  let level = accuracyPct>=100
+    ? Math.round(0.5*accuracyPct + 0.25*fluencyPct + 0.25*hesitationPct)
+    : Math.round(accuracyPct);
   return {
     level: Math.max(0,Math.min(100,level)),
     accuracyPct: Math.round(accuracyPct),
