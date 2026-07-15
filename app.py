@@ -45,6 +45,17 @@ RESULTS_SHEET_IDS = {
     "sara": os.getenv("SARA_RESULTS_SHEET_ID", "1JGWw_Jf8m3WF2-HS6sEohRmV6v2mmp29b6iSE3rgsOQ"),
 }
 EZRA_APP_BASE_URL = os.getenv("EZRA_APP_BASE_URL", "https://app.ezra.clap.co.il")
+# Super-admin dashboard (/admin) - one shared password (not per-teacher), lets
+# whoever runs the pilot see every teacher/student at a glance and add new
+# teachers without a code change + redeploy. Admin-added teachers are stored
+# in a "Teachers" tab of the catalog spreadsheet (see load_extra_teachers/
+# _append_teacher_row below) rather than a local file, because Render's local
+# disk is not reliably persisted across redeploys/restarts - the same reason
+# every other durable thing in this app (results, catalog, student levels)
+# already lives in a Google Sheet instead.
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin2026")
+ADMIN_SHEET_ID = os.getenv("ADMIN_SHEET_ID", CATALOG_SHEET_ID)
+TEACHERS_TAB = "Teachers"
 
 _cache = {}
 _sessions = {}
@@ -769,6 +780,96 @@ def build_exercise_app_url(csv_url):
     base = (EZRA_APP_BASE_URL or "https://app.ezra.clap.co.il").rstrip("/")
     return f"{base}/?lang=en&link={quote(csv_url, safe=':/?&=%') }"
 
+def extract_sheet_id(value):
+    """Pull the raw spreadsheet ID out of a normal Google Sheets URL pasted
+    from the browser address bar (share/edit link) - or, if it doesn't look
+    like a URL at all, assume it's already a raw ID and use it as-is."""
+    raw = clean_cell(value).strip()
+    if not raw:
+        return ""
+    m = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", raw)
+    return m.group(1) if m else raw
+
+TEACHERS_HEADER = [
+    "teacher_id", "name", "color", "color_light", "voice_gender",
+    "student_password", "teacher_password", "threshold", "max_attempts",
+    "results_sheet_id", "created_at",
+]
+
+def load_extra_teachers():
+    """Admin-added teachers (via /admin, see /api/admin-add-teacher), stored
+    in a "Teachers" tab of the catalog spreadsheet rather than a local file -
+    Render's local disk is not reliably persisted across redeploys/restarts,
+    the same reason every other durable thing in this app (results, catalog,
+    student levels) already lives in a Google Sheet instead. Returns a dict
+    in the same shape as the hardcoded TEACHERS dict, meant to be merged on
+    top of it (never overrides the original two - a duplicate teacher_id in
+    the sheet is just ignored, the hardcoded/env-var-configured version
+    always wins for Dan/Sara).
+    """
+    extra = {}
+    try:
+        import gspread
+        gc = get_gspread_client()
+        sh = gc.open_by_key(ADMIN_SHEET_ID)
+        try:
+            ws = sh.worksheet(TEACHERS_TAB)
+        except gspread.WorksheetNotFound:
+            return extra
+        for r in ws.get_all_records():
+            tid = re.sub(r"[^a-z0-9]", "", clean_cell(r.get("teacher_id", "")).strip().lower())
+            if not tid or tid in TEACHERS:
+                continue
+            extra[tid] = {
+                "name": clean_cell(r.get("name", "")) or tid,
+                "color": clean_cell(r.get("color", "")) or "#4318D1",
+                "color_light": clean_cell(r.get("color_light", "")) or "#ede7ff",
+                "voice_gender": clean_cell(r.get("voice_gender", "")) or "female",
+                "results_tab": tid,
+                "student_password": clean_cell(r.get("student_password", "")) or "class2026",
+                "teacher_password": clean_cell(r.get("teacher_password", "")) or (tid + "2026"),
+                "default_threshold": int(r.get("threshold") or 85),
+                "default_max_attempts": int(r.get("max_attempts") or 5),
+            }
+            rsid = clean_cell(r.get("results_sheet_id", "")).strip()
+            if rsid:
+                RESULTS_SHEET_IDS[tid] = rsid
+    except Exception as e:
+        print("LOAD EXTRA TEACHERS FAILED", e)
+    return extra
+
+def _append_teacher_row(tid, entry, results_sheet_id):
+    """Persist a newly admin-added teacher into the "Teachers" sheet tab so
+    it survives the next redeploy/restart (see load_extra_teachers above).
+    Creates the tab + header row on first use."""
+    import gspread
+    gc = get_gspread_client()
+    sh = gc.open_by_key(ADMIN_SHEET_ID)
+    try:
+        ws = sh.worksheet(TEACHERS_TAB)
+    except gspread.WorksheetNotFound:
+        ws = sh.add_worksheet(title=TEACHERS_TAB, rows=100, cols=len(TEACHERS_HEADER))
+        ws.append_row(TEACHERS_HEADER, value_input_option="USER_ENTERED")
+    ws.append_row([
+        tid, entry["name"], entry["color"], entry["color_light"], entry["voice_gender"],
+        entry["student_password"], entry["teacher_password"], entry["default_threshold"],
+        entry["default_max_attempts"], results_sheet_id or "", now_str(),
+    ], value_input_option="USER_ENTERED")
+
+# Merge in any admin-added teachers now that get_gspread_client/load_extra_teachers
+# are defined above (this has to run after TEACHERS/_teacher_state's initial
+# setup earlier in the file, and after these two functions - hence placed
+# here rather than up near the hardcoded Dan/Sara TEACHERS dict).
+_extra_teachers = load_extra_teachers()
+TEACHERS.update(_extra_teachers)
+for _tid, _t in _extra_teachers.items():
+    if _tid not in _teacher_state:
+        _teacher_state[_tid] = {
+            "threshold": _t["default_threshold"], "max_attempts": _t["default_max_attempts"],
+            "exercise_name": "תרגול דמו", "csv_url": "", "custom_exercises": [],
+            "allowed_students": [], "restrict_to_list": False, "silence_timeout_ms": 1200,
+        }
+
 def append_exercise_to_catalog_sheet(name, csv_url):
     """Option G: Teacher UI writes the new exercise into the master Google Sheet.
     Google Sheet remains the single source of truth. Expected catalog layout:
@@ -1130,6 +1231,10 @@ def home():
 @app.route("/teacher")
 def teacher():
     return Response(open(os.path.join(BASE_DIR, "teacher.html"), "rb").read(), content_type="text/html; charset=utf-8")
+
+@app.route("/admin")
+def admin_page():
+    return Response(open(os.path.join(BASE_DIR, "admin.html"), "rb").read(), content_type="text/html; charset=utf-8")
 
 @app.route("/manifest.json")
 def manifest():
@@ -1817,6 +1922,18 @@ def teacher_results():
     rows = merge_with_pending(sheet_rows, tid)
     return jsonify(ok=True, rows=rows[-200:], debug=debug)
 
+def _session_phase_label(s):
+    stage = s.get("stage", "accuracy")
+    if stage == "done":
+        return "סיים"
+    if s.get("in_review"):
+        return "סבב חזרה"
+    if stage == "preview":
+        return "חשיפה"
+    if stage == "cloze":
+        return "קלוז"
+    return "Mastery" if s.get("mastery_target", 0) > 0 else "אימון"
+
 @app.post("/api/teacher-students")
 def teacher_students():
     data = request.get_json(force=True)
@@ -1826,18 +1943,8 @@ def teacher_students():
     students = []
     for s in _sessions.values():
         if s["teacher_id"] == tid:
-            stage = s.get("stage", "accuracy")
-            done = stage == "done"
-            if done:
-                phase = "סיים"
-            elif s.get("in_review"):
-                phase = "סבב חזרה"
-            elif stage == "preview":
-                phase = "חשיפה"
-            elif stage == "cloze":
-                phase = "קלוז"
-            else:
-                phase = "Mastery" if s.get("mastery_target", 0) > 0 else "אימון"
+            phase = _session_phase_label(s)
+            done = phase == "סיים"
             students.append({
                 "name": s["student_name"], "index": s["current"], "total": len(s["sentences"]),
                 "done": done, "exercise": s["exercise_name"],
@@ -1851,6 +1958,115 @@ def teacher_students():
             })
     students.sort(key=lambda x: x.get("updated_at") or 0, reverse=True)
     return jsonify(ok=True, teacher=teacher_public(tid), active_exercise=_teacher_state[tid].get("exercise_name", ""), students=students)
+
+def _is_admin(data):
+    return bool(ADMIN_PASSWORD) and data.get("password") == ADMIN_PASSWORD
+
+@app.post("/api/admin-login")
+def admin_login():
+    data = request.get_json(force=True)
+    if not _is_admin(data):
+        return jsonify(ok=False, error="סיסמה שגויה"), 401
+    return jsonify(ok=True)
+
+@app.post("/api/admin-teachers")
+def admin_teachers():
+    """Overview row per teacher for the admin dashboard - name, current
+    exercise, and a live count of students currently mid-session, pulled
+    from the same in-memory _sessions the per-teacher dashboard uses."""
+    data = request.get_json(force=True)
+    if not _is_admin(data):
+        return jsonify(ok=False), 401
+    out = []
+    for tid, t in TEACHERS.items():
+        sessions_for_tid = [s for s in _sessions.values() if s["teacher_id"] == tid]
+        out.append({
+            "teacher_id": tid, "name": t["name"], "color": t["color"],
+            "voice_gender": t["voice_gender"],
+            "exercise_name": _teacher_state.get(tid, {}).get("exercise_name", ""),
+            "active_students": sum(1 for s in sessions_for_tid if _session_phase_label(s) != "סיים"),
+            "completed_students": sum(1 for s in sessions_for_tid if _session_phase_label(s) == "סיים"),
+            "has_results_sheet": tid in RESULTS_SHEET_IDS,
+        })
+    out.sort(key=lambda x: x["name"])
+    return jsonify(ok=True, teachers=out)
+
+@app.post("/api/admin-students")
+def admin_students():
+    """Every active/completed student session across ALL teachers, for the
+    admin's cross-teacher view (the per-teacher dashboard at /teacher only
+    ever sees its own teacher_id's students)."""
+    data = request.get_json(force=True)
+    if not _is_admin(data):
+        return jsonify(ok=False), 401
+    students = []
+    for s in _sessions.values():
+        students.append({
+            "teacher_id": s["teacher_id"], "teacher_name": TEACHERS.get(s["teacher_id"], {}).get("name", s["teacher_id"]),
+            "name": s["student_name"], "email": s.get("student_email", ""),
+            "index": s["current"], "total": len(s["sentences"]),
+            "exercise": s["exercise_name"], "phase": _session_phase_label(s),
+            "created_at": s.get("created_at"), "updated_at": s.get("updated_at"),
+        })
+    students.sort(key=lambda x: x.get("updated_at") or 0, reverse=True)
+    return jsonify(ok=True, students=students)
+
+@app.post("/api/admin-add-teacher")
+def admin_add_teacher():
+    """Add a new teacher at runtime (no code change/redeploy needed) - takes
+    effect immediately in-memory AND is written to the "Teachers" sheet tab
+    so it's still there after the next restart (see load_extra_teachers)."""
+    data = request.get_json(force=True)
+    if not _is_admin(data):
+        return jsonify(ok=False), 401
+    tid = re.sub(r"[^a-z0-9]", "", (data.get("teacher_id") or "").strip().lower())
+    name = clean_cell(data.get("name", "")).strip()
+    if not tid or not name:
+        return jsonify(ok=False, error="נדרש מזהה (אותיות/ספרות באנגלית) ושם"), 400
+    if tid in TEACHERS:
+        return jsonify(ok=False, error="המזהה הזה כבר קיים - בחר מזהה אחר"), 400
+    gender = data.get("voice_gender") if data.get("voice_gender") in ("male", "female") else "female"
+    student_password = (data.get("student_password") or "").strip() or "class2026"
+    teacher_password = (data.get("teacher_password") or "").strip() or (tid + "2026")
+    color = clean_cell(data.get("color", "")) or "#4318D1"
+    color_light = clean_cell(data.get("color_light", "")) or "#ede7ff"
+    try:
+        threshold = max(80, min(100, int(data.get("threshold") or 85)))
+    except (TypeError, ValueError):
+        threshold = 85
+    try:
+        max_attempts = max(4, min(7, int(data.get("max_attempts") or 5)))
+    except (TypeError, ValueError):
+        max_attempts = 5
+    results_sheet_id = extract_sheet_id(data.get("results_sheet_url") or "")
+
+    entry = {
+        "name": name, "color": color, "color_light": color_light, "voice_gender": gender,
+        "results_tab": tid, "student_password": student_password, "teacher_password": teacher_password,
+        "default_threshold": threshold, "default_max_attempts": max_attempts,
+    }
+    TEACHERS[tid] = entry
+    if results_sheet_id:
+        RESULTS_SHEET_IDS[tid] = results_sheet_id
+    _teacher_state[tid] = {
+        "threshold": threshold, "max_attempts": max_attempts, "exercise_name": "תרגול דמו",
+        "csv_url": "", "custom_exercises": [], "allowed_students": [], "restrict_to_list": False,
+        "silence_timeout_ms": 1200,
+    }
+    save_state()
+    sheet_warning = None
+    try:
+        _append_teacher_row(tid, entry, results_sheet_id)
+    except Exception as e:
+        # The teacher is already usable in-memory (login works right now) even
+        # if this write fails - just warn the admin that it may not survive
+        # the next redeploy until they retry or fix the Sheets connection.
+        print("APPEND TEACHER ROW FAILED", e)
+        sheet_warning = "המורה נוסף/ה ופעיל/ה כרגע, אך השמירה לגיליון נכשלה - ייתכן שהמורה ייעלם/תיעלם אחרי ריסטארט הבא. בדקו את חיבור ה-Google Sheets ונסו שוב."
+    return jsonify(
+        ok=True, teacher_id=tid, teacher_password=teacher_password, student_password=student_password,
+        results_sheet_configured=bool(results_sheet_id), warning=sheet_warning,
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)

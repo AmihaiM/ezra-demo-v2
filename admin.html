@@ -1,0 +1,173 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SpeakMaster — לוח ניהול</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<style>
+*{box-sizing:border-box}html,body{overflow-x:hidden;max-width:100vw}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}
+input,button,select{font:inherit}button{border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer}
+:focus-visible{outline:3px solid #FFC107;outline-offset:2px}
+.primary{background:#4318D1;color:white}.ghost{background:#ede7ff;color:#4318D1}
+.screen{min-height:100vh;padding:24px}.center{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1)}
+.card{background:white;border-radius:20px;padding:24px;box-shadow:0 8px 28px #0002;margin-bottom:18px}
+.login{width:min(380px,94vw)}
+input,select,textarea{width:100%;padding:11px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0;font-family:inherit}
+.err{display:none;background:#ffebee;color:#c62828;border-radius:10px;padding:8px;margin:8px 0}
+.top{display:none;background:#4318D1;color:white;padding:14px 20px;gap:12px;align-items:center;flex-wrap:wrap;row-gap:6px}
+.logout{margin-right:auto;background:#fff2;color:white}
+.wrap{display:none;max-width:1000px;margin:0 auto;padding:18px}
+.nav{display:flex;gap:8px;margin-bottom:18px}.nav button{flex:1;background:white;color:#4318D1}.nav button.active{background:#4318D1;color:white}
+.section{display:none}.section.active{display:block}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}
+.t-wrap{width:100%;overflow-x:auto;border:1px solid #ede7ff;border-radius:16px;background:white}
+.t{width:100%;border-collapse:collapse;min-width:640px}
+.t th{position:sticky;top:0;background:#4318D1;color:#fff;white-space:nowrap;text-align:right;padding:9px 10px;font-size:12px}
+.t td{padding:9px 10px;font-size:13px;border-bottom:1px solid #eee;vertical-align:top;text-align:right}
+.badge{display:inline-block;border-radius:999px;padding:4px 10px;background:#ede7ff;color:#4318D1;font-size:12px;font-weight:800}
+.pill-gray{background:#ede7ff;color:#4318D1}.pill-green{background:#dcfce7;color:#166534}
+.pill{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800}
+.hint{color:#666;font-size:13px}
+</style></head><body>
+<section id="login" class="screen center" role="dialog" aria-labelledby="loginTitle"><div class="card login">
+  <h1 id="loginTitle">🛠️ לוח ניהול</h1>
+  <p class="hint">גישה לצוות הפיתוח/הפיילוט בלבד - לא למורים או לתלמידים.</p>
+  <input id="password" type="password" placeholder="סיסמת ניהול" autocomplete="current-password">
+  <div id="err" class="err">סיסמה שגויה</div>
+  <button class="primary" style="width:100%" onclick="doLogin()">כניסה</button>
+  <p><a href="/">חזרה למסך התלמיד</a> · <a href="/teacher">לוח מורה</a></p>
+</div></section>
+<header id="top" class="top"><b>SpeakMaster — ניהול</b><button class="logout" onclick="logout()">יציאה</button></header>
+<main id="wrap" class="wrap">
+  <div class="nav">
+    <button class="active" onclick="showSection('teachers',this)">מורים</button>
+    <button onclick="showSection('students',this)">תלמידים (כל המורים)</button>
+  </div>
+
+  <section id="teachers" class="section active">
+    <div class="card">
+      <h2>מורים קיימים</h2>
+      <button class="ghost" onclick="loadTeachers()">רענן</button>
+      <div class="t-wrap" style="margin-top:10px"><table class="t" id="teachersTable">
+        <thead><tr><th>שם</th><th>מזהה</th><th>קול</th><th>תרגיל נוכחי</th><th>תלמידים פעילים</th><th>סיימו</th><th>גיליון תוצאות</th></tr></thead>
+        <tbody id="teachersBody"><tr><td colspan="7">טוען...</td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>➕ הוספת מורה חדש/ה</h2>
+      <p class="hint">לאחר ההוספה המורה זמין/ה מיד להתחברות תלמידים ולכניסה ללוח המורה שלו/ה ב-/teacher - בלי צורך בפריסה מחדש (deploy).</p>
+      <input id="newName" placeholder="שם המורה (למשל: רינה)">
+      <input id="newId" placeholder="מזהה קצר באנגלית (למשל: rina) - ישמש בכתובות ובכניסה" dir="ltr">
+      <select id="newGender"><option value="female">קול נשי</option><option value="male">קול גברי</option></select>
+      <input id="newTeacherPass" placeholder="סיסמת כניסה למורה (ריק = נבחר אוטומטית)" dir="ltr">
+      <input id="newStudentPass" placeholder="סיסמת כניסה לתלמידים (ריק = class2026)" dir="ltr">
+      <input id="newColor" placeholder="צבע (קוד HEX, למשל: #16a34a) - ריק = ברירת מחדל" dir="ltr">
+      <input id="newSheetUrl" placeholder="קישור לגיליון Google Sheets לתוצאות (ריק = בלי שמירת תוצאות בינתיים)" dir="ltr">
+      <p class="hint">חשוב: יש ליצור גיליון Google Sheets ריק, לשתף אותו עם חשבון השירות (service account) של האפליקציה בהרשאת עריכה, ולהדביק כאן את הקישור. אפשר גם להוסיף מורה בלי גיליון תוצאות כרגע ולהשלים זאת מאוחר יותר.</p>
+      <button class="primary" onclick="addTeacher()">הוסף מורה</button>
+      <div id="addResult" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <section id="students" class="section">
+    <div class="card">
+      <h2>כל התלמידים הפעילים/שסיימו</h2>
+      <div class="row">
+        <button class="ghost" onclick="loadStudents()">רענן</button>
+        <select id="teacherFilter" onchange="renderStudents()"><option value="">כל המורים</option></select>
+      </div>
+      <div class="t-wrap" style="margin-top:10px"><table class="t" id="studentsTable">
+        <thead><tr><th>תלמיד/ה</th><th>מורה</th><th>תרגיל</th><th>התקדמות</th><th>שלב</th><th>פעילות אחרונה</th></tr></thead>
+        <tbody id="studentsBody"><tr><td colspan="6">טוען...</td></tr></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+<script>
+var adminPassword='';
+var allStudents=[];
+document.addEventListener('DOMContentLoaded',()=>{document.getElementById('password').onkeydown=e=>{if(e.key==='Enter')doLogin()}});
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function api(path,obj){return fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({password:adminPassword},obj||{}))}).then(r=>r.json().then(d=>({ok:r.ok,d})))}
+function doLogin(){
+  adminPassword=document.getElementById('password').value;
+  fetch('/api/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:adminPassword})}).then(r=>{
+    if(!r.ok)throw Error();
+    document.getElementById('login').style.display='none';
+    document.getElementById('top').style.display='flex';
+    document.getElementById('wrap').style.display='block';
+    loadTeachers();loadStudents();
+  }).catch(()=>document.getElementById('err').style.display='block');
+}
+function logout(){location.reload()}
+function showSection(id,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(id==='students')loadStudents();
+}
+function loadTeachers(){
+  document.getElementById('teachersBody').innerHTML='<tr><td colspan="7">טוען...</td></tr>';
+  api('/api/admin-teachers').then(({ok,d})=>{
+    if(!ok){document.getElementById('teachersBody').innerHTML='<tr><td colspan="7">שגיאה בטעינה</td></tr>';return}
+    let rows=d.teachers||[];
+    document.getElementById('teachersBody').innerHTML=rows.map(t=>
+      '<tr><td><b>'+esc(t.name)+'</b></td><td dir="ltr">'+esc(t.teacher_id)+'</td><td>'+(t.voice_gender==='male'?'גברי':'נשי')+'</td>'+
+      '<td>'+esc(t.exercise_name||'—')+'</td>'+
+      '<td><span class="pill pill-gray">'+t.active_students+'</span></td>'+
+      '<td><span class="pill pill-green">'+t.completed_students+'</span></td>'+
+      '<td>'+(t.has_results_sheet?'✅':'⚠️ לא הוגדר')+'</td></tr>'
+    ).join('')||'<tr><td colspan="7">אין מורים עדיין</td></tr>';
+    // Keep the students-tab teacher filter in sync with whoever exists right now.
+    let sel=document.getElementById('teacherFilter'),current=sel.value;
+    sel.innerHTML='<option value="">כל המורים</option>'+rows.map(t=>'<option value="'+esc(t.teacher_id)+'">'+esc(t.name)+'</option>').join('');
+    sel.value=rows.some(t=>t.teacher_id===current)?current:'';
+  });
+}
+function addTeacher(){
+  let name=document.getElementById('newName').value.trim();
+  let tid=document.getElementById('newId').value.trim();
+  let resultBox=document.getElementById('addResult');
+  if(!name||!tid){resultBox.innerHTML='<div class="err" style="display:block">צריך למלא שם ומזהה</div>';return}
+  resultBox.innerHTML='<p class="hint">מוסיף/ה...</p>';
+  api('/api/admin-add-teacher',{
+    name:name, teacher_id:tid, voice_gender:document.getElementById('newGender').value,
+    teacher_password:document.getElementById('newTeacherPass').value.trim(),
+    student_password:document.getElementById('newStudentPass').value.trim(),
+    color:document.getElementById('newColor').value.trim(),
+    results_sheet_url:document.getElementById('newSheetUrl').value.trim(),
+  }).then(({ok,d})=>{
+    if(!ok||!d.ok){resultBox.innerHTML='<div class="err" style="display:block">'+esc(d.error||'שגיאה בהוספה')+'</div>';return}
+    let warn=d.warning?('<p style="color:#c62828">⚠️ '+esc(d.warning)+'</p>'):'';
+    resultBox.innerHTML='<div class="card" style="background:#f0fdf4;margin:0"><b>✅ המורה '+esc(name)+' נוסף/ה בהצלחה</b>'+
+      '<p class="hint">מזהה: <code dir="ltr">'+esc(d.teacher_id)+'</code></p>'+
+      '<p class="hint">סיסמת מורה: <code dir="ltr">'+esc(d.teacher_password)+'</code> · סיסמת תלמידים: <code dir="ltr">'+esc(d.student_password)+'</code></p>'+
+      '<p class="hint">'+(d.results_sheet_configured?'גיליון תוצאות מחובר.':'⚠️ לא הוגדר גיליון תוצאות - אפשר להוסיף בהמשך.')+'</p>'+
+      warn+'</div>';
+    document.getElementById('newName').value='';document.getElementById('newId').value='';
+    document.getElementById('newTeacherPass').value='';document.getElementById('newStudentPass').value='';
+    document.getElementById('newColor').value='';document.getElementById('newSheetUrl').value='';
+    loadTeachers();
+  });
+}
+function fmtTime(ts){if(!ts)return '';let d=new Date(ts*1000);return d.toLocaleString('he-IL',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})}
+function loadStudents(){
+  document.getElementById('studentsBody').innerHTML='<tr><td colspan="6">טוען...</td></tr>';
+  api('/api/admin-students').then(({ok,d})=>{
+    if(!ok){document.getElementById('studentsBody').innerHTML='<tr><td colspan="6">שגיאה בטעינה</td></tr>';return}
+    allStudents=d.students||[];
+    renderStudents();
+  });
+}
+function renderStudents(){
+  let f=document.getElementById('teacherFilter').value;
+  let rows=f?allStudents.filter(s=>s.teacher_id===f):allStudents;
+  document.getElementById('studentsBody').innerHTML=rows.map(s=>
+    '<tr><td><b>'+esc(s.name)+'</b><br><span class="hint">'+esc(s.email||'')+'</span></td>'+
+    '<td>'+esc(s.teacher_name)+'</td><td>'+esc(s.exercise||'')+'</td>'+
+    '<td>'+s.index+'/'+s.total+'</td>'+
+    '<td><span class="pill pill-gray">'+esc(s.phase)+'</span></td>'+
+    '<td>'+fmtTime(s.updated_at)+'</td></tr>'
+  ).join('')||'<tr><td colspan="6">אין תלמידים</td></tr>';
+}
+</script>
+</body></html>

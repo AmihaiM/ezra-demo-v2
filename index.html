@@ -137,7 +137,7 @@ button:active{transform:scale(.95)}
   .app-footer{display:block}
 }
 </style></head><body>
-<section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher" role="button" tabindex="0" aria-label="בחר את המורה דן"><div class="avatar" aria-hidden="true">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher" role="button" tabindex="0" aria-label="בחר את המורה שרה"><div class="avatar" aria-hidden="true">👩‍🏫</div><h2>שרה</h2></div></div></section>
+<section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards" id="teacherCards"></div></section>
 <div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2 id="historyTitle">📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
 <div id="resumePrompt" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resumePromptTitle"><div class="card" style="width:min(380px,92vw)"><h2 id="resumePromptTitle">🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
@@ -403,15 +403,37 @@ function handleSentenceComplete(res){
   sentenceFailCount=0;
 }
 document.addEventListener('DOMContentLoaded',init);
-function init(){fetch('/api/teachers').then(r=>r.json()).then(d=>{teacherData=d;Object.keys(d).forEach(id=>{let c=document.getElementById('tc-'+id),t=d[id];if(c){c.querySelector('h2').textContent=t.name;c.querySelector('.avatar').style.background=t.color_light;c.querySelector('.avatar').style.color=t.color}})}).catch(e=>alert('יש להריץ דרך Flask: http://127.0.0.1:5000'));
-document.getElementById('tc-ben').onclick=()=>selectTeacher('ben');document.getElementById('tc-sara').onclick=()=>selectTeacher('sara');
-// The teacher cards are role="button" divs (not real <button> elements, to
-// keep the existing free-form card layout/styling) - browsers don't give
-// those free Enter/Space activation the way a real button gets, so it has
-// to be wired manually or they're mouse/touch-only and unusable by keyboard.
-document.getElementById('tc-ben').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectTeacher('ben')}};
-document.getElementById('tc-sara').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectTeacher('sara')}};
-document.getElementById('name').onkeydown=e=>{if(e.key==='Enter')document.getElementById('pass').focus()};document.getElementById('pass').onkeydown=e=>{if(e.key==='Enter')submitLogin()};if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();populateAudioSettingsUI()}}
+function init(){
+  fetch('/api/teachers').then(r=>r.json()).then(d=>{
+    teacherData=d;
+    // Cards are built here from whatever /api/teachers returns, rather than
+    // being two hardcoded <div id="tc-ben">/<div id="tc-sara"> elements in
+    // the HTML - that used to mean a teacher added later via the admin
+    // panel (/admin) was fully functional server-side but simply invisible
+    // on this screen until someone manually added a matching card.
+    let container=document.getElementById('teacherCards');
+    container.innerHTML=Object.keys(d).map(id=>{
+      let t=d[id];
+      let avatar=t.voice_gender==='male'?'👨‍🏫':'👩‍🏫';
+      return '<div id="tc-'+esc(id)+'" class="card teacher" role="button" tabindex="0" aria-label="בחר את המורה '+esc(t.name||id)+'">'
+        +'<div class="avatar" aria-hidden="true" style="background:'+esc(t.color_light||'')+';color:'+esc(t.color||'')+'">'+avatar+'</div>'
+        +'<h2>'+esc(t.name||id)+'</h2></div>';
+    }).join('');
+    // The cards are role="button" divs (not real <button> elements, to keep
+    // this free-form card layout/styling) - browsers don't give those free
+    // Enter/Space activation the way a real button gets, so it's wired
+    // manually here or they'd be mouse/touch-only and unusable by keyboard.
+    Object.keys(d).forEach(id=>{
+      let c=document.getElementById('tc-'+id);
+      if(!c)return;
+      c.onclick=()=>selectTeacher(id);
+      c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectTeacher(id)}};
+    });
+  }).catch(e=>alert('יש להריץ דרך Flask: http://127.0.0.1:5000'));
+  document.getElementById('name').onkeydown=e=>{if(e.key==='Enter')document.getElementById('pass').focus()};
+  document.getElementById('pass').onkeydown=e=>{if(e.key==='Enter')submitLogin()};
+  if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();populateAudioSettingsUI()};
+}
 function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#4318D1');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | נדרשת התאמה מלאה (100%) בכל משפט | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';setTimeout(()=>document.getElementById('name').focus(),100)}
 function closeLogin(){document.getElementById('login').classList.remove('show')}
 // Escape closes whichever overlay/dialog is currently open - keyboard and
