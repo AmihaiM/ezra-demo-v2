@@ -134,10 +134,11 @@ button:active{transform:scale(.95)}
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards"><div id="tc-ben" class="card teacher"><div class="avatar">👨‍🏫</div><h2>דן</h2></div><div id="tc-sara" class="card teacher"><div class="avatar">👩‍🏫</div><h2>שרה</h2></div></div></section>
 <div id="login" class="overlay"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2>📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
-<section id="app"><div class="top"><b>SpeakMaster</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><div class="row" style="gap:6px;margin-top:4px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
+<div id="resumePrompt" class="overlay"><div class="card" style="width:min(380px,92vw)"><h2>🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
+<section id="app"><div class="top"><b>SpeakMaster</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div><div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><div class="row" style="gap:6px;margin-top:4px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div><button id="mic" class="primary mic" onclick="startRecognition()">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
 <div id="result" class="result"></div>
 <div id="masteryGauge" class="gauge-card">
-  <div class="gauge-title">🎯 מד ביצוע חי — דיוק, שטף וקצב</div>
+  <div class="gauge-title">🎯 מד שטף חי — קצב ורציפות דיבור</div>
   <svg viewBox="0 0 200 115" class="gauge-svg">
     <path d="M180,100 A80,80 0 0,1 164.7,53" stroke="#166534" stroke-width="18" fill="none" stroke-linecap="round"/>
     <path d="M164.7,53 A80,80 0 0,1 124.7,23.9" stroke="#22c55e" stroke-width="18" fill="none" stroke-linecap="round"/>
@@ -304,17 +305,15 @@ function computeGaugeBreakdown(score,metrics){
   let accuracyPct=Math.max(0,Math.min(100,Number(score)||0));
   let fluencyPct=Math.max(0,Math.min(100, wpm/80*100));
   let hesitationPct=Math.max(0,Math.min(100, 100-(silence/2000*100)));
-  // Speed/continuity must NEVER be able to inflate the gauge for a WRONG
-  // sentence - a student who talks fast and without pausing but says the
-  // wrong words entirely used to still get credit here (up to 50% of the
-  // gauge came from fluency+hesitation alone, regardless of accuracy),
-  // which read as the app "lying" about how well they actually did. Fix:
-  // fluency/hesitation only ever act as a bonus ON TOP OF an already-fully-
-  // correct sentence. Anything short of 100% accuracy shows the accuracy
-  // itself and nothing else - no amount of speed can raise it.
-  let level = accuracyPct>=100
-    ? Math.round(0.5*accuracyPct + 0.25*fluencyPct + 0.25*hesitationPct)
-    : Math.round(accuracyPct);
+  // Word accuracy is deliberately NOT part of this calculation - it's already
+  // shown separately as the plain "ציון: X%" score above. Once a student has
+  // shown they're genuinely engaging with the real sentence (gated in
+  // updateMasteryGauge below, not here), this gauge exists purely to reflect
+  // HOW naturally they said it - pace and lack of hesitation - regardless of
+  // whether every word was correct. Mixing accuracy back in here would just
+  // duplicate the plain score and reintroduce the earlier "why is my score
+  // high/low for the wrong reason" confusion.
+  let level = Math.round(0.5*fluencyPct + 0.5*hesitationPct);
   return {
     level: Math.max(0,Math.min(100,level)),
     accuracyPct: Math.round(accuracyPct),
@@ -323,7 +322,7 @@ function computeGaugeBreakdown(score,metrics){
   };
 }
 function gaugeLabelFor(level){
-  if(level>=85)return '🌟 מצוין — מדויק ושוטף';
+  if(level>=85)return '🌟 מצוין — שוטף וטבעי';
   if(level>=65)return '💪 טוב — כמעט שם';
   if(level>=40)return '📈 בתהליך';
   return '🔄 עדיין מתחיל';
@@ -332,9 +331,11 @@ function gaugeDiagnosis(bd){
   // A compliment alone when the gauge isn't 100% is not enough feedback - name
   // the specific weakest component so the student knows exactly what to work
   // on next time, instead of just seeing a number drop with no explanation.
+  // Accuracy is intentionally excluded here too - this gauge no longer scores
+  // word correctness at all (see computeGaugeBreakdown), so a tip about wrong
+  // words would contradict a high fluency reading instead of explaining it.
   if(bd.level>=99)return '';
   let items=[
-    {pct:bd.accuracyPct, msg:'יש טעויות במילים שנאמרו - ראו את הפירוט למעלה'},
     {pct:bd.fluencyPct, msg:'קצב הדיבור היה איטי מהרצוי - נסו לדבר ברצף טבעי בלי לעצור'},
     {pct:bd.hesitationPct, msg:'הייתה הפסקה/היסוס ארוך במהלך הדיבור'},
   ];
@@ -343,6 +344,13 @@ function gaugeDiagnosis(bd){
 }
 function updateMasteryGauge(score,metrics){
   let card=document.getElementById('masteryGauge'); if(!card)return;
+  let accuracyPct=Math.max(0,Math.min(100,Number(score)||0));
+  // Below ~1/3 correct words the attempt is effectively gibberish relative to
+  // the sentence - showing a fluency/pace reading here would be meaningless
+  // (or read as the app mocking a real learner's genuine mistakes). The
+  // gauge only switches on once there's a real, if imperfect, attempt at the
+  // actual sentence; below that it simply doesn't appear (no 0%, no minimum).
+  if(accuracyPct<34){ card.style.display='none'; return; }
   let bd=computeGaugeBreakdown(score,metrics);
   card.style.display='block';
   let needle=document.getElementById('gaugeNeedle');
@@ -351,7 +359,10 @@ function updateMasteryGauge(score,metrics){
   let sub=document.getElementById('gaugeBreakdown');
   if(sub){
     let diag=gaugeDiagnosis(bd);
-    sub.innerHTML='דיוק '+bd.accuracyPct+'% · קצב '+bd.fluencyPct+'% · רציפות '+bd.hesitationPct+'%'+(diag?'<br>'+esc(diag):'');
+    // Accuracy is deliberately not shown here (agreed for this pilot stage) -
+    // it's already shown separately as the plain "ציון: X%" above, and this
+    // gauge exists purely to reflect pace/continuity, not word correctness.
+    sub.innerHTML='קצב '+bd.fluencyPct+'% · רציפות '+bd.hesitationPct+'%'+(diag?'<br>'+esc(diag):'');
   }
 }
 function hideMasteryGauge(){let card=document.getElementById('masteryGauge'); if(card)card.style.display='none'}
@@ -409,18 +420,51 @@ function checkEmailField(name,email){
   el.style.display='none';
   return true;
 }
-function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;fetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;startApp()}).catch(e=>{let el=document.getElementById('loginErr');el.textContent=e.message||'שם/סיסמה לא תקינים';el.style.display='block'})}
+function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;fetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;
+  if(d.resumed&&d.resume_progress){
+    // A meaningfully in-progress session already exists for this student -
+    // ask before silently dropping them back into it, instead of assuming.
+    let p=d.resume_progress;
+    let stageLabel=p.stage==='preview'?'בהיכרות עם המשפטים':(p.stage==='cloze'?'בהשלמת משפטים (קלוז)':'באימון על המשפטים');
+    document.getElementById('resumePromptText').textContent='נמצא תרגול פתוח מפעם קודמת - היית '+stageLabel+', במשפט '+(p.index+1)+' מתוך '+p.total+'. להמשיך משם, או להתחיל את התרגיל הזה מחדש?';
+    document.getElementById('resumePrompt').classList.add('show');
+    return;
+  }
+  startApp()
+}).catch(e=>{let el=document.getElementById('loginErr');el.textContent=e.message||'שם/סיסמה לא תקינים';el.style.display='block'})}
+function resumeChoice(action){
+  document.getElementById('resumePrompt').classList.remove('show');
+  if(action==='restart'){
+    fetch('/api/restart-exercise',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(startApp);
+  } else {
+    startApp();
+  }
+}
 function viewMyHistory(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!checkEmailField(name,email))return;fetch('/api/my-history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{let hErr=document.getElementById('historyErr'),hBody=document.getElementById('historyBody');if(!ok){hErr.textContent=(d&&d.error)||'שגיאה בטעינת תוצאות';hErr.style.display='block';hBody.innerHTML='';document.getElementById('history').classList.add('show');return}hErr.style.display='none';let rows=d.rows||[];if(!rows.length){let dbg=d.debug||{};hBody.innerHTML='<p>עדיין אין תוצאות שמורות לאימייל הזה.</p><p class="small" dir="ltr" style="text-align:left">debug: sheet_configured='+dbg.sheet_configured+', email_column_found='+dbg.email_column_found+', sheet_rows_scanned='+dbg.sheet_rows_scanned+(dbg.sheet_error?', sheet_error='+esc(dbg.sheet_error):'')+'</p>'}else{let summary='<div class="summary-grid"><div class="summary-card"><div class="num">'+d.total+'</div>ניסיונות בסה"כ</div><div class="summary-card"><div class="num">'+(d.exam_avg!=null?d.exam_avg+'%':'—')+'</div>ממוצע מבחן סיום</div><div class="summary-card"><div class="num">'+(d.exercises||[]).length+'</div>תרגילים שונים</div></div>';let list=rows.slice().reverse().map(r=>{let passed=r.passed===true||r.passed==='TRUE'||r.passed==='true';return '<div class="summary-row '+(passed?'pass':'fail')+'"><b dir="rtl">'+esc(r.exercise||'')+'</b> <span class="small">('+esc(r.phase||'')+')</span><br>'+esc(r.sentence||'')+'<br>ציון: <b>'+esc(r.score)+'%</b> · '+esc(r.timestamp||'')+'</div>'}).join('');hBody.innerHTML=summary+'<div class="summary-list">'+list+'</div>'}document.getElementById('history').classList.add('show')}).catch(()=>{let hErr=document.getElementById('historyErr');hErr.textContent='שגיאה בטעינת תוצאות';hErr.style.display='block';document.getElementById('history').classList.add('show')})}
 function startApp(){let t=teacherData[currentTeacher]||{};document.getElementById('teacherName').textContent=emojis[currentTeacher]+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';populateAudioSettingsUI();loadQuestion()}
-function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
-  // Voice picker only matters once per practice pass - offer it on the very
-  // first sentence (so the student can confirm/adjust it right at the start),
-  // then get out of the way for the rest of the exercise. The speed control
-  // stays visible throughout since that's genuinely useful to change mid-exercise.
-  let vw=document.getElementById('voiceSelWrap');
-  if(vw)vw.style.display=(!q.review_round && q.index===0)?'flex':'none';
+function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();fetch('/api/question?student='+encodeURIComponent(studentId)).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
   let mw=document.getElementById('mismatchWarn');
   if(q.content_mismatch){mw.style.display='block';mw.textContent='⚠️ לא הצלחנו לטעון את התרגיל האמיתי ("'+q.exercise+'") מהגיליון של המורה, ולכן מוצג כרגע תרגיל לדוגמה במקום. בקש מהמורה לבדוק ששיתוף הגיליון הוגדר כ"כל מי שיש לו את הקישור — צפייה".'}else{mw.style.display='none'}
+  // Ungraded preview sweep: just show the sentence + let them replay audio
+  // and page back/forward - no mic, no score, no station logic below.
+  document.getElementById('previewNav').style.display=(q.stage==='preview')?'flex':'none';
+  if(q.stage==='preview'){
+    document.getElementById('prog').textContent='היכרות עם המשפטים '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;
+    document.getElementById('previewBack').disabled=!q.can_go_back;
+    setStation('preview', q);
+    // Voice picker only ever appears here, on the very first preview
+    // sentence (so the student can confirm/adjust it before any graded
+    // attempt) - it never reappears again later in the accuracy/cloze
+    // sweeps. The speed control stays visible throughout, since changing
+    // playback speed mid-exercise is still genuinely useful.
+    let vw0=document.getElementById('voiceSelWrap');
+    if(vw0)vw0.style.display=(q.index===0)?'flex':'none';
+    setTimeout(playSentence,350);
+    return;
+  }
+  document.getElementById('prog').textContent='משפט '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;
+  let vw=document.getElementById('voiceSelWrap');
+  if(vw)vw.style.display='none';
   if(q.review_round){
     setStation('review', q);
     setTimeout(playSentence,350);
@@ -449,9 +493,12 @@ function setStation(st,q){
   let prog=document.getElementById('prog'), he=document.getElementById('he');
   // Reset the normal top section first; cloze then hides its own share of it
   // completely, since the cloze widget below repeats the same info with its
-  // own header - leaving it up top too was just redundant clutter.
+  // own header - leaving it up top too was just redundant clutter. mic/skip
+  // are reset here too so leaving the preview stage (the only station that
+  // hides them) always restores them.
   play.style.display=''; show.style.display='';
   prog.style.display=''; phase.style.display=''; he.style.display='';
+  document.getElementById('mic').style.display=''; document.getElementById('skip').style.display='';
   if(st==='cloze'){
     prog.style.display='none';
     phase.style.display='none';
@@ -459,14 +506,27 @@ function setStation(st,q){
     document.getElementById('en').style.opacity='0';
     play.style.display='none'; show.style.display='none';
     document.getElementById('hint').textContent='אמור את המשפט המלא עם המילה החסרה';
+  } else if(st==='preview'){
+    // Ungraded exposure: read + listen only, no "hide English" toggle (there's
+    // nothing to test yet), no mic/skip - just play + the back/forward nav.
+    document.getElementById('en').style.opacity='1';
+    show.style.display='none';
+    document.getElementById('mic').style.display='none';
+    document.getElementById('skip').style.display='none';
+    document.getElementById('stopRec').style.display='none';
+    document.getElementById('nextBtn').style.display='none';
+    document.getElementById('capChoice').style.display='none';
+    hideCloze();
+    phase.innerHTML='👀 תחנה 1 — היכרות עם המשפטים, בלי ציון';
+    document.getElementById('hint').textContent='כשמוכנים, אפשר לעבור הלאה לתרגול';
   } else if(st==='practice'){
-    phase.innerHTML='⭐ תחנה 2 — אימון שליטה בשיטת Bloom | צריך התאמה מלאה (100%)';
+    phase.innerHTML='⭐ תחנה 3 — אימון שליטה בשיטת Bloom | צריך התאמה מלאה (100%)';
     document.getElementById('hint').textContent='חזור על המשפט עד לרצף נכון';
   } else if(st==='review'){
     phase.innerHTML='🔁 סבב חזרה — משפטים שדילגת עליהם קודם';
     document.getElementById('hint').textContent='הזדמנות אחת אחרונה, ואז המשפט יסומן למורה';
   } else {
-    phase.innerHTML='📘 תחנה 1 — קבלת המשפט, שמיעה וקריאה | צריך התאמה מלאה (100%)';
+    phase.innerHTML='📘 תחנה 2 — קבלת המשפט, שמיעה וקריאה | צריך התאמה מלאה (100%)';
     document.getElementById('hint').textContent='שמע את המשפט ואז לחץ על המיקרופון לאימון';
   }
 }
@@ -813,7 +873,7 @@ function showCloze(word,left,display){let el=document.getElementById('cloze');if
   // text instead of auto-computing a single-word blank - it may mark more than one
   // word and matches what the teacher actually authored.
   let blank=display?display:currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');
-  setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
+  setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 תחנה 4 — השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';
   // Combined onto one line (was a separate paragraph below the dots) - purely
@@ -824,7 +884,8 @@ function showMastery(consecutive,target,broken,attemptsLeft){let el=document.get
 function hideMastery(){document.getElementById('mastery').style.display='none'}
 function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
 function skipSentence(){fetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).then(()=>loadQuestion())}
-function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
+function previewNavGo(direction){fetch('/api/preview-nav',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,direction:direction})}).then(()=>loadQuestion())}
+function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 תחנה 5 — מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentence;currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';
   // If the teacher's source sheet defined a fill-in-the-blank variant for this
   // sentence (e.g. an articles a/an/the drill with "____" markers), show that
@@ -853,7 +914,7 @@ function showExamSummary(){
   document.getElementById('skip').classList.add('hidden-final');
   document.getElementById('mic').classList.add('hidden-final');
   document.getElementById('hint').textContent='כל הכבוד — סיימת את התרגול';
-  document.getElementById('prog').textContent='תחנה 4 הושלמה — סיכום אישי';
+  document.getElementById('prog').textContent='תחנה 5 הושלמה — סיכום אישי';
   let rows=examResults.map((r,i)=>'<div class="summary-row '+(r.passed?'pass':'fail')+'"><b>'+(i+1)+'. '+(Number(r.score)||0)+'%</b> — '+esc(r.sentence)+'<br><small>אמרת: '+esc(r.spoken||'')+'</small></div>').join('') || '<div class="summary-row">אין משפטים למבחן</div>';
   document.getElementById('en').innerHTML='<section class="summary-hero"><h2>🎉 סיימת!</h2><div class="score-circle" style="--score-deg:'+deg+'"><b>'+avg+'%</b></div><p>ציון סופי במבחן הרציף</p></section><div class="summary-grid"><div class="summary-card"><div class="num">'+passed+'/'+total+'</div><div>משפטים שעברו</div></div><div class="summary-card"><div class="num">'+avg+'%</div><div>ממוצע</div></div><div class="summary-card"><div class="num">⭐</div><div>Mastery נרשם בלוח המורה</div></div></div><div class="summary-actions"><button class="ghost" onclick="location.reload()">🔄 תרגול חדש</button><button class="primary" onclick="window.print()">🖨️ הדפס סיכום</button></div><div class="summary-list">'+rows+'</div>';
 }

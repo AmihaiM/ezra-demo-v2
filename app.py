@@ -699,7 +699,32 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
         "content_mismatch": content_mismatch,
         "level_track": level_track,
         "sentences": sentences,
+        # Global practice flow, swept across ALL sentences one stage at a time
+        # (didactic "let it breathe" restructure): "preview" (ungraded,
+        # listen/read every sentence once, free to go back/forward) -> then
+        # "accuracy" (station 1 + Bloom mastery reps, exactly as before, but
+        # completing one sentence moves on to the NEXT sentence instead of
+        # immediately testing that same sentence's cloze) -> then "cloze"
+        # (a second full sweep, cloze-testing every sentence that has one) ->
+        # then the review round / final exam, unchanged. "current" is always
+        # the index WITHIN the active stage's sweep, reset to 0 when a stage
+        # hands off to the next one. Sessions with no loaded sentences skip
+        # preview entirely (nothing to page through) so they fall straight
+        # into the existing empty-exercise handling.
+        "stage": "preview" if sentences else "accuracy",
         "current": 0,
+        # Per-sentence accuracy-stage results (mastery reps/score/attempts),
+        # cached here by index once a sentence finishes the accuracy sweep,
+        # so the SINGLE result row for that sentence (still just one row per
+        # sentence, same as before) can be written later once its cloze
+        # sweep is resolved too - even though the two sweeps now happen far
+        # apart in time instead of back-to-back for the same sentence.
+        "accuracy_data": {},
+        # Indices already fully written to results (skipped/capped straight
+        # out of the accuracy sweep) - the cloze sweep must skip over these
+        # entirely rather than asking for a cloze on a sentence that already
+        # has its one-and-only result row.
+        "finalized_indices": set(),
         "failed_attempts": 0,
         "sentence_attempts": 0,
         "stage2_attempts": 0,
@@ -976,30 +1001,71 @@ def fluency_from_metrics(spoken, score, metrics=None):
         "stt_confidence": stt_confidence,
     }
 
-def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, metrics=None):
+def advance_within_accuracy_stage(s):
+    """A sentence has just been read correctly (station 1, or after Bloom
+    mastery reps) during the ACCURACY sweep. Per the didactic restructure,
+    this no longer continues straight into that same sentence's cloze check -
+    cloze for every sentence is deferred into its own dedicated sweep only
+    after ALL sentences have been read correctly once each (see
+    advance_stage_if_swept). So: cache what would previously have gone
+    straight into the result row (mastery reps/score/attempts so far), then
+    simply move on to the next sentence within the accuracy sweep. The
+    result row itself is written later by finalize_sentence(), once this
+    sentence's cloze step (or lack of one) is resolved - still exactly one
+    row per sentence overall, just written later.
+    """
+    s.setdefault("accuracy_data", {})[s["current"]] = {
+        "attempts": max(1, s.get("sentence_attempts", 0)),
+        "mastery_target": s.get("mastery_target", 0),
+        "mastery_score": s.get("mastery_score", 0),
+    }
+    s["current"] += 1
+    s["failed_attempts"] = 0
+    s["sentence_attempts"] = 0
+    s["stage2_attempts"] = 0
+    s["bonus_attempts"] = 0
+    s["mastery_target"] = 0
+    s["mastery_consecutive"] = 0
+    s["mastery_score"] = 0
+
+def finalize_sentence(s, correct, spoken, score, passed=True, skipped=False, metrics=None):
+    """Writes the ONE result row for a sentence's whole journey (accuracy
+    sweep + cloze sweep, or a skip out of either) and advances the active
+    sweep to the next index. If this sentence already passed through the
+    accuracy sweep earlier (the normal case - see advance_within_accuracy_stage
+    above), its cached mastery reps/score/attempts are folded in here so the
+    row looks exactly like the old single-pass version even though the two
+    sweeps can now happen far apart in time. If there's no cached data (the
+    sentence was skipped/capped straight out of the accuracy sweep and never
+    reached cloze at all), the live session counters are used instead -
+    identical to the original pre-restructure behavior for that case.
+    """
     fluency = fluency_from_metrics(spoken, score, metrics)
+    ad = s.setdefault("accuracy_data", {}).pop(s["current"], None) or {}
     # Carry the sentence's teacher-authored fill-in-the-blank variant (if any)
     # through into the stored result row - this is how it survives into the
     # exam sentence pool later (built from s["results"], not re-fetched from
     # the CSV), so the final exam can show the same blanked prompt too.
     current_obj = s["sentences"][s["current"]] if s["current"] < len(s["sentences"]) else {}
+    best_score = max(ad.get("mastery_score", 0), s.get("mastery_score", 0), score or 0)
     row = {
         "timestamp": now_str(),
         "teacher_id": s["teacher_id"], "student_name": s["student_name"],
         "student_email": s.get("student_email", ""), "exercise": s["exercise_name"],
         "phase": "practice", "sentence": correct, "spoken": spoken, "score": score,
         "passed": bool(passed), "skipped": bool(skipped),
-        "attempts": max(1, s.get("sentence_attempts", 0)),
+        "attempts": ad.get("attempts", max(1, s.get("sentence_attempts", 0))),
         "max_attempts": s.get("max_attempts", ""),
-        "mastery_reps": s.get("mastery_target", 0),
+        "mastery_reps": ad.get("mastery_target", s.get("mastery_target", 0)),
         "mastery_status": "mastered" if passed and not skipped else "not_mastered",
-        "mastery_score": s.get("mastery_score", score),
+        "mastery_score": best_score,
         "cloze_passed": bool(s.get("cloze_passed", False)),
         "completion": current_obj.get("completion", ""),
         **fluency,
     }
     s["results"].append(row)
     write_result(row)
+    s.setdefault("finalized_indices", set()).add(s["current"])
     s["current"] += 1
     s["failed_attempts"] = 0
     s["sentence_attempts"] = 0
@@ -1017,6 +1083,45 @@ def record_and_advance(s, correct, spoken, score, passed=True, skipped=False, me
     s["cloze_display"] = ""
     s["cloze_attempts"] = 0
     s["cloze_passed"] = False
+
+def cloze_fields_for(sentence_obj):
+    cw = detect_cloze_word(sentence_obj.get("en", ""))
+    completion = sentence_obj.get("completion", "")
+    return cw, completion
+
+def advance_stage_if_swept(s):
+    """Whenever the active sweep (accuracy or cloze) has visited every
+    sentence, hand off to the next global stage - called at the top of both
+    /api/question and /api/answer so the two can never disagree about which
+    stage/sentence is currently active.
+    """
+    if s["stage"] == "accuracy" and s["current"] >= len(s["sentences"]):
+        s["stage"] = "cloze"
+        s["current"] = 0
+    if s["stage"] == "cloze":
+        # Skip straight over any sentence already fully finalized during the
+        # accuracy sweep (it was skipped/capped there and already has its one
+        # result row - it never gets a second look in cloze).
+        finalized = s.setdefault("finalized_indices", set())
+        while s["current"] < len(s["sentences"]) and s["current"] in finalized:
+            s["current"] += 1
+        if s["current"] < len(s["sentences"]) and not s.get("cloze_active"):
+            sentence_obj = s["sentences"][s["current"]]
+            cw, completion = cloze_fields_for(sentence_obj)
+            if not cw and not completion:
+                # Nothing to cloze-test in this sentence - it was already
+                # fully mastered in the accuracy sweep, so finalize it
+                # straight from that cached data and keep unwinding until we
+                # land on a sentence that actually needs a cloze attempt (or
+                # the sweep ends).
+                ad = s.get("accuracy_data", {}).get(s["current"], {})
+                finalize_sentence(s, sentence_obj.get("en", ""), "", ad.get("mastery_score", 0), True, metrics=None)
+                advance_stage_if_swept(s)
+                return
+            s["cloze_active"] = True
+            s["cloze_word"] = cw
+            s["cloze_display"] = completion
+            s["cloze_attempts"] = 0
 
 @app.route("/")
 def home():
@@ -1089,10 +1194,48 @@ def verify_student():
         allowed = {n.casefold() for n in ts.get("allowed_students", [])}
         if name.casefold() not in allowed:
             return jsonify(ok=False, error="השם שלך אינו ברשימת התלמידים המורשים. פנה למורה שלך."), 403
-    safe_name = re.sub(r"[^A-Za-z0-9א-ת_-]", "_", name)
-    sid = f"{tid}_{safe_name}_{int(time.time())}_{os.getpid()}"
-    new_session(sid, tid, name, student_email=email)
-    return jsonify(ok=True, student_id=sid, teacher=teacher_public(tid), exercise=_sessions[sid]["exercise_name"])
+    # Stable, deterministic session id (teacher + email) instead of a fresh
+    # timestamped id on every login. This is what actually lets a student
+    # close the tab/app and come back later to find themselves exactly where
+    # they left off, instead of restarting the whole exercise from sentence 1
+    # every time - previously EVERY login minted a brand-new id, so there was
+    # never anything to resume. (Surviving an actual SERVER RESTART/redeploy
+    # is a separate, bigger limitation - session state still lives only in
+    # memory, not in a database - see the /api/answer 404 handling comment.)
+    safe_email = re.sub(r"[^a-z0-9]", "_", email)
+    sid = f"{tid}_{safe_email}"
+    existing = _sessions.get(sid)
+    same_unfinished_exercise = bool(
+        existing and existing.get("csv_url", "") == ts.get("csv_url", "") and not existing.get("completed")
+    )
+    # Only worth asking "continue or restart?" if they actually got past the
+    # very start - never got past the first ungraded preview sentence means
+    # there's nothing meaningful to resume, so just carry on silently.
+    resumable = same_unfinished_exercise and not (existing.get("stage") == "preview" and existing.get("current", 0) == 0)
+    if same_unfinished_exercise:
+        # Same student, same teacher, same exercise, not finished yet -
+        # resume in place by default rather than wiping their progress (the
+        # frontend still asks the student to confirm before actually
+        # continuing into it - see "resumed"/"resume_progress" below - but
+        # the session itself is preserved either way until/unless they
+        # explicitly choose "start over" via /api/restart-exercise).
+        # Just refresh the display name (in case spelling/casing changed)
+        # and the timestamp used for the teacher's live-dashboard sort order.
+        existing["student_name"] = name
+        existing["updated_at"] = int(time.time())
+    else:
+        # No session yet, the exercise changed under them, or they already
+        # finished this one before - start fresh, same as always.
+        new_session(sid, tid, name, student_email=email)
+    resp = {"ok": True, "student_id": sid, "teacher": teacher_public(tid), "exercise": _sessions[sid]["exercise_name"]}
+    if resumable:
+        sess = _sessions[sid]
+        resp["resumed"] = True
+        resp["resume_progress"] = {
+            "index": sess.get("current", 0), "total": len(sess.get("sentences", [])),
+            "stage": sess.get("stage", "accuracy"),
+        }
+    return jsonify(resp)
 
 def read_results_sheet_rows(tid):
     """Read every row for a teacher's results sheet/tab back into dicts keyed
@@ -1183,11 +1326,38 @@ def my_history():
     exercises = sorted({r.get("exercise") for r in rows if r.get("exercise")})
     return jsonify(ok=True, rows=rows, total=total, exam_avg=exam_avg, exercises=exercises, debug=debug)
 
+@app.post("/api/restart-exercise")
+def restart_exercise():
+    """The student was asked "continue where you left off, or start over?"
+    (see /api/verify-student's "resumed" flag) and chose to start over -
+    wipe the resumed session's progress and rebuild it fresh, same as a
+    brand-new login would, but without needing a new session id."""
+    data = request.get_json(force=True)
+    s = _sessions.get(data.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    new_session(s["student_id"], s["teacher_id"], s["student_name"], student_email=s.get("student_email", ""))
+    return jsonify(ok=True)
+
 @app.get("/api/question")
 def question():
     s = _sessions.get(request.args.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
+    if s["stage"] == "preview":
+        # Ungraded exposure sweep - no mic, no score, just the sentence text
+        # and audio, with free back/forward navigation (see /api/preview-nav).
+        # Lets the student's ear/eye settle on the whole set before the first
+        # graded attempt, instead of cold-opening straight into a recording.
+        q = s["sentences"][s["current"]]
+        return jsonify({
+            "done": False, "stage": "preview", "he": q["he"], "en": q["en"],
+            "index": s["current"], "total": len(s["sentences"]),
+            "exercise": s["exercise_name"], "voice_gender": s["voice_gender"],
+            "can_go_back": s["current"] > 0,
+            "content_mismatch": s.get("content_mismatch", False),
+        })
+    advance_stage_if_swept(s)
     if s["current"] >= len(s["sentences"]):
         # Main pass is done. Before the final exam, give one extra single-attempt
         # round for any sentence that had to be skipped after 5 failed tries.
@@ -1203,6 +1373,7 @@ def question():
                 "exercise": s["exercise_name"], "review_round": True, **session_payload(s)
             })
         s["completed"] = True
+        s["stage"] = "done"
         total = len(s["results"])
         avg = int(sum(r["score"] for r in s["results"]) / total) if total else 0
         # Auto-advancement: only applies to sessions that used the built-in
@@ -1227,11 +1398,33 @@ def question():
         )
     q = s["sentences"][s["current"]]
     return jsonify({
-        "done": False, "he": q["he"], "en": q["en"], "index": s["current"], "total": len(s["sentences"]),
+        "done": False, "stage": s["stage"], "he": q["he"], "en": q["en"], "index": s["current"], "total": len(s["sentences"]),
         "threshold": s["threshold"], "max_attempts": s["max_attempts"], "voice_gender": s["voice_gender"],
         "exercise": s["exercise_name"], "review_round": False,
         "content_mismatch": s.get("content_mismatch", False), **session_payload(s)
     })
+
+@app.post("/api/preview-nav")
+def preview_nav():
+    """Navigation for the ungraded preview sweep only - forward or back a
+    sentence, no scoring involved. Once "next" is pressed past the last
+    sentence, the session moves on into the graded accuracy stage. Silently
+    a no-op if the student has already left the preview stage (e.g. a stale
+    button press after already moving on)."""
+    data = request.get_json(force=True)
+    s = _sessions.get(data.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    if s["stage"] != "preview":
+        return jsonify(ok=True)
+    if data.get("direction") == "back":
+        s["current"] = max(0, s["current"] - 1)
+    else:
+        s["current"] += 1
+        if s["current"] >= len(s["sentences"]):
+            s["stage"] = "accuracy"
+            s["current"] = 0
+    return jsonify(ok=True)
 
 def cap_choice(s, correct, spoken, score, base, metrics=None, sentence_obj=None, attempts_used=None):
     """Hard safety valve: no sentence auto-loops forever. But instead of forcibly
@@ -1277,7 +1470,7 @@ def cap_continue():
         return jsonify(error="no pending decision"), 400
     s["cap_pending"] = None
     s["bonus_attempts"] = 0
-    record_and_advance(s, pc["correct"], pc["spoken"], pc["score"], False, skipped=True, metrics=pc.get("metrics"))
+    finalize_sentence(s, pc["correct"], pc["spoken"], pc["score"], False, skipped=True, metrics=pc.get("metrics"))
     if pc.get("sentence_obj") and not s.get("in_review"):
         s["review_queue"].append(pc["sentence_obj"])
     return jsonify(ok=True)
@@ -1309,6 +1502,8 @@ def answer():
         # This happens when the server restarted (redeploy or free-tier spin-down)
         # and lost this student's in-memory session - it is NOT a real 0%.
         return jsonify(error="session not found", score=None, passed=False, words=[], advance=False), 404
+    if not s.get("in_review"):
+        advance_stage_if_swept(s)
     if s["current"] >= len(s["sentences"]) and not s.get("in_review"):
         return jsonify(done=True, results=s["results"], score=0, passed=False, words=[])
     s["updated_at"] = int(time.time())
@@ -1371,19 +1566,22 @@ def answer():
     # one global "sentence_attempts" counter, which meant failures on station 1
     # could quietly use up the whole budget before station 2/3 even started -
     # so a student could pass everything and still never see station 3, and the
-    # app would silently skip straight to the next sentence. Never again: cloze
-    # is only ever skipped if the sentence has no clozeable word at all, or if
-    # its OWN budget (below) runs out.
+    # app would silently skip straight to the next sentence.
+    #
+    # Didactic restructure: stations no longer run back-to-back for the SAME
+    # sentence. s["stage"] says which global sweep is active - "accuracy"
+    # (station 1 + Bloom mastery reps below) or "cloze" (station 3, entered
+    # only via the dedicated cloze sweep in advance_stage_if_swept, never
+    # inline here anymore). Every sentence passes through the accuracy sweep
+    # first; only once EVERY sentence has been read correctly does the cloze
+    # sweep begin, sentence by sentence again from the top.
 
-    # Station 3: Cloze check. This must happen ONLY after the practice/mastery station is complete.
-    # In cloze we hide the full English sentence and ask the student to rebuild it.
-    if s["cloze_active"]:
+    # Station 3: Cloze check - only reachable once s["stage"]=="cloze" has set
+    # s["cloze_active"] for the current sentence (see advance_stage_if_swept).
+    if s["stage"] == "cloze" and s["cloze_active"]:
         if passed:
-            s["cloze_active"] = False
-            s["cloze_word"] = None
             s["cloze_passed"] = True
-            s["mastery_score"] = max(s.get("mastery_score", 0), score)
-            record_and_advance(s, correct, spoken, s["mastery_score"] or score, True, metrics=metrics)
+            finalize_sentence(s, correct, spoken, score, True, metrics=metrics)
             return jsonify({**base, "station": "cloze", "cloze_done": True, "advance": True, **session_payload(s)})
 
         s["cloze_attempts"] += 1
@@ -1391,7 +1589,7 @@ def answer():
             return cap_choice(s, correct, spoken, score, {**base, "station": "cloze", "cloze_failed": True}, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["cloze_attempts"])
         return jsonify({**base, "station": "cloze", "cloze_mode": True, **session_payload(s)})
 
-    # Station 2: Bloom practice/mastery. The cloze station is NOT shown yet.
+    # Station 2: Bloom practice/mastery, within the accuracy sweep.
     if s["mastery_target"] > 0:
         s["stage2_attempts"] = int(s.get("stage2_attempts", 0)) + 1
         stage2_cap_reached = s["stage2_attempts"] >= s["max_attempts"] + s.get("bonus_attempts", 0)
@@ -1399,33 +1597,27 @@ def answer():
             s["mastery_consecutive"] += 1
             s["mastery_score"] = max(s.get("mastery_score", 0), score)
             if s["mastery_consecutive"] >= s["mastery_target"]:
-                # Practice mastery is complete. Now move to the separate cloze station -
-                # ALWAYS, regardless of how many station-2 attempts that took.
-                cw = detect_cloze_word(correct)
-                completion = sentence_obj.get("completion", "")
-                s["mastery_target"] = 0
-                s["mastery_consecutive"] = 0
-                s["stage2_attempts"] = 0
-                if not cw and not completion:
-                    record_and_advance(s, correct, spoken, s["mastery_score"] or score, True, metrics=metrics)
-                    return jsonify({**base, "station": "practice", "mastery_mode_done": True, "advance": True, **session_payload(s)})
-                s["cloze_active"] = True
-                s["cloze_word"] = cw
-                s["cloze_display"] = completion
-                s["cloze_attempts"] = 0
-                return jsonify({**base, "station": "practice", "mastery_mode_done": True, "cloze_mode": True, **session_payload(s)})
+                # Practice mastery is complete for THIS sentence. Per the
+                # restructure, move on to the NEXT sentence within the
+                # accuracy sweep instead of testing this one's cloze right
+                # away - cloze for every sentence happens later, in its own
+                # dedicated sweep (see advance_stage_if_swept).
+                advance_within_accuracy_stage(s)
+                return jsonify({**base, "station": "practice", "mastery_mode_done": True, "advance": True, **session_payload(s)})
             return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": False, **session_payload(s)})
         # A failed repetition mid-way through Bloom reinforcement does NOT reset
         # progress back to zero - it simply isn't counted as one of the required
         # successes. The student still just needs (target - consecutive) more
         # correct repetitions. Only running out of station 2's own attempt budget
-        # ends the loop (handled below) - this never borrows from station 1 or 3.
+        # ends the loop (handled below).
         if stage2_cap_reached:
             return cap_choice(s, correct, spoken, score, {**base, "station": "practice"}, metrics=metrics, sentence_obj=sentence_obj, attempts_used=s["stage2_attempts"])
         return jsonify({**base, "station": "practice", "mastery_mode": True, "streak_broken": True, **session_payload(s)})
 
-    # Station 1: normal practice / initial read. A passing first read enters either
-    # Bloom repetition mode (if there were failures) or the separate cloze check.
+    # Station 1: normal practice / initial read. A passing first read enters
+    # Bloom repetition mode if there were prior failures, otherwise the
+    # sentence's accuracy portion is already done - move on to the next
+    # sentence within the accuracy sweep (see comment above).
     s["sentence_attempts"] = int(s.get("sentence_attempts", 0)) + 1
     cap_reached = s["sentence_attempts"] >= s["max_attempts"] + s.get("bonus_attempts", 0)
     if passed:
@@ -1437,16 +1629,7 @@ def answer():
             s["stage2_attempts"] = 0
             return jsonify({**base, "station": "practice", "mastery_mode": True, "first_pass": True, **session_payload(s)})
 
-        cw = detect_cloze_word(correct)
-        completion = sentence_obj.get("completion", "")
-        if cw or completion:
-            s["cloze_active"] = True
-            s["cloze_word"] = cw
-            s["cloze_display"] = completion
-            s["cloze_attempts"] = 0
-            return jsonify({**base, "station": "practice", "cloze_mode": True, **session_payload(s)})
-
-        record_and_advance(s, correct, spoken, score, True, metrics=metrics)
+        advance_within_accuracy_stage(s)
         return jsonify({**base, "station": "practice", "advance": True, **session_payload(s)})
 
     s["failed_attempts"] += 1
@@ -1460,9 +1643,14 @@ def skip():
     s = _sessions.get(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
+    if s["stage"] == "preview":
+        # Nothing to "give up on" in the ungraded preview - use the
+        # back/forward buttons (/api/preview-nav) there instead.
+        return jsonify(ok=True)
+    advance_stage_if_swept(s)
     if s["current"] < len(s["sentences"]):
-        correct = s["sentences"][s["current"]]["en"]
-        record_and_advance(s, correct, "", 0, False, skipped=True)
+        correct = s["sentences"][s["current"]].get("en", "")
+        finalize_sentence(s, correct, "", 0, False, skipped=True)
     return jsonify(ok=True)
 
 @app.post("/api/score-only")
@@ -1638,10 +1826,21 @@ def teacher_students():
     students = []
     for s in _sessions.values():
         if s["teacher_id"] == tid:
-            phase = "סיים" if s["current"] >= len(s["sentences"]) else ("קלוז" if s.get("cloze_active") else ("Mastery" if s.get("mastery_target", 0) > 0 else "אימון"))
+            stage = s.get("stage", "accuracy")
+            done = stage == "done"
+            if done:
+                phase = "סיים"
+            elif s.get("in_review"):
+                phase = "סבב חזרה"
+            elif stage == "preview":
+                phase = "חשיפה"
+            elif stage == "cloze":
+                phase = "קלוז"
+            else:
+                phase = "Mastery" if s.get("mastery_target", 0) > 0 else "אימון"
             students.append({
                 "name": s["student_name"], "index": s["current"], "total": len(s["sentences"]),
-                "done": s["current"] >= len(s["sentences"]), "exercise": s["exercise_name"],
+                "done": done, "exercise": s["exercise_name"],
                 "teacher_current_exercise": _teacher_state[tid].get("exercise_name", ""),
                 "threshold": s["threshold"], "max_attempts": s["max_attempts"],
                 "failed_attempts": s["failed_attempts"], "sentence_attempts": s.get("sentence_attempts", 0),
