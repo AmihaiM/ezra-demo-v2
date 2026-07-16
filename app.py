@@ -8,7 +8,17 @@ import requests
 
 app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CACHE_TTL = 3600
+# How long fetched Google Sheets content (exercise catalog + parsed sentence
+# rows) is cached in memory before being re-fetched. This used to be 3600
+# (1 hour), which meant a teacher editing their exercise's sheet - fixing a
+# typo, adding/removing sentences - wouldn't see the change reflected for up
+# to an hour, with no way to force it sooner (a browser refresh has zero
+# effect since this cache lives on the server, not the client). Shortened to
+# 5 minutes as a safety net; set_exercise() below also explicitly invalidates
+# the cache for a teacher's chosen exercise every time they (re)select it, so
+# in practice a teacher can force an immediate refresh just by pressing
+# "בחר" again on the exercise they're already using.
+CACHE_TTL = 300
 STATE_FILE = os.path.join(BASE_DIR, "teacher_state.json")
 IL_TZ = ZoneInfo("Asia/Jerusalem")
 
@@ -490,6 +500,16 @@ def load_sentences_from_csv_ex(csv_url):
         sentences = FALLBACK_SENTENCES[:]
     _cache[key] = (time.time(), (sentences, used_fallback))
     return [dict(x) for x in sentences], used_fallback
+
+def invalidate_sentence_cache(csv_url):
+    """Drop the cached parsed rows for one exercise's sheet, so the next
+    load_sentences_from_csv(_ex) call re-fetches from Google Sheets instead of
+    serving a stale copy. Called whenever a teacher (re)selects an exercise,
+    and from the explicit "refresh" endpoint below."""
+    csv_url = extract_csv_url(csv_url or "")
+    if not csv_url:
+        return
+    _cache.pop("sentences:" + csv_url, None)
 
 _NUM_WORD_TO_DIGIT = {
     "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
@@ -1906,7 +1926,32 @@ def set_exercise():
     _teacher_state[tid]["exercise_name"] = clean_cell(data.get("name", "תרגול דמו")) or "תרגול דמו"
     _teacher_state[tid]["csv_url"] = csv_url
     save_state()
+    # Always force a fresh pull from the sheet on (re)selection - a teacher
+    # pressing "בחר" on the exercise they're already using is a natural,
+    # expected way to say "I just edited the sheet, load the latest version",
+    # not just a redundant no-op.
+    invalidate_sentence_cache(csv_url)
     return jsonify(ok=True, teacher=teacher_public(tid), sentence_count=len(load_sentences_from_csv(csv_url)))
+
+@app.post("/api/refresh-exercise")
+def refresh_exercise():
+    """Explicit "reload the content from the sheet now" action for a teacher,
+    without needing to re-pick the exercise from the catalog list - handy
+    right after editing the Google Sheet mid-lesson. New students starting
+    after this call get the fresh content immediately; students already
+    mid-exercise keep the sentence set they started with (each session
+    captured its own copy at creation time), so this never disrupts someone
+    already partway through."""
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+        return jsonify(ok=False), 401
+    csv_url = _teacher_state[tid].get("csv_url", "")
+    if not csv_url.strip():
+        return jsonify(ok=True, sentence_count=0, note="no_exercise_selected")
+    invalidate_sentence_cache(csv_url)
+    sentences = load_sentences_from_csv(csv_url)
+    return jsonify(ok=True, sentence_count=len(sentences))
 
 @app.post("/api/teacher-results")
 def teacher_results():
