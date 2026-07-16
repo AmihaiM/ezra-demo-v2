@@ -26,6 +26,16 @@ table{width:100%;border-collapse:collapse}
 .pill-gray{background:#ede7ff;color:#4318D1}.pill-green{background:#dcfce7;color:#166534}
 .pill{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800}
 .hint{color:#666;font-size:13px}
+/* Color picker for the "add teacher" form: a row of named swatches instead
+   of asking the admin to type a raw HEX code, which - fair complaint - means
+   nothing to most people at a glance. Clicking a swatch fills the hidden
+   color field; the HEX input still exists underneath for anyone who does
+   want a specific/custom shade, just demoted to a small optional line. */
+.swatches{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 4px}
+.swatch{width:38px;height:38px;border-radius:50%;cursor:pointer;border:3px solid transparent;box-shadow:0 2px 6px #0002;transition:transform .12s}
+.swatch:hover{transform:scale(1.1)}
+.swatch.selected{border-color:#1a1033}
+.swatch.selected::after{content:'✓';display:block;text-align:center;line-height:32px;color:#fff;font-weight:900;text-shadow:0 1px 2px #0006}
 </style></head><body>
 <section id="login" class="screen center" role="dialog" aria-labelledby="loginTitle"><div class="card login">
   <h1 id="loginTitle">🛠️ לוח ניהול</h1>
@@ -59,7 +69,9 @@ table{width:100%;border-collapse:collapse}
       <select id="newGender"><option value="female">קול נשי</option><option value="male">קול גברי</option></select>
       <input id="newTeacherPass" placeholder="סיסמת כניסה למורה (ריק = נבחר אוטומטית)" dir="ltr">
       <input id="newStudentPass" placeholder="סיסמת כניסה לתלמידים (ריק = class2026)" dir="ltr">
-      <input id="newColor" placeholder="צבע (קוד HEX, למשל: #16a34a) - ריק = ברירת מחדל" dir="ltr">
+      <p class="hint" style="margin:10px 0 0">צבע המורה (מוצג בכפתורים ובעיצוב המסכים שלו/ה)</p>
+      <div id="colorSwatches" class="swatches" role="group" aria-label="בחירת צבע מורה"></div>
+      <input id="newColor" placeholder="או קוד HEX מותאם אישית (אופציונלי, למשל: #16a34a)" dir="ltr" style="margin-top:6px">
       <input id="newSheetUrl" placeholder="קישור לגיליון Google Sheets לתוצאות (ריק = בלי שמירת תוצאות בינתיים)" dir="ltr">
       <p class="hint">חשוב: יש ליצור גיליון Google Sheets ריק, לשתף אותו עם חשבון השירות (service account) של האפליקציה בהרשאת עריכה, ולהדביק כאן את הקישור. אפשר גם להוסיף מורה בלי גיליון תוצאות כרגע ולהשלים זאת מאוחר יותר.</p>
       <button class="primary" onclick="addTeacher()">הוסף מורה</button>
@@ -84,7 +96,30 @@ table{width:100%;border-collapse:collapse}
 <script>
 var adminPassword='';
 var allStudents=[];
-document.addEventListener('DOMContentLoaded',()=>{document.getElementById('password').onkeydown=e=>{if(e.key==='Enter')doLogin()}});
+// Named color palette for the "add teacher" form - swatches instead of a raw
+// HEX code, which most admins won't be able to picture just by reading
+// digits. Colors chosen to be visually distinct from each other and from
+// the app's own default purple (#4318D1), so two teachers don't blend
+// together in the student's teacher-select screen.
+var TEACHER_COLORS=[
+  {hex:'#4318D1',name:'סגול (ברירת מחדל)'},{hex:'#be185d',name:'ורוד'},
+  {hex:'#0284c7',name:'כחול'},{hex:'#0d9488',name:'טורקיז'},
+  {hex:'#16a34a',name:'ירוק'},{hex:'#65a30d',name:'ירוק-ליים'},
+  {hex:'#eab308',name:'צהוב'},{hex:'#f97316',name:'כתום'},
+  {hex:'#ef4444',name:'אדום'},{hex:'#e11d48',name:'אדום-ורוד'},
+  {hex:'#6366f1',name:'אינדיגו'},{hex:'#78716c',name:'אפור-חום'},
+];
+function renderColorSwatches(){
+  document.getElementById('colorSwatches').innerHTML=TEACHER_COLORS.map(c=>
+    '<div class="swatch" style="background:'+c.hex+'" title="'+esc(c.name)+'" role="button" tabindex="0" aria-label="בחר צבע '+esc(c.name)+'" onclick="pickColor(\''+c.hex+'\',this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();pickColor(\''+c.hex+'\',this)}"></div>'
+  ).join('');
+}
+function pickColor(hex,el){
+  document.getElementById('newColor').value=hex;
+  document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
+  el.classList.add('selected');
+}
+document.addEventListener('DOMContentLoaded',()=>{document.getElementById('password').onkeydown=e=>{if(e.key==='Enter')doLogin()};renderColorSwatches()});
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function api(path,obj){return fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({password:adminPassword},obj||{}))}).then(r=>r.json().then(d=>({ok:r.ok,d})))}
 function doLogin(){
@@ -158,6 +193,7 @@ function addTeacher(){
     document.getElementById('newName').value='';document.getElementById('newId').value='';
     document.getElementById('newTeacherPass').value='';document.getElementById('newStudentPass').value='';
     document.getElementById('newColor').value='';document.getElementById('newSheetUrl').value='';
+    document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
     loadTeachers();
   });
 }

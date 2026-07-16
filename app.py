@@ -328,6 +328,24 @@ def load_catalog(lang_filter="en"):
 def clean_cell(value):
     return fix_mojibake(value).replace("\ufeff", "").strip().strip('"').strip()
 
+def lighten_hex(hex_color, amount=0.82):
+    """Blend a HEX color towards white, for deriving a matching light "avatar
+    background" tint from a teacher's chosen main color (used when the admin
+    picks a color swatch but doesn't separately specify color_light - without
+    this every teacher's avatar background defaulted to the same flat
+    lavender no matter what color they picked, which looked mismatched)."""
+    try:
+        h = hex_color.lstrip("#")
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        r = round(r + (255 - r) * amount)
+        g = round(g + (255 - g) * amount)
+        b = round(b + (255 - b) * amount)
+        return f"#{r:02x}{g:02x}{b:02x}"
+    except Exception:
+        return "#ede7ff"
+
 def looks_hebrew(text):
     return bool(re.search(r"[א-ת]", text or ""))
 
@@ -2085,7 +2103,11 @@ def admin_add_teacher():
     student_password = (data.get("student_password") or "").strip() or "class2026"
     teacher_password = (data.get("teacher_password") or "").strip() or (tid + "2026")
     color = clean_cell(data.get("color", "")) or "#4318D1"
-    color_light = clean_cell(data.get("color_light", "")) or "#ede7ff"
+    # No separate "light" shade collected from the admin form (just the one
+    # swatch/HEX field) - derive a matching pastel tint from the chosen main
+    # color instead of always falling back to the same flat lavender for
+    # every teacher regardless of what they picked.
+    color_light = clean_cell(data.get("color_light", "")) or lighten_hex(color)
     try:
         threshold = max(80, min(100, int(data.get("threshold") or 85)))
     except (TypeError, ValueError):
