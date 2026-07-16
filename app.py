@@ -880,8 +880,18 @@ def _append_teacher_row(tid, entry, results_sheet_id):
 # are defined above (this has to run after TEACHERS/_teacher_state's initial
 # setup earlier in the file, and after these two functions - hence placed
 # here rather than up near the hardcoded Dan/Sara TEACHERS dict).
+#
+# _persisted_teacher_ids tracks which teacher_ids are actually durable across
+# a restart: the two hardcoded ones, plus anything that was just successfully
+# read back from the Teachers sheet tab (proof it's really saved there). A
+# teacher added via /api/admin-add-teacher only joins this set once its sheet
+# write confirms success - if that write silently failed, the admin dashboard
+# can flag it as "not saved" instead of the teacher just vanishing, unexplained,
+# on the next redeploy (exactly what happened before this was added).
+_persisted_teacher_ids = set(TEACHERS.keys())
 _extra_teachers = load_extra_teachers()
 TEACHERS.update(_extra_teachers)
+_persisted_teacher_ids.update(_extra_teachers.keys())
 for _tid, _t in _extra_teachers.items():
     if _tid not in _teacher_state:
         _teacher_state[_tid] = {
@@ -2032,6 +2042,7 @@ def admin_teachers():
             "active_students": sum(1 for s in sessions_for_tid if _session_phase_label(s) != "סיים"),
             "completed_students": sum(1 for s in sessions_for_tid if _session_phase_label(s) == "סיים"),
             "has_results_sheet": tid in RESULTS_SHEET_IDS,
+            "persisted": tid in _persisted_teacher_ids,
         })
     out.sort(key=lambda x: x["name"])
     return jsonify(ok=True, teachers=out)
@@ -2102,16 +2113,44 @@ def admin_add_teacher():
     sheet_warning = None
     try:
         _append_teacher_row(tid, entry, results_sheet_id)
+        _persisted_teacher_ids.add(tid)
     except Exception as e:
         # The teacher is already usable in-memory (login works right now) even
         # if this write fails - just warn the admin that it may not survive
         # the next redeploy until they retry or fix the Sheets connection.
+        # Deliberately NOT added to _persisted_teacher_ids here, so the admin
+        # dashboard's teacher list can flag this one as unsaved until a retry
+        # succeeds - this is exactly the gap that let a teacher disappear on
+        # restart with no warning before this check existed.
         print("APPEND TEACHER ROW FAILED", e)
         sheet_warning = "המורה נוסף/ה ופעיל/ה כרגע, אך השמירה לגיליון נכשלה - ייתכן שהמורה ייעלם/תיעלם אחרי ריסטארט הבא. בדקו את חיבור ה-Google Sheets ונסו שוב."
     return jsonify(
         ok=True, teacher_id=tid, teacher_password=teacher_password, student_password=student_password,
         results_sheet_configured=bool(results_sheet_id), warning=sheet_warning,
     )
+
+@app.post("/api/admin-retry-persist-teacher")
+def admin_retry_persist_teacher():
+    """Retry saving an already-added (in-memory) teacher to the Teachers
+    sheet tab, for when the first save failed (see admin_add_teacher's
+    sheet_warning) - lets the admin fix a Sheets connection issue and re-save
+    without re-entering the teacher's details or risking a duplicate-id error
+    from re-submitting the add form."""
+    data = request.get_json(force=True)
+    if not _is_admin(data):
+        return jsonify(ok=False), 401
+    tid = (data.get("teacher_id") or "").strip().lower()
+    if tid not in TEACHERS:
+        return jsonify(ok=False, error="מורה לא נמצא/ה"), 404
+    if tid in _persisted_teacher_ids:
+        return jsonify(ok=True, already_persisted=True)
+    try:
+        _append_teacher_row(tid, TEACHERS[tid], RESULTS_SHEET_IDS.get(tid, ""))
+        _persisted_teacher_ids.add(tid)
+        return jsonify(ok=True)
+    except Exception as e:
+        print("RETRY APPEND TEACHER ROW FAILED", e)
+        return jsonify(ok=False, error="השמירה נכשלה שוב - בדקו את חיבור ה-Google Sheets (הרשאות שיתוף, credentials)."), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

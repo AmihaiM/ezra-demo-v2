@@ -47,8 +47,8 @@ table{width:100%;border-collapse:collapse}
       <h2>מורים קיימים</h2>
       <button class="ghost" onclick="loadTeachers()">רענן</button>
       <div class="t-wrap" style="margin-top:10px"><table class="t" id="teachersTable">
-        <thead><tr><th>שם</th><th>מזהה</th><th>קול</th><th>תרגיל נוכחי</th><th>תלמידים פעילים</th><th>סיימו</th><th>גיליון תוצאות</th></tr></thead>
-        <tbody id="teachersBody"><tr><td colspan="7">טוען...</td></tr></tbody>
+        <thead><tr><th>שם</th><th>מזהה</th><th>קול</th><th>תרגיל נוכחי</th><th>תלמידים פעילים</th><th>סיימו</th><th>גיליון תוצאות</th><th>נשמר לצמיתות</th></tr></thead>
+        <tbody id="teachersBody"><tr><td colspan="8">טוען...</td></tr></tbody>
       </table></div>
     </div>
     <div class="card">
@@ -106,22 +106,34 @@ function showSection(id,btn){
   if(id==='students')loadStudents();
 }
 function loadTeachers(){
-  document.getElementById('teachersBody').innerHTML='<tr><td colspan="7">טוען...</td></tr>';
+  document.getElementById('teachersBody').innerHTML='<tr><td colspan="8">טוען...</td></tr>';
   api('/api/admin-teachers').then(({ok,d})=>{
-    if(!ok){document.getElementById('teachersBody').innerHTML='<tr><td colspan="7">שגיאה בטעינה</td></tr>';return}
+    if(!ok){document.getElementById('teachersBody').innerHTML='<tr><td colspan="8">שגיאה בטעינה</td></tr>';return}
     let rows=d.teachers||[];
     document.getElementById('teachersBody').innerHTML=rows.map(t=>
       '<tr><td><b>'+esc(t.name)+'</b></td><td dir="ltr">'+esc(t.teacher_id)+'</td><td>'+(t.voice_gender==='male'?'גברי':'נשי')+'</td>'+
       '<td>'+esc(t.exercise_name||'—')+'</td>'+
       '<td><span class="pill pill-gray">'+t.active_students+'</span></td>'+
       '<td><span class="pill pill-green">'+t.completed_students+'</span></td>'+
-      '<td>'+(t.has_results_sheet?'✅':'⚠️ לא הוגדר')+'</td></tr>'
-    ).join('')||'<tr><td colspan="7">אין מורים עדיין</td></tr>';
+      '<td>'+(t.has_results_sheet?'✅':'⚠️ לא הוגדר')+'</td>'+
+      // A teacher that isn't persisted will vanish on the next redeploy/restart
+      // with no other warning - this is exactly what happened to a teacher
+      // added while the Sheets connection had a problem, so it's surfaced
+      // here with an immediate one-click retry rather than staying invisible
+      // until someone notices the teacher is suddenly gone.
+      '<td>'+(t.persisted?'✅':'<span style="color:#c62828;font-weight:800">⚠️ לא נשמר</span> <button class="ghost" style="padding:3px 9px;font-size:12px" onclick="retryPersist(\''+esc(t.teacher_id)+'\')">נסה שוב</button>')+'</td></tr>'
+    ).join('')||'<tr><td colspan="8">אין מורים עדיין</td></tr>';
     // Keep the students-tab teacher filter in sync with whoever exists right now.
     let sel=document.getElementById('teacherFilter'),current=sel.value;
     sel.innerHTML='<option value="">כל המורים</option>'+rows.map(t=>'<option value="'+esc(t.teacher_id)+'">'+esc(t.name)+'</option>').join('');
     sel.value=rows.some(t=>t.teacher_id===current)?current:'';
   });
+}
+function retryPersist(tid){
+  api('/api/admin-retry-persist-teacher',{teacher_id:tid}).then(({ok,d})=>{
+    if(ok&&d.ok){alert('נשמר בהצלחה! המורה יישאר קיים גם אחרי ריסטארט הבא.');loadTeachers()}
+    else{alert('השמירה נכשלה שוב: '+(d.error||'שגיאה לא ידועה')+'\n\nבדקו שהגיליון (אותו גיליון שמשמש לקטלוג התרגילים) משותף לחשבון השירות (service account) של Google עם הרשאת עריכה.')}
+  }).catch(()=>alert('שגיאה ברענון'))
 }
 function addTeacher(){
   let name=document.getElementById('newName').value.trim();

@@ -584,7 +584,7 @@ function resumeChoice(action){
 }
 function viewMyHistory(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!checkEmailField(name,email))return;fetch('/api/my-history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{let hErr=document.getElementById('historyErr'),hBody=document.getElementById('historyBody');if(!ok){hErr.textContent=(d&&d.error)||'שגיאה בטעינת תוצאות';hErr.style.display='block';hBody.innerHTML='';document.getElementById('history').classList.add('show');setTimeout(()=>{let c=document.querySelector('#history .card button');if(c)c.focus()},50);return}hErr.style.display='none';let rows=d.rows||[];if(!rows.length){let dbg=d.debug||{};hBody.innerHTML='<p>עדיין אין תוצאות שמורות לאימייל הזה.</p><p class="small" dir="ltr" style="text-align:left">debug: sheet_configured='+dbg.sheet_configured+', email_column_found='+dbg.email_column_found+', sheet_rows_scanned='+dbg.sheet_rows_scanned+(dbg.sheet_error?', sheet_error='+esc(dbg.sheet_error):'')+'</p>'}else{let summary='<div class="summary-grid"><div class="summary-card"><div class="num">'+d.total+'</div>ניסיונות בסה"כ</div><div class="summary-card"><div class="num">'+(d.exam_avg!=null?d.exam_avg+'%':'—')+'</div>ממוצע מבחן סיום</div><div class="summary-card"><div class="num">'+(d.exercises||[]).length+'</div>תרגילים שונים</div></div>';let list=rows.slice().reverse().map(r=>{let passed=r.passed===true||r.passed==='TRUE'||r.passed==='true';return '<div class="summary-row '+(passed?'pass':'fail')+'"><b dir="rtl">'+esc(r.exercise||'')+'</b> <span class="small">('+esc(r.phase||'')+')</span><br>'+esc(r.sentence||'')+'<br>ציון: <b>'+esc(r.score)+'%</b> · '+esc(r.timestamp||'')+'</div>'}).join('');hBody.innerHTML=summary+'<div class="summary-list">'+list+'</div>'}document.getElementById('history').classList.add('show');setTimeout(()=>{let c=document.querySelector('#history .card button');if(c)c.focus()},50)}).catch(()=>{let hErr=document.getElementById('historyErr');hErr.textContent='שגיאה בטעינת תוצאות';hErr.style.display='block';document.getElementById('history').classList.add('show');setTimeout(()=>{let c=document.querySelector('#history .card button');if(c)c.focus()},50)})}
 function startApp(){let t=teacherData[currentTeacher]||{};let avatar=emojis[currentTeacher]||(t.voice_gender==='male'?'👨‍🏫':'👩‍🏫');document.getElementById('teacherName').textContent=avatar+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';populateAudioSettingsUI();loadQuestion()}
-function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
+function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.error==='session not found'){showSessionExpired();return}if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
   let mw=document.getElementById('mismatchWarn');
   if(q.content_mismatch){mw.style.display='block';mw.textContent='⚠️ לא הצלחנו לטעון את התרגיל האמיתי ("'+q.exercise+'") מהגיליון של המורה, ולכן מוצג כרגע תרגיל לדוגמה במקום. בקש מהמורה לבדוק ששיתוף הגיליון הוגדר כ"כל מי שיש לו את הקישור — צפייה".'}else{mw.style.display='none'}
   // Ungraded preview sweep: just show the sentence + let them replay audio
@@ -879,16 +879,36 @@ function startRecognition(){
   rec.onerror=()=>{busy=false;submitted=true;clearTimeout(micColorTimer);let micEl=document.getElementById('mic');micEl.classList.remove('on');micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');document.getElementById('stopRec').style.display='none';document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
   rec.start();
 }
+// The server's in-memory session store (_sessions) does not survive a Render
+// restart/redeploy - so a student who was mid-exercise when that happened
+// gets "session not found" back from the server on their next request. This
+// used to only be caught reactively, inside showResult() after a submitted
+// answer came back with that error - meaning /api/question itself could
+// return the same error first (e.g. right after re-opening a backgrounded
+// tab) and the old code had no guard for that: it would plow ahead building
+// the question UI from a response with no he/en/index/total/exercise
+// fields, showing garbled "undefined | undefined מתוך NaN" progress text and
+// re-revealing the play/mic/skip controls for a sentence that doesn't exist.
+// Both loadQuestion() and showResult() now funnel through this one function
+// the instant they see this specific error, before any of that can render.
+function showSessionExpired(){
+  hideAll();
+  document.getElementById('previewNav').style.display='none';
+  let box=document.getElementById('result');
+  box.style.display='block'; box.className='result fail';
+  box.innerHTML='<h3>⏳ החיבור פג תוקף</h3><div>כנראה שהייתה הפסקה ארוכה והשרת התאפס. לחצו לרענן ולהתחיל את התרגיל הזה מחדש — זה לא באמת ציון 0.</div><button class="primary" style="margin-top:10px" onclick="location.reload()">🔄 רענן והתחל מחדש</button>';
+  document.getElementById('prog').textContent='';
+  document.getElementById('he').textContent='';
+  document.getElementById('en').textContent='';
+  document.getElementById('phase').textContent='';
+}
 function submitAnswer(spoken,metrics){sentenceAttemptCount++;apiFetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,answer:spoken,metrics:metrics||{}})},loadQuestion).then(r=>r.json()).then(res=>{busy=false;showResult(spoken,res)}).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה בשליחת תשובה'})}
 function showResult(spoken,res){
   let box=document.getElementById('result');
   if(!res || typeof res.score!=='number'){
+    if(res && res.error==='session not found'){showSessionExpired();return}
     box.style.display='block'; box.className='result fail';
-    if(res && res.error==='session not found'){
-      box.innerHTML='<h3>⏳ החיבור פג תוקף</h3><div>כנראה שהייתה הפסקה ארוכה והשרת התאפס. לחצו לרענן ולהתחיל את התרגיל הזה מחדש — זה לא באמת ציון 0.</div><button class="primary" style="margin-top:10px" onclick="location.reload()">🔄 רענן והתחל מחדש</button>';
-    } else {
-      box.innerHTML='<h3>⚠️ שגיאה בבדיקת התשובה</h3><div>לא התקבל ציון מהשרת. נסה לרענן או לבדוק את הלוג של Flask.</div>'+(res&&res.error?'<pre dir="ltr">'+esc(res.error)+'</pre>':'');
-    }
+    box.innerHTML='<h3>⚠️ שגיאה בבדיקת התשובה</h3><div>לא התקבל ציון מהשרת. נסה לרענן או לבדוק את הלוג של Flask.</div>'+(res&&res.error?'<pre dir="ltr">'+esc(res.error)+'</pre>':'');
     document.getElementById('hint').textContent='נסה שוב';
     return;
   }
