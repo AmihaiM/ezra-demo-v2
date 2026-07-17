@@ -183,7 +183,7 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 <div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none"><label style="flex:1;font-size:12.5px;color:#666">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2 id="historyTitle">📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
 <div id="resumePrompt" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resumePromptTitle"><div class="card" style="width:min(380px,92vw)"><h2 id="resumePromptTitle">🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
-<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button></div><span id="studentTag" class="student"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
+<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button></div><span id="studentTag" class="student"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><div id="recTimer" style="display:none;text-align:center;font-weight:800;color:var(--tc,#4318D1);font-size:14px;margin-top:4px" aria-live="off">0:00</div><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><button id="practiceAgainBtn" class="ghost" style="display:none;width:100%;margin-top:8px" onclick="practiceAgainNow()">🔁 תרגל שוב את המשפט הזה (לא משפיע על הציון)</button><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
 <div id="result" class="result" aria-live="polite"></div>
 <div id="masteryGauge" class="gauge-card">
   <div class="gauge-title">🎯 מד שטף חי — קצב ורציפות דיבור</div>
@@ -203,7 +203,7 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 </div></div></div></section>
 <div class="app-footer">🧠 מנוע למיומנות בשפה על פי שיטת פרופ' בלום ·  פותח על ידי עמיחי מייטליס ובהדרכת סולי תמרי · © כל הזכויות שמורות</div>
 <script>
-var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200,studentPhotoDataUrl='';
+var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200,studentPhotoDataUrl='',lastCompletedSentence=null,practiceMode=false;
 // A student's own photo is entirely optional, cosmetic, and per-device -
 // stored client-side in localStorage keyed by email (same pattern as the
 // XP/streak gamification data below), not on the server, so there's no new
@@ -885,6 +885,18 @@ function startRecognition(){
   // turns red can lose the first word entirely.
   let micColorTimer=setTimeout(()=>{let m=document.getElementById('mic');m.classList.add('on');m.setAttribute('aria-label','מקליט... לחץ על "סיים הקלטה" כדי לעצור')},250);
   document.getElementById('stopRec').style.display='block';
+  // Live recording-time readout: pure feedback (never itself read by scoring),
+  // but pace/speed IS what the mastery gauge measures - seeing the seconds
+  // tick by while they speak gives a concrete, visual sense of their own
+  // pace in the moment, instead of only finding out "too slow/too fast"
+  // after the fact in the gauge breakdown.
+  let recTimerEl=document.getElementById('recTimer'), recTimerStart=performance.now();
+  recTimerEl.textContent='0:00'; recTimerEl.style.display='block';
+  let recTimerInterval=setInterval(()=>{
+    let sec=Math.floor((performance.now()-recTimerStart)/1000);
+    recTimerEl.textContent=Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');
+  },250);
+  let stopRecTimer=()=>{clearInterval(recTimerInterval);recTimerEl.style.display='none'};
   // Never let the student play the reference audio into their own mic while
   // recording - that would score 100% without them actually saying anything.
   document.getElementById('play').disabled=true;
@@ -924,6 +936,7 @@ function startRecognition(){
   rec.onend=()=>{
     let endedAt=performance.now();
     clearTimeout(micColorTimer);
+    stopRecTimer();
     let micEl=document.getElementById('mic');
     micEl.classList.remove('on');
     micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');
@@ -945,9 +958,9 @@ function startRecognition(){
     lastMetrics=metrics;
     if(!spoken){busy=false;document.getElementById('hint').textContent='לא נקלט דיבור — נסה שוב';return}
     document.getElementById('hint').textContent='מעבד...';
-    if(examMode)submitExamAnswer(spoken,metrics);else submitAnswer(spoken,metrics);
+    if(examMode)submitExamAnswer(spoken,metrics);else if(practiceMode)submitPracticeRepeat(spoken);else submitAnswer(spoken,metrics);
   };
-  rec.onerror=()=>{busy=false;submitted=true;clearTimeout(micColorTimer);let micEl=document.getElementById('mic');micEl.classList.remove('on');micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');document.getElementById('stopRec').style.display='none';document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
+  rec.onerror=()=>{busy=false;submitted=true;clearTimeout(micColorTimer);stopRecTimer();let micEl=document.getElementById('mic');micEl.classList.remove('on');micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');document.getElementById('stopRec').style.display='none';document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
   rec.start();
 }
 // The server's in-memory session store (_sessions) does not survive a Render
@@ -1069,7 +1082,22 @@ function showResult(spoken,res){
   } else {
     hideCapChoice();
   }
-  if(res.advance){document.getElementById('en').style.opacity='1';handleSentenceComplete(res);showNextButton(loadQuestion)}
+  if(res.advance){
+    document.getElementById('en').style.opacity='1';
+    handleSentenceComplete(res);
+    // Remember the sentence that was just genuinely finished (not the
+    // single-attempt review round, which isn't really "practice") so the
+    // student can optionally go back and say it again afterward, instead of
+    // only ever being able to move forward.
+    let practiceBtn=document.getElementById('practiceAgainBtn');
+    if(res.passed && res.station!=='review' && currentQ){
+      lastCompletedSentence={he:currentQ.he,en:currentQ.en};
+      practiceBtn.style.display='block';
+    } else {
+      practiceBtn.style.display='none';
+    }
+    showNextButton(loadQuestion);
+  }
   // Auto-scroll so the fresh feedback is immediately in view - not "scroll to
   // the bottom of the page" (the next/continue button is pinned there now
   // regardless, via position:fixed, so that's never actually the problem),
@@ -1078,6 +1106,51 @@ function showResult(spoken,res){
   if(box.style.display==='block'){
     setTimeout(()=>{box.scrollIntoView({behavior:'smooth',block:'start'})},60);
   }
+}
+// Voluntary "practice this sentence again" flow - entirely separate from the
+// real progress/scoring path. Entering it just swaps the displayed sentence
+// back to the last one the student passed and re-arms the mic; leaving it
+// (exitPracticeMode) simply re-fetches the real current question from the
+// server, so nothing about actual progress ever has to be rewound.
+function practiceAgainNow(){
+  if(!lastCompletedSentence)return;
+  practiceMode=true;
+  hideNextButton();
+  document.getElementById('practiceAgainBtn').style.display='none';
+  currentQ=lastCompletedSentence;
+  document.getElementById('he').textContent=lastCompletedSentence.he||'';
+  document.getElementById('en').textContent=lastCompletedSentence.en||'';
+  document.getElementById('en').style.opacity='1';
+  document.getElementById('result').style.display='none';
+  hideMastery();hideMasteryGauge();hideCloze();
+  document.getElementById('phase').innerHTML='🔁 תרגול חופשי — לא משפיע על ההתקדמות או הציון';
+  document.getElementById('hint').textContent='לחץ על המיקרופון ונסה שוב';
+  setTimeout(playSentence,300);
+}
+function submitPracticeRepeat(spoken){
+  apiFetch('/api/practice-repeat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answer:spoken,correct:(lastCompletedSentence&&lastCompletedSentence.en)||''})}).then(r=>r.json()).then(res=>{
+    busy=false;
+    let box=document.getElementById('result');
+    box.style.display='block';
+    box.className='result '+(res.passed?'pass':'fail');
+    let words=(res.words||[]).map(w=>'<span class="w '+esc(w.status)+'">'+esc(w.word)+'</span>').join(' ');
+    box.innerHTML='<h3>'+(res.passed?'✅ מצוין! 🎉':'💪 עדיין לא בדיוק')+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div><div class="words">'+words+'</div><p class="small">תרגול חופשי — לא נשמר ולא משפיע על ההתקדמות.</p>';
+    document.getElementById('hint').textContent=res.passed?'יפה! אפשר לנסות עוד פעם או לחזור לתרגול הרגיל':'נסה שוב, או חזור לתרגול הרגיל';
+    showPracticeExitButton();
+  }).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה'});
+}
+function showPracticeExitButton(){
+  let btn=document.getElementById('nextBtn');
+  btn.textContent='➡️ חזרה לתרגול הרגיל';
+  nextAction=exitPracticeMode;
+  btn.style.display='block';
+  syncFooterVisibility();
+}
+function exitPracticeMode(){
+  practiceMode=false;
+  document.getElementById('nextBtn').textContent='▶️ הבא';
+  hideNextButton();
+  loadQuestion();
 }
 function syncFooterVisibility(){
   let occupied=document.getElementById('nextBtn').style.display==='block'||document.getElementById('capChoice').style.display==='flex';
@@ -1125,7 +1198,7 @@ function showMastery(consecutive,target,broken,attemptsLeft){let el=document.get
   let attemptsLine=(typeof attemptsLeft==='number')?' · ניסיונות שנותרו: '+attemptsLeft:'';
   el.innerHTML='<h3>⭐ מצב שליטה (Mastery)</h3><p>צריך '+target+' חזרות נכונות ('+consecutive+'/'+target+')'+attemptsLine+'</p><div class="dots">'+dots+'</div>'}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
-function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
+function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';document.getElementById('recTimer').style.display='none';document.getElementById('practiceAgainBtn').style.display='none';hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
 function skipSentence(){apiFetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})},skipSentence).then(()=>loadQuestion()).catch(()=>{})}
 function previewNavGo(direction){apiFetch('/api/preview-nav',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,direction:direction})},()=>previewNavGo(direction)).then(()=>loadQuestion()).catch(()=>{})}
 function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 תחנה 4 — מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}

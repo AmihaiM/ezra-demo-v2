@@ -1845,6 +1845,23 @@ def score_only():
     score = similarity(spoken, correct)
     return jsonify(score=score, passed=score >= threshold, words=word_level(spoken, correct), debug_expected=correct)
 
+@app.post("/api/practice-repeat")
+def practice_repeat():
+    """Voluntary, ungraded re-attempt of a sentence the student already
+    passed - lets them go back and say it again for their own benefit
+    ("I finished it, but I want another rep") without touching the session's
+    stage/index bookkeeping, the results sheet, or the mastery/exam pool.
+    Pure score-and-forget, using the same 100%-to-pass bar stations 1-3 use
+    for a real pass, so the feedback stays consistent with what "passing"
+    means everywhere else in the app."""
+    data = request.get_json(force=True)
+    spoken = data.get("answer", "")
+    correct = (data.get("correct") or "").strip()
+    if not correct:
+        return jsonify(score=0, passed=False, words=[], error="missing sentence"), 400
+    score = similarity(spoken, correct)
+    return jsonify(score=score, passed=score >= 100, words=word_level(spoken, correct))
+
 @app.post("/api/exam-result")
 def exam_result():
     data = request.get_json(force=True)
