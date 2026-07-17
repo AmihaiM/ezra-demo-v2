@@ -180,10 +180,10 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 </style></head><body>
 <div id="connBanner" role="alert"><span id="connBannerMsg">אין חיבור לשרת כרגע.</span><button onclick="connRetry()">🔄 נסה שוב</button></div>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards" id="teacherCards"></div></section>
-<div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
+<div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none"><label style="flex:1;font-size:12.5px;color:#666">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2 id="historyTitle">📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
 <div id="resumePrompt" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resumePromptTitle"><div class="card" style="width:min(380px,92vw)"><h2 id="resumePromptTitle">🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
-<section id="app"><div class="top"><b>SpeakMaster</b><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button></div><span id="studentTag" class="student"></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
+<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button></div><span id="studentTag" class="student"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
 <div id="result" class="result" aria-live="polite"></div>
 <div id="masteryGauge" class="gauge-card">
   <div class="gauge-title">🎯 מד שטף חי — קצב ורציפות דיבור</div>
@@ -203,7 +203,35 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 </div></div></div></section>
 <div class="app-footer">🧠 מנוע למיומנות בשפה על פי שיטת פרופ' בלום ·  פותח על ידי עמיחי מייטליס ובהדרכת סולי תמרי · © כל הזכויות שמורות</div>
 <script>
-var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200;
+var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200,studentPhotoDataUrl='';
+// A student's own photo is entirely optional, cosmetic, and per-device -
+// stored client-side in localStorage keyed by email (same pattern as the
+// XP/streak gamification data below), not on the server, so there's no new
+// backend storage needed for something this lightweight.
+function getStudentPhoto(email){if(!email)return '';try{return localStorage.getItem('ezra_photo_'+email)||''}catch(e){return ''}}
+function saveStudentPhoto(email,dataUrl){if(!email)return;try{localStorage.setItem('ezra_photo_'+email,dataUrl)}catch(e){}}
+function handleStudentPhotoFile(input){
+  let file=input.files&&input.files[0];
+  if(!file)return;
+  let reader=new FileReader();
+  reader.onload=e=>{
+    let img=new Image();
+    img.onload=()=>{
+      let size=120;
+      let canvas=document.createElement('canvas');
+      canvas.width=size;canvas.height=size;
+      let ctx=canvas.getContext('2d');
+      let scale=Math.max(size/img.width,size/img.height);
+      let w=img.width*scale,h=img.height*scale;
+      ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+      studentPhotoDataUrl=canvas.toDataURL('image/jpeg',0.7);
+      let prev=document.getElementById('loginPhotoPreview');
+      prev.src=studentPhotoDataUrl;prev.style.display='inline-block';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 
 // ---------------------------------------------------------------------------
 // Connection resilience layer. Real-world symptom this fixes: a student
@@ -532,6 +560,18 @@ function init(){
   }).catch(()=>{});
   document.getElementById('name').onkeydown=e=>{if(e.key==='Enter')document.getElementById('pass').focus()};
   document.getElementById('pass').onkeydown=e=>{if(e.key==='Enter')submitLogin()};
+  // Returning student, same device: pre-fill the photo preview from
+  // localStorage the moment they finish typing their email, so they see
+  // their own picture is already remembered instead of it only quietly
+  // reappearing after they log in.
+  document.getElementById('email').onblur=()=>{
+    let email=document.getElementById('email').value.trim().toLowerCase();
+    let saved=getStudentPhoto(email);
+    if(saved && !studentPhotoDataUrl){
+      let prev=document.getElementById('loginPhotoPreview');
+      prev.src=saved;prev.style.display='inline-block';
+    }
+  };
   if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();populateAudioSettingsUI()};
 }
 function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#4318D1');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | נדרשת התאמה מלאה (100%) בכל משפט | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';setTimeout(()=>document.getElementById('name').focus(),100)}
@@ -586,7 +626,30 @@ function resumeChoice(action){
   }
 }
 function viewMyHistory(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!checkEmailField(name,email))return;fetch('/api/my-history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,email:email,password:pass})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{let hErr=document.getElementById('historyErr'),hBody=document.getElementById('historyBody');if(!ok){hErr.textContent=(d&&d.error)||'שגיאה בטעינת תוצאות';hErr.style.display='block';hBody.innerHTML='';document.getElementById('history').classList.add('show');setTimeout(()=>{let c=document.querySelector('#history .card button');if(c)c.focus()},50);return}hErr.style.display='none';let rows=d.rows||[];if(!rows.length){let dbg=d.debug||{};hBody.innerHTML='<p>עדיין אין תוצאות שמורות לאימייל הזה.</p><p class="small" dir="ltr" style="text-align:left">debug: sheet_configured='+dbg.sheet_configured+', email_column_found='+dbg.email_column_found+', sheet_rows_scanned='+dbg.sheet_rows_scanned+(dbg.sheet_error?', sheet_error='+esc(dbg.sheet_error):'')+'</p>'}else{let summary='<div class="summary-grid"><div class="summary-card"><div class="num">'+d.total+'</div>ניסיונות בסה"כ</div><div class="summary-card"><div class="num">'+(d.exam_avg!=null?d.exam_avg+'%':'—')+'</div>ממוצע מבחן סיום</div><div class="summary-card"><div class="num">'+(d.exercises||[]).length+'</div>תרגילים שונים</div></div>';let list=rows.slice().reverse().map(r=>{let passed=r.passed===true||r.passed==='TRUE'||r.passed==='true';return '<div class="summary-row '+(passed?'pass':'fail')+'"><b dir="rtl">'+esc(r.exercise||'')+'</b> <span class="small">('+esc(r.phase||'')+')</span><br>'+esc(r.sentence||'')+'<br>ציון: <b>'+esc(r.score)+'%</b> · '+esc(r.timestamp||'')+'</div>'}).join('');hBody.innerHTML=summary+'<div class="summary-list">'+list+'</div>'}document.getElementById('history').classList.add('show');setTimeout(()=>{let c=document.querySelector('#history .card button');if(c)c.focus()},50)}).catch(()=>{let hErr=document.getElementById('historyErr');hErr.textContent='שגיאה בטעינת תוצאות';hErr.style.display='block';document.getElementById('history').classList.add('show');setTimeout(()=>{let c=document.querySelector('#history .card button');if(c)c.focus()},50)})}
-function startApp(){let t=teacherData[currentTeacher]||{};let avatar=emojis[currentTeacher]||(t.voice_gender==='male'?'👨‍🏫':'👩‍🏫');document.getElementById('teacherName').textContent=avatar+' '+(t.name||currentTeacher);document.getElementById('studentTag').textContent='👤 '+studentName;document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';populateAudioSettingsUI();loadQuestion()}
+function startApp(){
+  let t=teacherData[currentTeacher]||{};
+  let teacherAvatarImg=document.getElementById('teacherAvatarImg');
+  if(t.photo_url){
+    // A real uploaded photo (see /admin) replaces the emoji in the top bar too,
+    // not just the teacher-select card - same fallback logic either way.
+    teacherAvatarImg.src=t.photo_url;teacherAvatarImg.style.display='inline-block';
+    document.getElementById('teacherName').textContent=t.name||currentTeacher;
+  } else {
+    teacherAvatarImg.style.display='none';
+    let avatar=emojis[currentTeacher]||(t.voice_gender==='male'?'👨‍🏫':'👩‍🏫');
+    document.getElementById('teacherName').textContent=avatar+' '+(t.name||currentTeacher);
+  }
+  // Student's own optional photo (see login screen) - saved per-device in
+  // localStorage keyed by email, same pattern as the XP/streak gamification
+  // data, so it reappears automatically on a returning login without any
+  // server-side storage needed for what's a purely cosmetic touch.
+  if(studentPhotoDataUrl)saveStudentPhoto(studentEmail,studentPhotoDataUrl);
+  let studentPhoto=studentPhotoDataUrl||getStudentPhoto(studentEmail);
+  let studentAvatarImg=document.getElementById('studentAvatarImg');
+  if(studentPhoto){studentAvatarImg.src=studentPhoto;studentAvatarImg.style.display='inline-block'}else{studentAvatarImg.style.display='none'}
+  document.getElementById('studentTagText').textContent='👤 '+studentName;
+  document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';populateAudioSettingsUI();loadQuestion()
+}
 function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.error==='session not found'){showSessionExpired();return}if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
   let mw=document.getElementById('mismatchWarn');
   if(q.content_mismatch){mw.style.display='block';mw.textContent='⚠️ לא הצלחנו לטעון את התרגיל האמיתי ("'+q.exercise+'") מהגיליון של המורה, ולכן מוצג כרגע תרגיל לדוגמה במקום. בקש מהמורה לבדוק ששיתוף הגיליון הוגדר כ"כל מי שיש לו את הקישור — צפייה".'}else{mw.style.display='none'}
