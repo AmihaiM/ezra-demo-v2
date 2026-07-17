@@ -57,8 +57,8 @@ table{width:100%;border-collapse:collapse}
       <h2>מורים קיימים</h2>
       <button class="ghost" onclick="loadTeachers()">רענן</button>
       <div class="t-wrap" style="margin-top:10px"><table class="t" id="teachersTable">
-        <thead><tr><th>שם</th><th>מזהה</th><th>קול</th><th>תרגיל נוכחי</th><th>תלמידים פעילים</th><th>סיימו</th><th>גיליון תוצאות</th><th>נשמר לצמיתות</th></tr></thead>
-        <tbody id="teachersBody"><tr><td colspan="8">טוען...</td></tr></tbody>
+        <thead><tr><th></th><th>שם</th><th>מזהה</th><th>קול</th><th>תרגיל נוכחי</th><th>תלמידים פעילים</th><th>סיימו</th><th>גיליון תוצאות</th><th>נשמר לצמיתות</th><th></th></tr></thead>
+        <tbody id="teachersBody"><tr><td colspan="9">טוען...</td></tr></tbody>
       </table></div>
     </div>
     <div class="card">
@@ -72,10 +72,40 @@ table{width:100%;border-collapse:collapse}
       <p class="hint" style="margin:10px 0 0">צבע המורה (מוצג בכפתורים ובעיצוב המסכים שלו/ה)</p>
       <div id="colorSwatches" class="swatches" role="group" aria-label="בחירת צבע מורה"></div>
       <input id="newColor" placeholder="או קוד HEX מותאם אישית (אופציונלי, למשל: #16a34a)" dir="ltr" style="margin-top:6px">
+      <p class="hint" style="margin:10px 0 0">תמונת המורה (אופציונלי - במקום האייקון הכללי)</p>
+      <div class="row" style="align-items:center;gap:12px">
+        <img id="newPhotoPreview" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none">
+        <input type="file" id="newPhotoFile" accept="image/*" style="width:auto;flex:1" onchange="handlePhotoFile(this,'newPhotoUrl','newPhotoPreview')">
+      </div>
+      <input type="hidden" id="newPhotoUrl">
       <input id="newSheetUrl" placeholder="קישור לגיליון Google Sheets לתוצאות (ריק = בלי שמירת תוצאות בינתיים)" dir="ltr">
       <p class="hint">חשוב: יש ליצור גיליון Google Sheets ריק, לשתף אותו עם חשבון השירות (service account) של האפליקציה בהרשאת עריכה, ולהדביק כאן את הקישור. אפשר גם להוסיף מורה בלי גיליון תוצאות כרגע ולהשלים זאת מאוחר יותר.</p>
       <button class="primary" onclick="addTeacher()">הוסף מורה</button>
       <div id="addResult" style="margin-top:10px"></div>
+    </div>
+    <div class="card" id="editTeacherCard" style="display:none">
+      <h2>✏️ עריכת מורה: <span id="editTeacherName"></span></h2>
+      <p class="hint">שדה ריק = לא משתנה. הסיסמאות הנוכחיות מוצגות למטה ואפשר לשנות רק את מה שרוצים.</p>
+      <input id="editName" placeholder="שם המורה">
+      <select id="editGender"><option value="female">קול נשי</option><option value="male">קול גברי</option></select>
+      <input id="editTeacherPass" placeholder="סיסמת מורה" dir="ltr">
+      <input id="editStudentPass" placeholder="סיסמת תלמידים" dir="ltr">
+      <p class="hint" style="margin:10px 0 0">צבע</p>
+      <div id="editColorSwatches" class="swatches" role="group" aria-label="בחירת צבע מורה"></div>
+      <input id="editColor" placeholder="או קוד HEX מותאם אישית" dir="ltr" style="margin-top:6px">
+      <p class="hint" style="margin:10px 0 0">תמונה</p>
+      <div class="row" style="align-items:center;gap:12px">
+        <img id="editPhotoPreview" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none">
+        <input type="file" id="editPhotoFile" accept="image/*" style="width:auto;flex:1" onchange="handlePhotoFile(this,'editPhotoUrl','editPhotoPreview')">
+        <button class="ghost" style="width:auto" onclick="clearEditPhoto()" type="button">הסר תמונה</button>
+      </div>
+      <input type="hidden" id="editPhotoUrl">
+      <input id="editSheetUrl" placeholder="קישור לגיליון Google Sheets לתוצאות" dir="ltr">
+      <div class="row" style="margin-top:10px">
+        <button class="primary" onclick="saveEditTeacher()">שמור שינויים</button>
+        <button class="ghost" onclick="closeEditTeacher()">ביטול</button>
+      </div>
+      <div id="editResult" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -109,17 +139,99 @@ var TEACHER_COLORS=[
   {hex:'#ef4444',name:'אדום'},{hex:'#e11d48',name:'אדום-ורוד'},
   {hex:'#6366f1',name:'אינדיגו'},{hex:'#78716c',name:'אפור-חום'},
 ];
-function renderColorSwatches(){
-  document.getElementById('colorSwatches').innerHTML=TEACHER_COLORS.map(c=>
-    '<div class="swatch" style="background:'+c.hex+'" title="'+esc(c.name)+'" role="button" tabindex="0" aria-label="בחר צבע '+esc(c.name)+'" onclick="pickColor(\''+c.hex+'\',this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();pickColor(\''+c.hex+'\',this)}"></div>'
+// Generalized so the same swatch palette can render into either the "add"
+// form's #colorSwatches (feeding #newColor) or the "edit" form's
+// #editColorSwatches (feeding #editColor) - clicking a swatch only clears
+// the "selected" ring on swatches within its own group, not the other form's.
+function renderSwatchesInto(containerId,hiddenInputId){
+  document.getElementById(containerId).innerHTML=TEACHER_COLORS.map(c=>
+    '<div class="swatch" style="background:'+c.hex+'" title="'+esc(c.name)+'" role="button" tabindex="0" aria-label="בחר צבע '+esc(c.name)+'" onclick="pickColorInto(\''+hiddenInputId+'\',\''+c.hex+'\',this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();pickColorInto(\''+hiddenInputId+'\',\''+c.hex+'\',this)}"></div>'
   ).join('');
 }
-function pickColor(hex,el){
-  document.getElementById('newColor').value=hex;
-  document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
+function pickColorInto(hiddenInputId,hex,el){
+  document.getElementById(hiddenInputId).value=hex;
+  el.parentElement.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
   el.classList.add('selected');
 }
-document.addEventListener('DOMContentLoaded',()=>{document.getElementById('password').onkeydown=e=>{if(e.key==='Enter')doLogin()};renderColorSwatches()});
+// Resizes/crops whatever image the admin picks down to a small square JPEG
+// and encodes it as a data: URI stored directly in the hidden field - see
+// the backend note on why this (not a raw file upload) is what's sent.
+function handlePhotoFile(input,hiddenId,previewId){
+  let file=input.files&&input.files[0];
+  if(!file)return;
+  let reader=new FileReader();
+  reader.onload=e=>{
+    let img=new Image();
+    img.onload=()=>{
+      let size=160;
+      let canvas=document.createElement('canvas');
+      canvas.width=size;canvas.height=size;
+      let ctx=canvas.getContext('2d');
+      let scale=Math.max(size/img.width,size/img.height);
+      let w=img.width*scale,h=img.height*scale;
+      ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+      let dataUrl=canvas.toDataURL('image/jpeg',0.72);
+      document.getElementById(hiddenId).value=dataUrl;
+      let prev=document.getElementById(previewId);
+      prev.src=dataUrl;prev.style.display='inline-block';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function clearEditPhoto(){
+  document.getElementById('editPhotoUrl').value='';
+  document.getElementById('editPhotoFile').value='';
+  let prev=document.getElementById('editPhotoPreview');
+  prev.style.display='none';prev.src='';
+}
+function openEditTeacher(tid){
+  api('/api/admin-teacher-detail',{teacher_id:tid}).then(({ok,d})=>{
+    if(!ok||!d.ok){alert('שגיאה בטעינת פרטי המורה: '+(d.error||'')); return}
+    let t=d.teacher;
+    let card=document.getElementById('editTeacherCard');
+    card.dataset.tid=tid;
+    document.getElementById('editTeacherName').textContent=(t.name||tid)+' ('+tid+')';
+    document.getElementById('editName').value=t.name||'';
+    document.getElementById('editGender').value=t.voice_gender||'female';
+    document.getElementById('editTeacherPass').value=t.teacher_password||'';
+    document.getElementById('editStudentPass').value=t.student_password||'';
+    document.getElementById('editColor').value=t.color||'';
+    document.getElementById('editPhotoUrl').value=t.photo_url||'';
+    document.getElementById('editPhotoFile').value='';
+    document.getElementById('editSheetUrl').value='';
+    let prev=document.getElementById('editPhotoPreview');
+    if(t.photo_url){prev.src=t.photo_url;prev.style.display='inline-block'}else{prev.style.display='none';prev.src=''}
+    renderSwatchesInto('editColorSwatches','editColor');
+    document.getElementById('editResult').innerHTML='';
+    card.style.display='block';
+    card.scrollIntoView({behavior:'smooth',block:'start'});
+  }).catch(()=>alert('שגיאה בטעינת פרטי המורה'));
+}
+function closeEditTeacher(){
+  document.getElementById('editTeacherCard').style.display='none';
+}
+function saveEditTeacher(){
+  let tid=document.getElementById('editTeacherCard').dataset.tid;
+  let resultBox=document.getElementById('editResult');
+  resultBox.innerHTML='<p class="hint">שומר...</p>';
+  api('/api/admin-update-teacher',{
+    teacher_id:tid,
+    name:document.getElementById('editName').value.trim(),
+    voice_gender:document.getElementById('editGender').value,
+    teacher_password:document.getElementById('editTeacherPass').value.trim(),
+    student_password:document.getElementById('editStudentPass').value.trim(),
+    color:document.getElementById('editColor').value.trim(),
+    photo_url:document.getElementById('editPhotoUrl').value,
+    results_sheet_url:document.getElementById('editSheetUrl').value.trim(),
+  }).then(({ok,d})=>{
+    if(!ok||!d.ok){resultBox.innerHTML='<div class="err" style="display:block">'+esc(d.error||'שגיאה בשמירה')+'</div>';return}
+    let warn=d.warning?('<p style="color:#c62828">⚠️ '+esc(d.warning)+'</p>'):'';
+    resultBox.innerHTML='<div class="card" style="background:#f0fdf4;margin:0"><b>✅ נשמר בהצלחה</b></div>'+warn;
+    loadTeachers();
+  }).catch(()=>{resultBox.innerHTML='<div class="err" style="display:block">שגיאה בשמירה</div>'});
+}
+document.addEventListener('DOMContentLoaded',()=>{document.getElementById('password').onkeydown=e=>{if(e.key==='Enter')doLogin()};renderSwatchesInto('colorSwatches','newColor')});
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function api(path,obj){return fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({password:adminPassword},obj||{}))}).then(r=>r.json().then(d=>({ok:r.ok,d})))}
 function doLogin(){
@@ -141,12 +253,13 @@ function showSection(id,btn){
   if(id==='students')loadStudents();
 }
 function loadTeachers(){
-  document.getElementById('teachersBody').innerHTML='<tr><td colspan="8">טוען...</td></tr>';
+  document.getElementById('teachersBody').innerHTML='<tr><td colspan="9">טוען...</td></tr>';
   api('/api/admin-teachers').then(({ok,d})=>{
-    if(!ok){document.getElementById('teachersBody').innerHTML='<tr><td colspan="8">שגיאה בטעינה</td></tr>';return}
+    if(!ok){document.getElementById('teachersBody').innerHTML='<tr><td colspan="9">שגיאה בטעינה</td></tr>';return}
     let rows=d.teachers||[];
     document.getElementById('teachersBody').innerHTML=rows.map(t=>
-      '<tr><td><b>'+esc(t.name)+'</b></td><td dir="ltr">'+esc(t.teacher_id)+'</td><td>'+(t.voice_gender==='male'?'גברי':'נשי')+'</td>'+
+      '<tr><td>'+(t.photo_url?'<img src="'+esc(t.photo_url)+'" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle">':'<span class="badge" style="background:'+esc(t.color||'#ede7ff')+'22">'+(t.voice_gender==='male'?'👨‍🏫':'👩‍🏫')+'</span>')+'</td>'+
+      '<td><b>'+esc(t.name)+'</b></td><td dir="ltr">'+esc(t.teacher_id)+'</td><td>'+(t.voice_gender==='male'?'גברי':'נשי')+'</td>'+
       '<td>'+esc(t.exercise_name||'—')+'</td>'+
       '<td><span class="pill pill-gray">'+t.active_students+'</span></td>'+
       '<td><span class="pill pill-green">'+t.completed_students+'</span></td>'+
@@ -156,8 +269,9 @@ function loadTeachers(){
       // added while the Sheets connection had a problem, so it's surfaced
       // here with an immediate one-click retry rather than staying invisible
       // until someone notices the teacher is suddenly gone.
-      '<td>'+(t.persisted?'✅':'<span style="color:#c62828;font-weight:800">⚠️ לא נשמר</span> <button class="ghost" style="padding:3px 9px;font-size:12px" onclick="retryPersist(\''+esc(t.teacher_id)+'\')">נסה שוב</button>')+'</td></tr>'
-    ).join('')||'<tr><td colspan="8">אין מורים עדיין</td></tr>';
+      '<td>'+(t.persisted?'✅':'<span style="color:#c62828;font-weight:800">⚠️ לא נשמר</span> <button class="ghost" style="padding:3px 9px;font-size:12px" onclick="retryPersist(\''+esc(t.teacher_id)+'\')">נסה שוב</button>')+'</td>'+
+      '<td><button class="ghost" style="padding:5px 12px;font-size:12px" onclick="openEditTeacher(\''+esc(t.teacher_id)+'\')">✏️ ערוך</button></td></tr>'
+    ).join('')||'<tr><td colspan="9">אין מורים עדיין</td></tr>';
     // Keep the students-tab teacher filter in sync with whoever exists right now.
     let sel=document.getElementById('teacherFilter'),current=sel.value;
     sel.innerHTML='<option value="">כל המורים</option>'+rows.map(t=>'<option value="'+esc(t.teacher_id)+'">'+esc(t.name)+'</option>').join('');
@@ -181,6 +295,7 @@ function addTeacher(){
     teacher_password:document.getElementById('newTeacherPass').value.trim(),
     student_password:document.getElementById('newStudentPass').value.trim(),
     color:document.getElementById('newColor').value.trim(),
+    photo_url:document.getElementById('newPhotoUrl').value,
     results_sheet_url:document.getElementById('newSheetUrl').value.trim(),
   }).then(({ok,d})=>{
     if(!ok||!d.ok){resultBox.innerHTML='<div class="err" style="display:block">'+esc(d.error||'שגיאה בהוספה')+'</div>';return}
@@ -193,6 +308,8 @@ function addTeacher(){
     document.getElementById('newName').value='';document.getElementById('newId').value='';
     document.getElementById('newTeacherPass').value='';document.getElementById('newStudentPass').value='';
     document.getElementById('newColor').value='';document.getElementById('newSheetUrl').value='';
+    document.getElementById('newPhotoUrl').value='';document.getElementById('newPhotoFile').value='';
+    document.getElementById('newPhotoPreview').style.display='none';document.getElementById('newPhotoPreview').src='';
     document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
     loadTeachers();
   });

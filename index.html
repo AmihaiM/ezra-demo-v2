@@ -511,9 +511,12 @@ function init(){
     let container=document.getElementById('teacherCards');
     container.innerHTML=Object.keys(d).map(id=>{
       let t=d[id];
-      let avatar=t.voice_gender==='male'?'👨‍🏫':'👩‍🏫';
+      // A real uploaded photo (see /admin) replaces the gender-based emoji
+      // placeholder when the teacher has one - the emoji stays as a fallback
+      // for anyone who hasn't uploaded a photo yet.
+      let avatarInner=t.photo_url?'<img src="'+esc(t.photo_url)+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':(t.voice_gender==='male'?'👨‍🏫':'👩‍🏫');
       return '<div id="tc-'+esc(id)+'" class="card teacher" role="button" tabindex="0" aria-label="בחר את המורה '+esc(t.name||id)+'">'
-        +'<div class="avatar" aria-hidden="true" style="background:'+esc(t.color_light||'')+';color:'+esc(t.color||'')+'">'+avatar+'</div>'
+        +'<div class="avatar" aria-hidden="true" style="background:'+esc(t.color_light||'')+';color:'+esc(t.color||'')+';overflow:hidden">'+avatarInner+'</div>'
         +'<h2>'+esc(t.name||id)+'</h2></div>';
     }).join('');
     // The cards are role="button" divs (not real <button> elements, to keep
@@ -670,13 +673,18 @@ function setStation(st,q){
     phase.innerHTML='👀 תחנה 1 — היכרות עם המשפטים, בלי ציון';
     document.getElementById('hint').textContent='כשמוכנים, אפשר לעבור הלאה לתרגול';
   } else if(st==='practice'){
-    phase.innerHTML='⭐ תחנה 3 — אימון שליטה בשיטת Bloom | צריך התאמה מלאה (100%)';
+    // Same station number (2) as the plain "listen" phase below - both are
+    // the "saying the sentence" stage from the student's point of view (the
+    // first attempt, then repeated Bloom-mastery reps until it's solid), not
+    // two separate stations. Only the sub-label changes to reflect where in
+    // that stage they are.
+    phase.innerHTML='⭐ תחנה 2 — אמירת המשפט (חזרות לשליטה, שיטת Bloom) | צריך התאמה מלאה (100%)';
     document.getElementById('hint').textContent='חזור על המשפט עד לרצף נכון';
   } else if(st==='review'){
     phase.innerHTML='🔁 סבב חזרה — משפטים שדילגת עליהם קודם';
     document.getElementById('hint').textContent='הזדמנות אחת אחרונה, ואז המשפט יסומן למורה';
   } else {
-    phase.innerHTML='📘 תחנה 2 — קבלת המשפט, שמיעה וקריאה | צריך התאמה מלאה (100%)';
+    phase.innerHTML='📘 תחנה 2 — אמירת המשפט | צריך התאמה מלאה (100%)';
     document.getElementById('hint').textContent='שמע את המשפט ואז לחץ על המיקרופון לאימון';
   }
 }
@@ -1045,7 +1053,7 @@ function showCloze(word,left,display){let el=document.getElementById('cloze');if
   // text instead of auto-computing a single-word blank - it may mark more than one
   // word and matches what the teacher actually authored.
   let blank=display?display:currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');
-  setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 תחנה 4 — השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
+  setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 תחנה 3 — השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';
   // Combined onto one line (was a separate paragraph below the dots) - purely
@@ -1057,7 +1065,7 @@ function hideMastery(){document.getElementById('mastery').style.display='none'}
 function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
 function skipSentence(){apiFetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})},skipSentence).then(()=>loadQuestion()).catch(()=>{})}
 function previewNavGo(direction){apiFetch('/api/preview-nav',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,direction:direction})},()=>previewNavGo(direction)).then(()=>loadQuestion()).catch(()=>{})}
-function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 תחנה 5 — מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
+function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 תחנה 4 — מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentence;currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';
   // If the teacher's source sheet defined a fill-in-the-blank variant for this
   // sentence (e.g. an articles a/an/the drill with "____" markers), show that
@@ -1086,7 +1094,7 @@ function showExamSummary(){
   document.getElementById('skip').classList.add('hidden-final');
   document.getElementById('mic').classList.add('hidden-final');
   document.getElementById('hint').textContent='כל הכבוד — סיימת את התרגול';
-  document.getElementById('prog').textContent='תחנה 5 הושלמה — סיכום אישי';
+  document.getElementById('prog').textContent='תחנה 4 הושלמה — סיכום אישי';
   let rows=examResults.map((r,i)=>'<div class="summary-row '+(r.passed?'pass':'fail')+'"><b>'+(i+1)+'. '+(Number(r.score)||0)+'%</b> — '+esc(r.sentence)+'<br><small>אמרת: '+esc(r.spoken||'')+'</small></div>').join('') || '<div class="summary-row">אין משפטים למבחן</div>';
   document.getElementById('en').innerHTML='<section class="summary-hero"><h2>🎉 סיימת!</h2><div class="score-circle" style="--score-deg:'+deg+'"><b>'+avg+'%</b></div><p>ציון סופי במבחן הרציף</p></section><div class="summary-grid"><div class="summary-card"><div class="num">'+passed+'/'+total+'</div><div>משפטים שעברו</div></div><div class="summary-card"><div class="num">'+avg+'%</div><div>ממוצע</div></div><div class="summary-card"><div class="num">⭐</div><div>Mastery נרשם בלוח המורה</div></div></div><div class="summary-actions"><button class="ghost" onclick="location.reload()">🔄 תרגול חדש</button><button class="primary" onclick="window.print()">🖨️ הדפס סיכום</button></div><div class="summary-list">'+rows+'</div>';
 }

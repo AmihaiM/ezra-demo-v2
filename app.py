@@ -37,6 +37,7 @@ TEACHERS = {
         "teacher_password": os.getenv("BEN_TEACHER_PASSWORD", "ben2026"),
         "default_threshold": int(os.getenv("BEN_THRESHOLD", "85")),
         "default_max_attempts": int(os.getenv("BEN_MAX_ATTEMPTS", "5")),
+        "photo_url": "",
     },
     "sara": {
         "name": "שרה", "color": "#be185d", "color_light": "#fce8f3", "voice_gender": "female",
@@ -44,6 +45,7 @@ TEACHERS = {
         "teacher_password": os.getenv("SARA_TEACHER_PASSWORD", "sara2026"),
         "default_threshold": int(os.getenv("SARA_THRESHOLD", "85")),
         "default_max_attempts": int(os.getenv("SARA_MAX_ATTEMPTS", "5")),
+        "photo_url": "",
     },
 }
 CATALOG_SHEET_ID = os.getenv("CATALOG_SHEET_ID", "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk")
@@ -59,7 +61,7 @@ EZRA_APP_BASE_URL = os.getenv("EZRA_APP_BASE_URL", "https://app.ezra.clap.co.il"
 # whoever runs the pilot see every teacher/student at a glance and add new
 # teachers without a code change + redeploy. Admin-added teachers are stored
 # in a "Teachers" tab of the catalog spreadsheet (see load_extra_teachers/
-# _append_teacher_row below) rather than a local file, because Render's local
+# _upsert_teacher_row below) rather than a local file, because Render's local
 # disk is not reliably persisted across redeploys/restarts - the same reason
 # every other durable thing in this app (results, catalog, student levels)
 # already lives in a Google Sheet instead.
@@ -296,6 +298,7 @@ def teacher_public(tid):
         "voice_gender": t["voice_gender"], "threshold": s["threshold"], "max_attempts": s["max_attempts"],
         "exercise_name": s.get("exercise_name", "תרגול דמו"),
         "silence_timeout_ms": s.get("silence_timeout_ms", 1200),
+        "photo_url": t.get("photo_url", ""),
     }
 
 def load_catalog(lang_filter="en"):
@@ -831,19 +834,22 @@ def extract_sheet_id(value):
 TEACHERS_HEADER = [
     "teacher_id", "name", "color", "color_light", "voice_gender",
     "student_password", "teacher_password", "threshold", "max_attempts",
-    "results_sheet_id", "created_at",
+    "results_sheet_id", "created_at", "photo_url",
 ]
 
 def load_extra_teachers():
-    """Admin-added teachers (via /admin, see /api/admin-add-teacher), stored
-    in a "Teachers" tab of the catalog spreadsheet rather than a local file -
-    Render's local disk is not reliably persisted across redeploys/restarts,
-    the same reason every other durable thing in this app (results, catalog,
-    student levels) already lives in a Google Sheet instead. Returns a dict
-    in the same shape as the hardcoded TEACHERS dict, meant to be merged on
-    top of it (never overrides the original two - a duplicate teacher_id in
-    the sheet is just ignored, the hardcoded/env-var-configured version
-    always wins for Dan/Sara).
+    """Admin-added (or admin-edited) teachers, stored in a "Teachers" tab of
+    the catalog spreadsheet rather than a local file - Render's local disk is
+    not reliably persisted across redeploys/restarts, the same reason every
+    other durable thing in this app (results, catalog, student levels)
+    already lives in a Google Sheet instead. Returns a dict in the same shape
+    as the hardcoded TEACHERS dict, meant to be merged on top of it.
+    A row here DOES override a hardcoded entry (Dan/Sara) if one exists for
+    the same teacher_id - that's intentional: saving an edit via /admin
+    writes a row for whichever teacher was edited, hardcoded or not, and that
+    saved row is meant to become the new source of truth from then on. A
+    hardcoded teacher who has never been edited simply has no row here yet,
+    so their env-var-configured defaults keep applying untouched.
     """
     extra = {}
     try:
@@ -856,7 +862,7 @@ def load_extra_teachers():
             return extra
         for r in ws.get_all_records():
             tid = re.sub(r"[^a-z0-9]", "", clean_cell(r.get("teacher_id", "")).strip().lower())
-            if not tid or tid in TEACHERS:
+            if not tid:
                 continue
             extra[tid] = {
                 "name": clean_cell(r.get("name", "")) or tid,
@@ -868,6 +874,7 @@ def load_extra_teachers():
                 "teacher_password": clean_cell(r.get("teacher_password", "")) or (tid + "2026"),
                 "default_threshold": int(r.get("threshold") or 85),
                 "default_max_attempts": int(r.get("max_attempts") or 5),
+                "photo_url": clean_cell(r.get("photo_url", "")),
             }
             rsid = clean_cell(r.get("results_sheet_id", "")).strip()
             if rsid:
@@ -876,10 +883,11 @@ def load_extra_teachers():
         print("LOAD EXTRA TEACHERS FAILED", e)
     return extra
 
-def _append_teacher_row(tid, entry, results_sheet_id):
-    """Persist a newly admin-added teacher into the "Teachers" sheet tab so
-    it survives the next redeploy/restart (see load_extra_teachers above).
-    Creates the tab + header row on first use."""
+def _upsert_teacher_row(tid, entry, results_sheet_id):
+    """Create OR update this teacher's row in the "Teachers" sheet tab, so
+    both adding a new teacher and editing an existing one (including the two
+    hardcoded ones, Dan/Sara) survive the next redeploy/restart (see
+    load_extra_teachers above). Creates the tab + header row on first use."""
     import gspread
     gc = get_gspread_client()
     sh = gc.open_by_key(ADMIN_SHEET_ID)
@@ -888,11 +896,23 @@ def _append_teacher_row(tid, entry, results_sheet_id):
     except gspread.WorksheetNotFound:
         ws = sh.add_worksheet(title=TEACHERS_TAB, rows=100, cols=len(TEACHERS_HEADER))
         ws.append_row(TEACHERS_HEADER, value_input_option="USER_ENTERED")
-    ws.append_row([
-        tid, entry["name"], entry["color"], entry["color_light"], entry["voice_gender"],
-        entry["student_password"], entry["teacher_password"], entry["default_threshold"],
-        entry["default_max_attempts"], results_sheet_id or "", now_str(),
-    ], value_input_option="USER_ENTERED")
+    row_values = [
+        tid, entry.get("name", tid), entry.get("color", "#4318D1"), entry.get("color_light", "#ede7ff"),
+        entry.get("voice_gender", "female"), entry.get("student_password", "class2026"),
+        entry.get("teacher_password", tid + "2026"), entry.get("default_threshold", 85),
+        entry.get("default_max_attempts", 5), results_sheet_id or "", now_str(),
+        entry.get("photo_url", ""),
+    ]
+    cell = None
+    try:
+        cell = ws.find(tid, in_column=1)
+    except Exception:
+        cell = None
+    if cell:
+        last_col = chr(ord("A") + len(TEACHERS_HEADER) - 1)
+        ws.update(f"A{cell.row}:{last_col}{cell.row}", [row_values], value_input_option="USER_ENTERED")
+    else:
+        ws.append_row(row_values, value_input_option="USER_ENTERED")
 
 # Merge in any admin-added teachers now that get_gspread_client/load_extra_teachers
 # are defined above (this has to run after TEACHERS/_teacher_state's initial
@@ -907,8 +927,17 @@ def _append_teacher_row(tid, entry, results_sheet_id):
 # can flag it as "not saved" instead of the teacher just vanishing, unexplained,
 # on the next redeploy (exactly what happened before this was added).
 _persisted_teacher_ids = set(TEACHERS.keys())
+# results_tab for Dan/Sara points at their existing, already-populated results
+# worksheet tabs ("Ben"/"Sara") - a sheet-loaded override must never replace
+# that with the lowercase teacher_id (load_extra_teachers' generic default),
+# or their score history would silently look empty (wrong tab name). Every
+# other field DOES take the sheet's value when an edit was saved for them.
+_hardcoded_results_tabs = {tid: t["results_tab"] for tid, t in TEACHERS.items()}
 _extra_teachers = load_extra_teachers()
 TEACHERS.update(_extra_teachers)
+for _tid, _tab in _hardcoded_results_tabs.items():
+    if _tid in TEACHERS:
+        TEACHERS[_tid]["results_tab"] = _tab
 _persisted_teacher_ids.update(_extra_teachers.keys())
 for _tid, _t in _extra_teachers.items():
     if _tid not in _teacher_state:
@@ -2055,7 +2084,7 @@ def admin_teachers():
         sessions_for_tid = [s for s in _sessions.values() if s["teacher_id"] == tid]
         out.append({
             "teacher_id": tid, "name": t["name"], "color": t["color"],
-            "voice_gender": t["voice_gender"],
+            "voice_gender": t["voice_gender"], "photo_url": t.get("photo_url", ""),
             "exercise_name": _teacher_state.get(tid, {}).get("exercise_name", ""),
             "active_students": sum(1 for s in sessions_for_tid if _session_phase_label(s) != "סיים"),
             "completed_students": sum(1 for s in sessions_for_tid if _session_phase_label(s) == "סיים"),
@@ -2117,11 +2146,21 @@ def admin_add_teacher():
     except (TypeError, ValueError):
         max_attempts = 5
     results_sheet_id = extract_sheet_id(data.get("results_sheet_url") or "")
+    # A small compressed image, already resized+encoded to a data: URI by the
+    # browser before it ever reaches here (see admin.html) - or a plain
+    # external image link if the admin pastes one instead. Storing this
+    # directly in the Teachers sheet cell (rather than accepting a raw file
+    # upload to save on Render's disk) keeps it consistent with everything
+    # else durable in this app, and Render's local disk isn't reliably
+    # persisted across restarts anyway.
+    photo_url = (data.get("photo_url") or "").strip()
+    if len(photo_url) > 45000:
+        return jsonify(ok=False, error="התמונה גדולה מדי לשמירה - נסה תמונה קטנה/דחוסה יותר"), 400
 
     entry = {
         "name": name, "color": color, "color_light": color_light, "voice_gender": gender,
         "results_tab": tid, "student_password": student_password, "teacher_password": teacher_password,
-        "default_threshold": threshold, "default_max_attempts": max_attempts,
+        "default_threshold": threshold, "default_max_attempts": max_attempts, "photo_url": photo_url,
     }
     TEACHERS[tid] = entry
     if results_sheet_id:
@@ -2134,7 +2173,7 @@ def admin_add_teacher():
     save_state()
     sheet_warning = None
     try:
-        _append_teacher_row(tid, entry, results_sheet_id)
+        _upsert_teacher_row(tid, entry, results_sheet_id)
         _persisted_teacher_ids.add(tid)
     except Exception as e:
         # The teacher is already usable in-memory (login works right now) even
@@ -2167,12 +2206,96 @@ def admin_retry_persist_teacher():
     if tid in _persisted_teacher_ids:
         return jsonify(ok=True, already_persisted=True)
     try:
-        _append_teacher_row(tid, TEACHERS[tid], RESULTS_SHEET_IDS.get(tid, ""))
+        _upsert_teacher_row(tid, TEACHERS[tid], RESULTS_SHEET_IDS.get(tid, ""))
         _persisted_teacher_ids.add(tid)
         return jsonify(ok=True)
     except Exception as e:
         print("RETRY APPEND TEACHER ROW FAILED", e)
         return jsonify(ok=False, error="השמירה נכשלה שוב - בדקו את חיבור ה-Google Sheets (הרשאות שיתוף, credentials)."), 500
+
+@app.post("/api/admin-teacher-detail")
+def admin_teacher_detail():
+    """Full editable snapshot of one teacher (including current password
+    values, unlike /api/admin-teachers' list view) - used to pre-fill the
+    admin dashboard's edit form so the admin can see what's already set
+    instead of retyping everything from scratch."""
+    data = request.get_json(force=True)
+    if not _is_admin(data):
+        return jsonify(ok=False), 401
+    tid = (data.get("teacher_id") or "").strip().lower()
+    if tid not in TEACHERS:
+        return jsonify(ok=False, error="מורה לא נמצא/ה"), 404
+    t = TEACHERS[tid]
+    return jsonify(ok=True, teacher={
+        "teacher_id": tid, "name": t.get("name", tid), "color": t.get("color", "#4318D1"),
+        "voice_gender": t.get("voice_gender", "female"),
+        "student_password": t.get("student_password", ""), "teacher_password": t.get("teacher_password", ""),
+        "photo_url": t.get("photo_url", ""),
+        "results_sheet_id": RESULTS_SHEET_IDS.get(tid, ""),
+    })
+
+@app.post("/api/admin-update-teacher")
+def admin_update_teacher():
+    """Edit an existing teacher's details (any teacher - including the two
+    hardcoded ones, Dan/Sara). Every field is optional here: only fields
+    actually present/non-empty in the request overwrite the current value,
+    so the admin doesn't have to re-supply everything (e.g. re-type both
+    passwords) just to change one field like the color. Takes effect
+    immediately in-memory, and is written to the Teachers sheet tab the same
+    way a newly added teacher is - see _upsert_teacher_row."""
+    data = request.get_json(force=True)
+    if not _is_admin(data):
+        return jsonify(ok=False), 401
+    tid = (data.get("teacher_id") or "").strip().lower()
+    if tid not in TEACHERS:
+        return jsonify(ok=False, error="מורה לא נמצא/ה"), 404
+    entry = dict(TEACHERS[tid])
+    if clean_cell(data.get("name", "")).strip():
+        entry["name"] = clean_cell(data["name"]).strip()
+    if data.get("voice_gender") in ("male", "female"):
+        entry["voice_gender"] = data["voice_gender"]
+    color = clean_cell(data.get("color", "")).strip()
+    if color:
+        entry["color"] = color
+        entry["color_light"] = lighten_hex(color)
+    if (data.get("student_password") or "").strip():
+        entry["student_password"] = data["student_password"].strip()
+    if (data.get("teacher_password") or "").strip():
+        entry["teacher_password"] = data["teacher_password"].strip()
+    if data.get("threshold"):
+        try:
+            entry["default_threshold"] = max(80, min(100, int(data["threshold"])))
+        except (TypeError, ValueError):
+            pass
+    if data.get("max_attempts"):
+        try:
+            entry["default_max_attempts"] = max(4, min(7, int(data["max_attempts"])))
+        except (TypeError, ValueError):
+            pass
+    photo_url = data.get("photo_url")
+    if photo_url is not None:
+        photo_url = photo_url.strip()
+        if len(photo_url) > 45000:
+            return jsonify(ok=False, error="התמונה גדולה מדי לשמירה - נסה תמונה קטנה/דחוסה יותר"), 400
+        entry["photo_url"] = photo_url
+    results_sheet_id = RESULTS_SHEET_IDS.get(tid, "")
+    if (data.get("results_sheet_url") or "").strip():
+        results_sheet_id = extract_sheet_id(data["results_sheet_url"])
+        RESULTS_SHEET_IDS[tid] = results_sheet_id
+
+    TEACHERS[tid] = entry
+    if tid in _teacher_state:
+        _teacher_state[tid]["threshold"] = entry.get("default_threshold", _teacher_state[tid]["threshold"])
+        _teacher_state[tid]["max_attempts"] = entry.get("default_max_attempts", _teacher_state[tid]["max_attempts"])
+    save_state()
+    sheet_warning = None
+    try:
+        _upsert_teacher_row(tid, entry, results_sheet_id)
+        _persisted_teacher_ids.add(tid)
+    except Exception as e:
+        print("UPDATE TEACHER ROW FAILED", e)
+        sheet_warning = "העדכון פעיל כרגע, אך השמירה לגיליון נכשלה - ייתכן שהשינויים ייעלמו אחרי ריסטארט הבא. בדקו את חיבור ה-Google Sheets ונסו שוב (או השתמשו ב'נסה שוב' בטבלת המורים)."
+    return jsonify(ok=True, warning=sheet_warning)
 
 if __name__ == "__main__":
     app.run(debug=True)
