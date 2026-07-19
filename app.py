@@ -1297,7 +1297,15 @@ def advance_stage_if_swept(s):
                 # land on a sentence that actually needs a cloze attempt (or
                 # the sweep ends).
                 ad = s.get("accuracy_data", {}).get(s["current"], {})
-                finalize_sentence(s, sentence_obj.get("en", ""), "", ad.get("mastery_score", 0), True, metrics=None)
+                # ad is only populated by a genuine accuracy-stage pass
+                # (advance_within_accuracy_stage). If it's empty, this index
+                # was fast-forwarded past accuracy without ever being
+                # attempted (student jumped straight to a later station via
+                # the step bar) - record it as skipped, not as a silent
+                # fabricated "pass", so it's correctly excluded from the exam
+                # pool instead of inflating the score with a 0% "pass".
+                attempted = bool(ad)
+                finalize_sentence(s, sentence_obj.get("en", ""), "", ad.get("mastery_score", 0), passed=attempted, skipped=not attempted, metrics=None)
                 advance_stage_if_swept(s)
                 return
             s["cloze_active"] = True
@@ -1856,6 +1864,102 @@ def skip():
         correct = s["sentences"][s["current"]].get("en", "")
         finalize_sentence(s, correct, "", 0, False, skipped=True)
     return jsonify(ok=True)
+
+_STAGE_TO_STATION = {"preview": 1, "accuracy": 2, "cloze": 3, "done": 4}
+
+def _blank_display_for(sentence_obj):
+    """Same blanking logic real station 3 uses (cloze_fields_for +
+    detect_cloze_word), just pre-rendered into a display string here instead
+    of being driven live by cloze_active/cloze_word session state. Needed so
+    the free-practice picker can show a genuinely blanked prompt for ANY
+    sentence with a detectable cloze word - not only the minority that have a
+    teacher-authored "completion" override - otherwise station 3's free
+    practice silently degrades into looking identical to station 2's."""
+    cw, completion = cloze_fields_for(sentence_obj)
+    if completion:
+        return completion
+    if not cw:
+        return ""
+    words = sentence_obj.get("en", "").split()
+    return " ".join("______" if re.sub(r"[^a-z0-9]", "", w.lower()) == cw else w for w in words)
+
+@app.get("/api/exercise-sentences")
+def exercise_sentences():
+    """Full sentence list for the current exercise - used by the bottom
+    step-bar's "browse and freely re-practice" picker when a student taps an
+    earlier, already-completed station. Practicing from here always goes
+    through the existing ungraded practice-repeat flow, never touches scored
+    results. cloze_display is the pre-blanked prompt for station 3's variant
+    of that free practice (empty string if this sentence has no detectable
+    blank, same as real cloze - it just never gets tested there either)."""
+    s = _sessions.get(request.args.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    return jsonify(sentences=[
+        {"he": q.get("he", ""), "en": q.get("en", ""), "completion": q.get("completion", ""), "cloze_display": _blank_display_for(q)}
+        for q in s.get("sentences", [])
+    ])
+
+@app.post("/api/jump-station")
+def jump_station():
+    """Student-driven station jump (bottom step bar) - free forward or
+    backward navigation between the 4 stations at any moment, per explicit
+    request. Semantics, chosen deliberately to reuse existing, already-safe
+    mechanics rather than rewriting scoring:
+    - Forward jumps (skip ahead) fast-forward past the intervening station(s)
+      WITHOUT calling finalize_sentence for the sentences skipped over - they
+      simply never went through that station, so whatever station they DO
+      still reach (e.g. cloze, station 3) scores them purely on what they
+      actually say there. This mirrors today's single-sentence skip: skipped
+      content is excluded from the exam pool, never counted as a zero.
+    - Backward to station 1 (preview) is a true free re-visit - preview is
+      always ungraded, so there is nothing to protect.
+    - Backward to station 2/3 after they're already finished is intentionally
+      NOT a real state rewind (that would risk writing duplicate/conflicting
+      result rows for the same sentence). Instead it hands back mode
+      "free_practice" so the client opens the existing ungraded
+      practice-repeat flow over that station's sentences - real progress and
+      scores are never touched.
+    """
+    data = request.get_json(force=True)
+    s = _sessions.get(data.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    try:
+        target = int(data.get("target"))
+    except (TypeError, ValueError):
+        target = 0
+    if target not in (1, 2, 3, 4):
+        return jsonify(ok=False, error="bad target"), 400
+    advance_stage_if_swept(s)
+    stage_num = _STAGE_TO_STATION.get(s["stage"], 2)
+    if target == stage_num:
+        return jsonify(ok=True, mode="same", station=stage_num)
+    if target < stage_num:
+        if target == 1:
+            s["stage"] = "preview"
+            s["current"] = 0
+            return jsonify(ok=True, mode="preview")
+        return jsonify(ok=True, mode="free_practice", station=target)
+    # target > stage_num: skip forward past the intervening station(s).
+    if s["stage"] == "preview":
+        s["stage"] = "accuracy"
+        s["current"] = 0
+    if target >= 3 and s["stage"] == "accuracy":
+        s["current"] = len(s["sentences"])
+        advance_stage_if_swept(s)
+    if target >= 4 and s["stage"] == "cloze":
+        s["current"] = len(s["sentences"])
+        # Jumping straight to the exam is a deliberate "test me on everything"
+        # request, not a per-sentence skip - mark the session done/complete
+        # immediately (mirrors what /api/question's own done-detection would
+        # do once it's next called) so teacher-facing live status and
+        # resume-login logic stay consistent even though the client builds
+        # the exam directly from the full sentence list instead of going
+        # through /api/question's (mostly-empty/skipped) results pool.
+        s["stage"] = "done"
+        s["completed"] = True
+    return jsonify(ok=True, mode="skipped_forward", station=target)
 
 @app.post("/api/score-only")
 def score_only():
