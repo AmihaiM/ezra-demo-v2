@@ -647,7 +647,10 @@ function startApp(){
   let studentPhoto=studentPhotoDataUrl||getStudentPhoto(studentEmail);
   let studentAvatarImg=document.getElementById('studentAvatarImg');
   if(studentPhoto){studentAvatarImg.src=studentPhoto;studentAvatarImg.style.display='inline-block'}else{studentAvatarImg.style.display='none'}
-  document.getElementById('studentTagText').textContent='👤 '+studentName;
+  // Only prefix the generic person emoji when there's no real photo to show -
+  // otherwise the actual avatar image already does that job, and showing
+  // both together just looks like the photo upload silently failed.
+  document.getElementById('studentTagText').textContent=(studentPhoto?'':'👤 ')+studentName;
   document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';populateAudioSettingsUI();loadQuestion()
 }
 function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.error==='session not found'){showSessionExpired();return}if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
