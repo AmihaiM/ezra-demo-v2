@@ -11,7 +11,13 @@
    :focus-visible only shows for keyboard nav (not every mouse click), so
    this adds a clear themed ring without adding visual noise for touch/mouse use. */
 :focus-visible{outline:3px solid #FFC107;outline-offset:2px}
-.teacher:focus-visible{outline-color:#fff}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:16px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:18px;padding:14px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;row-gap:4px}.top b{white-space:nowrap}.student{background:#fff2;border-radius:20px;padding:6px 12px;cursor:pointer}.student:hover{background:#fff4}.student:focus-visible{outline:2px solid #fff;outline-offset:2px}.wrap{max-width:850px;margin:0 auto;padding:10px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:21px;font-weight:800;margin:8px 0}.en{direction:ltr;text-align:left;font-size:17px;color:#4318D1;opacity:0;transition:.25s}.row{display:flex;gap:8px;flex-wrap:wrap}.mic{width:60px;height:60px;border-radius:50%;font-size:24px;display:block;margin:12px auto}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:12px;padding:9px 11px;margin:7px 0;font-size:14px}.result{background:#f8fafc;border:2px solid #e0d9ff}.pass{background:#e8f5e9;border-color:#4CAF50}.fail{background:#ffebee;border-color:#ef5350}.cloze{background:#e0f2fe;border:2px solid #0284c7}.mastery{background:#fff3e0;border:2px solid #FF9800}.exam{background:#fff7ed;border:2px solid #fed7aa}.words{direction:ltr;text-align:left;line-height:1.6;font-size:13px}.w{display:inline-block;padding:1px 6px;margin:1px;border-radius:6px}.w.correct{background:#e8f5e9;color:#2e7d32}.w.wrong,.w.missing{background:#ffebee;color:#c62828;text-decoration:line-through}.w.extra{background:#fff3e0;color:#e65100}.ok{color:#16a34a}.bad{color:#dc2626}.dots{display:flex;gap:5px}.dot{width:15px;height:15px;border-radius:50%;border:2px solid #FF9800;background:#ffe0b2}.dot.done{background:#FF9800}.small{font-size:13px;color:#666}
+.teacher:focus-visible{outline-color:#fff}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:16px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:18px;padding:14px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;row-gap:4px}.top b{white-space:nowrap}.student{background:#fff2;border-radius:20px;padding:6px 12px;cursor:pointer}.student:hover{background:#fff4}.student:focus-visible{outline:2px solid #fff;outline-offset:2px}.wrap{max-width:850px;margin:0 auto;padding:10px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:25px;font-weight:800;margin:8px 0;line-height:1.3}.en{direction:ltr;text-align:left;font-size:17px;color:#4318D1;opacity:0;transition:.25s}.row{display:flex;gap:8px;flex-wrap:wrap}
+/* De-emphasized secondary controls (listen again / show-hide / skip) so the
+   mic stays the one visually dominant action, per UX review: "one dominant
+   action at a time" instead of several equal-weight buttons competing with it. */
+.row .ghost{background:transparent;border:1.5px solid #ddd6fe;color:#6b5b95;font-size:13px;padding:7px 11px;font-weight:600;box-shadow:none}
+.row .danger{background:transparent;border:1.5px solid #f7b8b4;color:#c0392b;font-size:13px;padding:7px 11px;font-weight:600;box-shadow:none}
+.mic{width:64px;height:64px;border-radius:50%;font-size:26px;display:block;margin:12px auto;box-shadow:0 5px 16px #0003}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:12px;padding:9px 11px;margin:7px 0;font-size:14px}.result{background:#f8fafc;border:2px solid #e0d9ff}.pass{background:#e8f5e9;border-color:#4CAF50}.fail{background:#ffebee;border-color:#ef5350}.cloze{background:#e0f2fe;border:2px solid #0284c7}.mastery{background:#fff3e0;border:2px solid #FF9800}.exam{background:#fff7ed;border:2px solid #fed7aa}.words{direction:ltr;text-align:left;line-height:1.6;font-size:13px}.w{display:inline-block;padding:1px 6px;margin:1px;border-radius:6px}.w.correct{background:#e8f5e9;color:#2e7d32}.w.wrong,.w.missing{background:#ffebee;color:#c62828;text-decoration:line-through}.w.extra{background:#fff3e0;color:#e65100}.ok{color:#16a34a}.bad{color:#dc2626}.dots{display:flex;gap:5px}.dot{width:15px;height:15px;border-radius:50%;border:2px solid #FF9800;background:#ffe0b2}.dot.done{background:#FF9800}.small{font-size:13px;color:#666}
 
 .summary-hero{background:linear-gradient(135deg,#4318D1,#be185d);color:#fff;border-radius:24px;padding:26px;margin-bottom:20px;text-align:center;box-shadow:0 18px 44px #4318d133}.summary-hero h2{font-size:34px;margin:0 0 8px}.score-circle{width:140px;height:140px;border-radius:50%;background:conic-gradient(#22c55e var(--score-deg),rgba(255,255,255,.25) 0);display:grid;place-items:center;margin:18px auto;border:8px solid rgba(255,255,255,.25)}.score-circle b{font-size:34px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}.summary-card{background:#fff;border:1px solid #ede7ff;border-radius:18px;padding:16px;box-shadow:0 8px 24px #4318d112;text-align:center}.summary-card .num{font-size:28px;font-weight:900;color:var(--tc,#4318D1)}.summary-list{display:grid;gap:12px;margin-top:16px}.summary-row{background:#fff;border:1px solid #ede7ff;border-radius:16px;padding:14px;box-shadow:0 6px 18px #4318d10d;direction:ltr;text-align:left}.summary-row.pass{border-inline-start:7px solid #22c55e}.summary-row.fail{border-inline-start:7px solid #ef4444}.summary-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}.hidden-final{display:none!important}
 
@@ -37,12 +43,20 @@ button:active{transform:scale(.95)}
 #select .card.teacher{transition:transform .2s,box-shadow .2s}
 .progress{position:relative;overflow:hidden}
 .bar{background:linear-gradient(90deg,var(--tc,#4318D1),#be185d)}
-.gauge-card{display:none;background:#fff;border:2px solid #ede7ff;border-radius:14px;padding:7px 10px 4px;margin:7px 0;text-align:center}
+.gauge-card{display:none;background:#fff;border:2px solid #ede7ff;border-radius:14px;padding:7px 10px 4px;margin:7px 0;text-align:center;cursor:pointer}
 .gauge-title{font-weight:800;color:#4318D1;font-size:12px;margin-bottom:1px}
 .gauge-svg{width:130px;max-width:50%;height:auto}
 .gauge-label{font-weight:800;font-size:13px;margin-top:-4px}
 .gauge-breakdown{font-size:11px;color:#666;margin:2px 0 4px;line-height:1.4}
 .gauge-needle{transform-origin:100px 100px;transition:transform .6s cubic-bezier(.34,1.56,.64,1)}
+/* Collapsed by default (see toggleGaugeExpanded): the detailed SVG gauge and
+   pace/hesitation breakdown are a "deep stat" per UX review feedback - they
+   stay one tap away instead of competing with the sentence for attention on
+   every single attempt. Score+label stays visible as a compact one-line
+   summary either way. */
+.gauge-card:not(.expanded){padding:5px 10px}
+.gauge-card:not(.expanded) .gauge-svg,.gauge-card:not(.expanded) .gauge-breakdown{display:none}
+.gauge-toggle-hint{font-size:11px;color:#9d8fe0;font-weight:700;margin-top:1px}
 /* Practice screen layout: single column (mobile) by default so everything -
    sentence, mic, result, gauge - stacks in reading order and fits a phone
    viewport without excess height. On wide screens the same markup switches
@@ -183,9 +197,9 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 <div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none"><label style="flex:1;font-size:12.5px;color:#666">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2 id="historyTitle">📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
 <div id="resumePrompt" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resumePromptTitle"><div class="card" style="width:min(380px,92vw)"><h2 id="resumePromptTitle">🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
-<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button></div><span id="studentTag" class="student" role="button" tabindex="0" aria-label="הצג את התוצאות שלי" title="הצג את התוצאות שלי" onclick="showMyResultsFromApp()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyResultsFromApp()}"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box" id="sentenceBox"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><div id="recTimer" style="display:none;text-align:center;font-weight:800;color:var(--tc,#4318D1);font-size:14px;margin-top:4px" aria-live="off">0:00</div><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><button id="practiceAgainBtn" class="ghost" style="display:none;width:100%;margin-top:8px" onclick="practiceAgainNow()">🔁 תרגל שוב את המשפט הזה (לא משפיע על הציון)</button><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
+<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button><button id="logoutBtn" class="mute-btn" onclick="if(confirm('להתנתק ולהחליף תלמיד/ה? (יידרש להזין שם/אימייל/סיסמה מחדש בפעם הבאה)'))logoutStudent()" title="התנתק / החלף תלמיד (למחשב משותף)" aria-label="התנתק">🚪</button></div><span id="studentTag" class="student" role="button" tabindex="0" aria-label="הצג את התוצאות שלי" title="הצג את התוצאות שלי" onclick="showMyResultsFromApp()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyResultsFromApp()}"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box" id="sentenceBox"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><div id="recTimer" style="display:none;text-align:center;font-weight:800;color:var(--tc,#4318D1);font-size:14px;margin-top:4px" aria-live="off">0:00</div><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" style="text-align:center;color:#666" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><div id="cloze" class="banner cloze"></div><button id="practiceAgainBtn" class="ghost" style="display:none;width:100%;margin-top:8px" onclick="practiceAgainNow()">🔁 תרגל שוב את המשפט הזה (לא משפיע על הציון)</button><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
 <div id="result" class="result" aria-live="polite"></div>
-<div id="masteryGauge" class="gauge-card">
+<div id="masteryGauge" class="gauge-card" role="button" tabindex="0" aria-label="מד שטף - הרחב לפירוט" onclick="toggleGaugeExpanded()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGaugeExpanded()}">
   <div class="gauge-title">🎯 מד שטף חי — קצב ורציפות דיבור</div>
   <svg viewBox="0 0 200 115" class="gauge-svg">
     <path d="M180,100 A80,80 0 0,1 164.7,53" stroke="#166534" stroke-width="18" fill="none" stroke-linecap="round"/>
@@ -198,6 +212,7 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
   </svg>
   <div id="gaugeLabel" class="gauge-label">—</div>
   <div id="gaugeBreakdown" class="gauge-breakdown"></div>
+  <div id="gaugeToggleHint" class="gauge-toggle-hint">▼ הצג פירוט (קצב/רציפות)</div>
 </div>
 <div id="mastery" class="banner mastery"></div>
 </div></div></div></section>
@@ -210,6 +225,25 @@ var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail=
 // backend storage needed for something this lightweight.
 function getStudentPhoto(email){if(!email)return '';try{return localStorage.getItem('ezra_photo_'+email)||''}catch(e){return ''}}
 function saveStudentPhoto(email,dataUrl){if(!email)return;try{localStorage.setItem('ezra_photo_'+email,dataUrl)}catch(e){}}
+// Stability fix: a plain browser refresh used to wipe every JS variable
+// (currentTeacher/studentId/studentName/...) and dump the student back on the
+// teacher-select screen even though the SERVER session was often still fine
+// (in-memory sessions only die on a server restart, not a client refresh) -
+// this was reported as "why do I land on the home page every time I
+// refresh?". The fix: remember the last successful login on this device and
+// silently re-verify it on page load instead of making the student pick
+// their teacher and retype name/email/password again every time. The saved
+// "password" here is the shared class password (same one printed on the
+// board for the whole class), not a personal secret, so this is the same
+// sensitivity level as the photo/XP data already kept in localStorage.
+function saveLastLogin(teacherId,name,email,password){try{localStorage.setItem('ezra_last_login',JSON.stringify({teacherId:teacherId,name:name,email:email,password:password}))}catch(e){}}
+function getLastLogin(){try{return JSON.parse(localStorage.getItem('ezra_last_login')||'null')}catch(e){return null}}
+function clearLastLogin(){try{localStorage.removeItem('ezra_last_login')}catch(e){}}
+// Shared-device safety valve: without this, a saved login on a classroom
+// computer would silently keep resuming as the SAME student forever - this
+// lets a student (or teacher resetting the machine between classes) clear it
+// and land back on the normal teacher-select screen.
+function logoutStudent(){clearLastLogin();location.reload()}
 function handleStudentPhotoFile(input){
   let file=input.files&&input.files[0];
   if(!file)return;
@@ -427,6 +461,19 @@ function fireConfetti(count){
 // already computes those in buildSpeechMetrics() before every submit, so no
 // server changes are needed - just remember the last computed metrics object.
 var lastMetrics={recording_duration_ms:0,silence_ms:0,words_per_minute:0};
+// Collapsed by default (see .gauge-card:not(.expanded) in CSS) - the student
+// can tap the gauge to see the pace/hesitation breakdown, but it doesn't
+// force itself on them after every single attempt. Preference persists across
+// sentences within the session (not reset by updateMasteryGauge below) so a
+// student/teacher who wants it open doesn't have to keep re-expanding it.
+var gaugeExpanded=false;
+function toggleGaugeExpanded(){
+  gaugeExpanded=!gaugeExpanded;
+  let card=document.getElementById('masteryGauge');
+  if(card)card.classList.toggle('expanded',gaugeExpanded);
+  let hint=document.getElementById('gaugeToggleHint');
+  if(hint)hint.textContent=gaugeExpanded?'▲ הסתר פירוט':'▼ הצג פירוט (קצב/רציפות)';
+}
 function computeGaugeBreakdown(score,metrics){
   let m=metrics||{};
   let wpm=Number(m.words_per_minute)||0;
@@ -497,6 +544,22 @@ function updateMasteryGauge(score,metrics){
   }
 }
 function hideMasteryGauge(){let card=document.getElementById('masteryGauge'); if(card)card.style.display='none'}
+// "Focus mode" while actively recording (per UX review: the moment the
+// student is producing speech should be as close to a bare listen-speak loop
+// as possible - sentence + mic only, no competing stats). Everything hidden
+// here already reappears on its own right after the attempt: updateMasteryGauge
+// re-runs on every result, and the stats-row/mastery banner are plain CSS
+// display toggles with no state to restore beyond turning them back on.
+function enterRecordingFocus(){
+  let gauge=document.getElementById('masteryGauge'); if(gauge)gauge.style.display='none';
+  let mastery=document.getElementById('mastery'); if(mastery)mastery.style.display='none';
+  let stats=document.querySelector('.stats-row'); if(stats)stats.style.display='none';
+  let show=document.getElementById('show'); if(show)show.style.display='none';
+}
+function exitRecordingFocus(){
+  let stats=document.querySelector('.stats-row'); if(stats)stats.style.display='';
+  let show=document.getElementById('show'); if(show)show.style.display='';
+}
 
 function handleSentenceComplete(res){
   // Called once a sentence is fully done (server says advance:true), whether
@@ -557,6 +620,7 @@ function init(){
       c.onclick=()=>selectTeacher(id);
       c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectTeacher(id)}};
     });
+    autoResumeLogin();
   }).catch(()=>{});
   document.getElementById('name').onkeydown=e=>{if(e.key==='Enter')document.getElementById('pass').focus()};
   document.getElementById('pass').onkeydown=e=>{if(e.key==='Enter')submitLogin()};
@@ -604,7 +668,7 @@ function checkEmailField(name,email){
   el.style.display='none';
   return true;
 }
-function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;let _isConnErr=false;apiFetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})},submitLogin).then(r=>r.json().then(d=>({ok:r.ok,d})),e=>{_isConnErr=true;throw e}).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;studentPassword=pass;voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;
+function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;let _isConnErr=false;apiFetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})},submitLogin).then(r=>r.json().then(d=>({ok:r.ok,d})),e=>{_isConnErr=true;throw e}).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;studentPassword=pass;saveLastLogin(currentTeacher,name,email,pass);voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;
   if(d.resumed&&d.resume_progress){
     // A meaningfully in-progress session already exists for this student -
     // ask before silently dropping them back into it, instead of assuming.
@@ -617,6 +681,50 @@ function submitLogin(){let name=document.getElementById('name').value.trim(),ema
   }
   startApp()
 }).catch(e=>{let el=document.getElementById('loginErr');el.textContent=_isConnErr?'אין חיבור לשרת כרגע - נסה שוב בעוד רגע (לחצן "נסה שוב" למעלה).':(e.message||'שם/סיסמה לא תקינים');el.style.display='block'})}
+// Runs once on every page load (see init()) - if this device already has a
+// remembered login (see saveLastLogin), skip the teacher-select screen
+// entirely and silently re-verify with the server instead of making the
+// student pick their teacher and retype name/email/password on every single
+// refresh. Mirrors submitLogin()'s success path (including the existing
+// "continue where you left off?" resume prompt if the server still has a
+// live in-memory session) but reads from localStorage instead of the login
+// form fields. Any failure (wrong/changed password, teacher removed, no
+// saved login at all) just falls through to the normal manual screen -
+// nothing here can strand the student.
+function autoResumeLogin(){
+  let saved=getLastLogin();
+  if(!saved||!saved.teacherId||!saved.email||!teacherData[saved.teacherId])return;
+  currentTeacher=saved.teacherId;
+  let t=teacherData[currentTeacher]||{};
+  voiceGender=t.voice_gender||'female';
+  document.documentElement.style.setProperty('--tc',t.color||'#4318D1');
+  let _isConnErr=false;
+  apiFetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:saved.name,email:saved.email,password:saved.password})},autoResumeLogin)
+    .then(r=>r.json().then(d=>({ok:r.ok,d})),e=>{_isConnErr=true;throw e})
+    .then(({ok,d})=>{
+      if(!ok)throw new Error((d&&d.error)||'');
+      studentId=d.student_id;studentName=saved.name;studentEmail=saved.email;studentPassword=saved.password;
+      voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;
+      silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;
+      if(d.resumed&&d.resume_progress){
+        let p=d.resume_progress;
+        let stageLabel=p.stage==='preview'?'בהיכרות עם המשפטים':(p.stage==='cloze'?'בהשלמת משפטים (קלוז)':'באימון על המשפטים');
+        document.getElementById('resumePromptText').textContent='נמצא תרגול פתוח מפעם קודמת - היית '+stageLabel+', במשפט '+(p.index+1)+' מתוך '+p.total+'. להמשיך משם, או להתחיל את התרגיל הזה מחדש?';
+        document.getElementById('resumePrompt').classList.add('show');
+        setTimeout(()=>document.querySelector('#resumePrompt button.primary').focus(),50);
+        return;
+      }
+      startApp();
+    })
+    .catch(()=>{
+      // A connection error should NOT wipe the saved login - just leave the
+      // student on the manual screen and let them retry later. Only clear
+      // the saved credentials for an actual rejection (wrong password after
+      // a teacher change, student removed, etc.) so a stale/invalid saved
+      // login doesn't keep silently failing forever.
+      if(!_isConnErr)clearLastLogin();
+    });
+}
 function resumeChoice(action){
   document.getElementById('resumePrompt').classList.remove('show');
   if(action==='restart'){
@@ -711,6 +819,17 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip',
     setTimeout(playSentence,350);
   }
 }).catch(e=>document.getElementById('he').textContent='שגיאה בטעינת משפט')}
+// "Explain once, then clean" (per UX feedback): the progress line ("משפט X
+// מתוך Y | שם התרגיל") and the station header ("⭐ תחנה 2 — ...") are static
+// per station - repeating them verbatim on every single sentence is exactly
+// the kind of text clutter the redesign above was meant to reduce. They now
+// show in full only on the FIRST sentence after entering a station; every
+// later sentence within that same station hides both and leans on the
+// progress bar (#bar) alone. practice/listen count as the same station
+// (station 2 - Bloom reps vs plain listen, see the station-numbering notes
+// below) so switching between them mid-station doesn't re-trigger the intro.
+var lastAnnouncedGroup=null;
+function stationGroupOf(st){ return (st==='practice'||st==='listen') ? 'read' : st; }
 function setStation(st,q){
   let phase=document.getElementById('phase');
   let play=document.getElementById('play'), show=document.getElementById('show');
@@ -724,6 +843,9 @@ function setStation(st,q){
   prog.style.display=''; phase.style.display=''; he.style.display='';
   document.getElementById('sentenceBox').style.display='';
   document.getElementById('mic').style.display=''; document.getElementById('skip').style.display='';
+  let group=stationGroupOf(st);
+  let isFirstInStation=(group!==lastAnnouncedGroup);
+  lastAnnouncedGroup=group;
   if(st==='cloze'){
     prog.style.display='none';
     // Hide the ENTIRE top sentence box (not just its children) - the cloze
@@ -762,6 +884,14 @@ function setStation(st,q){
   } else {
     phase.innerHTML='📘 תחנה 2 — אמירת המשפט | צריך התאמה מלאה (100%)';
     document.getElementById('hint').textContent='שמע את המשפט ואז לחץ על המיקרופון לאימון';
+  }
+  // Apply the "explain once" rule last, after the branch above has already
+  // set this station's text - a repeat visit to the same station simply
+  // hides both lines again (harmless even for cloze, which already hides
+  // prog/phase unconditionally above).
+  if(!isFirstInStation){
+    phase.style.display='none';
+    prog.style.display='none';
   }
 }
 function pickVoice(){
@@ -915,6 +1045,7 @@ function startRecognition(){
   document.getElementById('play').disabled=true;
   document.getElementById('play').classList.add('hidden-final');
   document.getElementById('hint').textContent='מקשיב...';
+  enterRecordingFocus();
   rec.onresult=e=>{
     lastSpeechAt=performance.now();
     // Root cause found after the first fix attempt (summing all final
@@ -950,6 +1081,7 @@ function startRecognition(){
     let endedAt=performance.now();
     clearTimeout(micColorTimer);
     stopRecTimer();
+    exitRecordingFocus();
     let micEl=document.getElementById('mic');
     micEl.classList.remove('on');
     micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');
@@ -973,7 +1105,7 @@ function startRecognition(){
     document.getElementById('hint').textContent='מעבד...';
     if(examMode)submitExamAnswer(spoken,metrics);else if(practiceMode)submitPracticeRepeat(spoken);else submitAnswer(spoken,metrics);
   };
-  rec.onerror=()=>{busy=false;submitted=true;clearTimeout(micColorTimer);stopRecTimer();let micEl=document.getElementById('mic');micEl.classList.remove('on');micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');document.getElementById('stopRec').style.display='none';document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
+  rec.onerror=()=>{busy=false;submitted=true;clearTimeout(micColorTimer);stopRecTimer();exitRecordingFocus();let micEl=document.getElementById('mic');micEl.classList.remove('on');micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');document.getElementById('stopRec').style.display='none';document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
   rec.start();
 }
 // The server's in-memory session store (_sessions) does not survive a Render
@@ -1211,7 +1343,7 @@ function showMastery(consecutive,target,broken,attemptsLeft){let el=document.get
   let attemptsLine=(typeof attemptsLeft==='number')?' · ניסיונות שנותרו: '+attemptsLeft:'';
   el.innerHTML='<h3>⭐ מצב שליטה (Mastery)</h3><p>צריך '+target+' חזרות נכונות ('+consecutive+'/'+target+')'+attemptsLine+'</p><div class="dots">'+dots+'</div>'}
 function hideMastery(){document.getElementById('mastery').style.display='none'}
-function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';document.getElementById('sentenceBox').style.display='';document.getElementById('recTimer').style.display='none';document.getElementById('practiceAgainBtn').style.display='none';hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
+function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';document.getElementById('sentenceBox').style.display='';document.getElementById('recTimer').style.display='none';document.getElementById('practiceAgainBtn').style.display='none';exitRecordingFocus();hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
 function skipSentence(){apiFetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})},skipSentence).then(()=>loadQuestion()).catch(()=>{})}
 function previewNavGo(direction){apiFetch('/api/preview-nav',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,direction:direction})},()=>previewNavGo(direction)).then(()=>loadQuestion()).catch(()=>{})}
 function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 תחנה 4 — מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
