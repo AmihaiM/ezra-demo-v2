@@ -72,6 +72,10 @@ TEACHERS_TAB = "Teachers"
 _cache = {}
 _sessions = {}
 _pending_results = []
+# Cache of teacher_id -> that teacher's results worksheet gid (see
+# get_results_tab_gid below) - avoids one extra Google Sheets API round trip
+# on every single teacher login once it's been looked up once.
+_results_tab_gid_cache = {}
 
 FALLBACK_SENTENCES = [
     {"en": "I love learning English", "he": "אני אוהב ללמוד אנגלית"},
@@ -1394,6 +1398,22 @@ def verify_student():
     # very start - never got past the first ungraded preview sentence means
     # there's nothing meaningful to resume, so just carry on silently.
     resumable = same_unfinished_exercise and not (existing.get("stage") == "preview" and existing.get("current", 0) == 0)
+    # A session marked "completed" (see /api/question - this happens once the
+    # practice/cloze SWEEP finishes, BEFORE the exam, since the exam itself
+    # runs entirely client-side and never reports "the whole thing is truly
+    # over" back to the server) silently gets replaced by a brand-new
+    # new_session() below. If that happens right after the student actually
+    # finished - e.g. the page reloads mid-exam or right after seeing their
+    # score, including via the auto-resume-on-refresh flow - they land back
+    # on station 1 of a fresh attempt with zero explanation, which reads as
+    # "why did it just go back to the same exercise". Capture what they just
+    # finished here so the client can show a one-time, honest explanation
+    # instead of looking like silent data loss.
+    just_completed = None
+    if existing and existing.get("completed"):
+        prev_results = existing.get("results", [])
+        prev_avg = int(sum(r.get("score", 0) for r in prev_results) / len(prev_results)) if prev_results else None
+        just_completed = {"exercise": existing.get("exercise_name", ""), "avg_score": prev_avg}
     if same_unfinished_exercise:
         # Same student, same teacher, same exercise, not finished yet -
         # resume in place by default rather than wiping their progress (the
@@ -1410,6 +1430,8 @@ def verify_student():
         # finished this one before - start fresh, same as always.
         new_session(sid, tid, name, student_email=email)
     resp = {"ok": True, "student_id": sid, "teacher": teacher_public(tid), "exercise": _sessions[sid]["exercise_name"]}
+    if just_completed:
+        resp["just_completed"] = just_completed
     if resumable:
         sess = _sessions[sid]
         resp["resumed"] = True
@@ -1885,6 +1907,30 @@ def exam_result():
     write_result(row)
     return jsonify(ok=True)
 
+def get_results_tab_gid(tid, sheet_id):
+    """Best-effort lookup of the specific worksheet (tab) gid holding this
+    teacher's results, so the "open results sheet" link in teacher.html can
+    deep-link straight to their tab instead of whatever tab the spreadsheet
+    happens to open on by default (gid=0 / last-viewed). Several teachers can
+    share one results spreadsheet with one tab each (see results_tab in
+    TEACHERS/load_extra_teachers) - without the gid, a teacher clicking the
+    link could land on a DIFFERENT teacher's tab (or an empty default tab)
+    and reasonably conclude their results never made it to the sheet, even
+    though they did - this was reported as exactly that: results visible in
+    the dashboard but "missing" from the sheet."""
+    if tid in _results_tab_gid_cache:
+        return _results_tab_gid_cache[tid]
+    try:
+        import gspread
+        tab = TEACHERS[tid]["results_tab"]
+        sh = get_gspread_client().open_by_key(sheet_id)
+        ws = sh.worksheet(tab)
+        _results_tab_gid_cache[tid] = ws.id
+        return ws.id
+    except Exception as e:
+        print("GET RESULTS TAB GID FAILED", tid, e)
+        return None
+
 @app.post("/api/teacher-login")
 def teacher_login():
     data = request.get_json(force=True)
@@ -1893,11 +1939,15 @@ def teacher_login():
         return jsonify(ok=False), 401
     s = _teacher_state[tid]
     sheet_id = RESULTS_SHEET_IDS.get(tid, RESULTS_SHEET_ID)
+    sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
+    gid = get_results_tab_gid(tid, sheet_id)
+    if gid is not None:
+        sheet_url += f"#gid={gid}"
     return jsonify(
         ok=True, teacher=teacher_public(tid),
         allowed_students=s.get("allowed_students", []),
         restrict_to_list=bool(s.get("restrict_to_list", False)),
-        results_sheet_url=f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit",
+        results_sheet_url=sheet_url,
     )
 
 @app.post("/api/teacher-allowed-students")
@@ -1978,7 +2028,7 @@ def add_exercise():
         return jsonify(
             ok=False,
             error=(
-                "לא הצלחתי לכתוב לגוגל שיט הראשי. ודא ש-GOOGLE_CREDENTIALS_JSON מוגדר "
+                "לא הצלחתי לכתוב ל-Google Sheet הראשי. ודא ש-GOOGLE_CREDENTIALS_JSON מוגדר "
                 "ושה-Service Account קיבל הרשאת Editor לגיליון התרגילים."
             ),
             details=str(e),
@@ -2312,6 +2362,16 @@ def admin_update_teacher():
     except Exception as e:
         print("UPDATE TEACHER ROW FAILED", e)
         sheet_warning = "העדכון פעיל כרגע, אך השמירה לגיליון נכשלה - ייתכן שהשינויים ייעלמו אחרי ריסטארט הבא. בדקו את חיבור ה-Google Sheets ונסו שוב (או השתמשו ב'נסה שוב' בטבלת המורים)."
+        # Bug this fixes: if this teacher was ALREADY marked persisted from an
+        # earlier successful save (e.g. when first added), a later failed
+        # edit - such as adding a photo - used to leave them marked
+        # "persisted" anyway, since this set only ever grew. The admin
+        # dashboard's "✅ נשמר לצמיתות" badge would then lie: it showed green
+        # even though the LATEST change (the photo) never reached the sheet,
+        # so it silently reverted on the next restart with no warning ever
+        # shown again. Un-marking it here makes the badge flip back to
+        # "⚠️ לא נשמר" so the retry button actually appears.
+        _persisted_teacher_ids.discard(tid)
     return jsonify(ok=True, warning=sheet_warning)
 
 if __name__ == "__main__":

@@ -11,7 +11,13 @@
    :focus-visible only shows for keyboard nav (not every mouse click), so
    this adds a clear themed ring without adding visual noise for touch/mouse use. */
 :focus-visible{outline:3px solid #FFC107;outline-offset:2px}
-.teacher:focus-visible{outline-color:#fff}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:16px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:18px;padding:14px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;row-gap:4px}.top b{white-space:nowrap}.student{background:#fff2;border-radius:20px;padding:6px 12px;cursor:pointer}.student:hover{background:#fff4}.student:focus-visible{outline:2px solid #fff;outline-offset:2px}.wrap{max-width:850px;margin:0 auto;padding:10px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:25px;font-weight:800;margin:8px 0;line-height:1.3}.en{direction:ltr;text-align:left;font-size:17px;color:#4318D1;opacity:0;transition:.25s}.row{display:flex;gap:8px;flex-wrap:wrap}
+.teacher:focus-visible{outline-color:#fff}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:16px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:18px;padding:14px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;row-gap:4px}.top b{white-space:nowrap}.student{background:#fff2;border-radius:20px;padding:6px 12px;cursor:pointer}.student:hover{background:#fff4}.student:focus-visible{outline:2px solid #fff;outline-offset:2px}.wrap{max-width:1050px;margin:0 auto;padding:10px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:27px;font-weight:800;margin:8px 0;line-height:1.3}.en{direction:ltr;text-align:left;font-size:19px;color:#4318D1;opacity:0;transition:.25s}
+/* Wider workspace on desktop (was capped at 850px, leaving large empty side
+   margins on anything wider than a small laptop) plus larger sentence/
+   translation text to match - both scale down automatically on narrower
+   screens since max-width is a ceiling, not a fixed size, and the mobile
+   media query below still has the final say on phone-sized fonts. */
+.wrap .card{padding:22px}.row{display:flex;gap:8px;flex-wrap:wrap}
 /* De-emphasized secondary controls (listen again / show-hide / skip) so the
    mic stays the one visually dominant action, per UX review: "one dominant
    action at a time" instead of several equal-weight buttons competing with it. */
@@ -67,7 +73,7 @@ button:active{transform:scale(.95)}
 .practice-grid{display:block}
 .col-a,.col-b{min-width:0}
 @media (min-width:760px){
-  .practice-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;align-items:start}
+  .practice-grid{display:grid;grid-template-columns:1.3fr .7fr;gap:26px;align-items:start}
   /* col-b (result/gauge/mastery) was still taller than col-a on its own and
      ran past the bottom of the viewport - shrink its internals specifically
      rather than the whole app, since col-b is the narrower column here and
@@ -107,8 +113,9 @@ button:active{transform:scale(.95)}
   .row button{padding:6px 10px;font-size:13px}
   #hint{margin:3px 0 0;font-size:12.5px}
   #stopRec{margin-top:5px!important;padding:7px 10px}
-  .card{padding:11px}
-  .sentence{font-size:19px;margin:6px 0}
+  .wrap .card{padding:13px}
+  .sentence{font-size:21px;margin:6px 0}
+  .en{font-size:16px}
 }
 /* "הבא" (and the continue/retry choice) pinned to the bottom of the viewport
    instead of living at the end of the content flow - no amount of shrinking
@@ -432,6 +439,20 @@ function showLevelUpToast(level){
   setTimeout(()=>t.classList.add('show'),30);
   setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),500)},4200);
 }
+// Shown right after login/auto-resume when the server had to start a brand
+// new session because the previous one was already fully finished (see
+// just_completed in /api/verify-student) - without this, landing back on
+// station 1 looks exactly like an unexplained restart/bug, especially now
+// that a refresh can silently re-trigger this via autoResumeLogin().
+function showJustCompletedToast(info){
+  if(!info)return;
+  let t=document.createElement('div'); t.className='badge-toast';
+  let scoreLine=(typeof info.avg_score==='number')?(' (ציון ממוצע '+info.avg_score+'%)'):'';
+  t.innerHTML='<span class="bicon">✅</span><div><b>סיימת את "'+esc(info.exercise||'')+'"'+scoreLine+'</b><br><span style="font-size:13px;opacity:.85">מתחילים עכשיו תרגול חדש</span></div>';
+  document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),30);
+  setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),500)},4200);
+}
 
 // Stars are earned by ACCURACY, not by how many stations/repeats a sentence
 // needed. n = number of real wrong submissions for this sentence (mastery's
@@ -668,7 +689,7 @@ function checkEmailField(name,email){
   el.style.display='none';
   return true;
 }
-function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;let _isConnErr=false;apiFetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})},submitLogin).then(r=>r.json().then(d=>({ok:r.ok,d})),e=>{_isConnErr=true;throw e}).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;studentPassword=pass;saveLastLogin(currentTeacher,name,email,pass);voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;
+function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;let _isConnErr=false;apiFetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})},submitLogin).then(r=>r.json().then(d=>({ok:r.ok,d})),e=>{_isConnErr=true;throw e}).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;studentPassword=pass;saveLastLogin(currentTeacher,name,email,pass);voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;if(d.just_completed)setTimeout(()=>showJustCompletedToast(d.just_completed),400);
   if(d.resumed&&d.resume_progress){
     // A meaningfully in-progress session already exists for this student -
     // ask before silently dropping them back into it, instead of assuming.
@@ -706,6 +727,7 @@ function autoResumeLogin(){
       studentId=d.student_id;studentName=saved.name;studentEmail=saved.email;studentPassword=saved.password;
       voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;
       silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;
+      if(d.just_completed)setTimeout(()=>showJustCompletedToast(d.just_completed),400);
       if(d.resumed&&d.resume_progress){
         let p=d.resume_progress;
         let stageLabel=p.stage==='preview'?'בהיכרות עם המשפטים':(p.stage==='cloze'?'בהשלמת משפטים (קלוז)':'באימון על המשפטים');

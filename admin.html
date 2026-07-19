@@ -226,8 +226,14 @@ function saveEditTeacher(){
     results_sheet_url:document.getElementById('editSheetUrl').value.trim(),
   }).then(({ok,d})=>{
     if(!ok||!d.ok){resultBox.innerHTML='<div class="err" style="display:block">'+esc(d.error||'שגיאה בשמירה')+'</div>';return}
-    let warn=d.warning?('<p style="color:#c62828">⚠️ '+esc(d.warning)+'</p>'):'';
-    resultBox.innerHTML='<div class="card" style="background:#f0fdf4;margin:0"><b>✅ נשמר בהצלחה</b></div>'+warn;
+    // A warning means the change is live right now but did NOT reach the
+    // sheet - showing a plain green "success" card above it (as before) was
+    // actively misleading, since the change can silently revert on the next
+    // restart. This is exactly how a teacher's photo could "upload fine" and
+    // then quietly disappear later with no visible cause.
+    resultBox.innerHTML=d.warning
+      ? '<div class="card" style="background:#fff3e0;border:2px solid #FF9800;margin:0"><b>⚠️ השינוי פעיל, אך לא נשמר לצמיתות</b><p style="margin:6px 0 0">'+esc(d.warning)+'</p></div>'
+      : '<div class="card" style="background:#f0fdf4;margin:0"><b>✅ נשמר בהצלחה</b></div>';
     loadTeachers();
   }).catch(()=>{resultBox.innerHTML='<div class="err" style="display:block">שגיאה בשמירה</div>'});
 }
@@ -299,8 +305,12 @@ function addTeacher(){
     results_sheet_url:document.getElementById('newSheetUrl').value.trim(),
   }).then(({ok,d})=>{
     if(!ok||!d.ok){resultBox.innerHTML='<div class="err" style="display:block">'+esc(d.error||'שגיאה בהוספה')+'</div>';return}
-    let warn=d.warning?('<p style="color:#c62828">⚠️ '+esc(d.warning)+'</p>'):'';
-    resultBox.innerHTML='<div class="card" style="background:#f0fdf4;margin:0"><b>✅ המורה '+esc(name)+' נוסף/ה בהצלחה</b>'+
+    // See saveEditTeacher() for why a warning changes the box's whole
+    // background/border instead of being a small line under a green
+    // "success" header - the teacher IS usable right now either way, but a
+    // warning means it may silently revert on the next restart.
+    let warn=d.warning?('<p style="margin:6px 0 0">⚠️ '+esc(d.warning)+'</p>'):'';
+    resultBox.innerHTML='<div class="card" style="background:'+(d.warning?'#fff3e0;border:2px solid #FF9800':'#f0fdf4')+';margin:0"><b>'+(d.warning?'⚠️':'✅')+' המורה '+esc(name)+' נוסף/ה'+(d.warning?', אך ראו אזהרה למטה':' בהצלחה')+'</b>'+
       '<p class="hint">מזהה: <code dir="ltr">'+esc(d.teacher_id)+'</code></p>'+
       '<p class="hint">סיסמת מורה: <code dir="ltr">'+esc(d.teacher_password)+'</code> · סיסמת תלמידים: <code dir="ltr">'+esc(d.student_password)+'</code></p>'+
       '<p class="hint">'+(d.results_sheet_configured?'גיליון תוצאות מחובר.':'⚠️ לא הוגדר גיליון תוצאות - אפשר להוסיף בהמשך.')+'</p>'+
