@@ -124,10 +124,10 @@ button:active{transform:scale(.95)}
    all, the same pattern most language-learning apps use for their main CTA.
    The content above can be however tall it needs to be and scrolls normally
    underneath this bar. */
-.wrap{padding-bottom:146px}
+.wrap{padding-bottom:184px}
 @media (max-width:759px){
   #nextBtn,#capChoice{
-    position:fixed!important;left:12px;right:12px;bottom:68px;
+    position:fixed!important;left:12px;right:12px;bottom:104px;
     width:auto!important;margin:0!important;z-index:60;
     box-shadow:0 -6px 24px #0003;
   }
@@ -137,15 +137,21 @@ button:active{transform:scale(.95)}
    non-negotiable request). Sits in its own fixed strip below the
    next/cap-choice bar so the two never overlap; the attribution footer
    yields this space entirely while the practice screen is active. */
-#stationBar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:56;background:#fff;border-top:1px solid #e5e0f5;box-shadow:0 -4px 16px #0001;padding:6px 8px;gap:4px;justify-content:center}
+#stationBar{display:none;flex-direction:column;position:fixed;left:0;right:0;bottom:0;z-index:56;background:#fff;border-top:1px solid #e5e0f5;box-shadow:0 -4px 16px #0001;padding:6px 8px;gap:4px}
 body.in-app #stationBar{display:flex}
 body.in-app .app-footer{display:none!important}
+.station-row{display:flex;gap:4px;justify-content:center}
 .station-step{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;background:transparent;border:0;padding:3px 6px;border-radius:10px;min-width:50px;flex:0 1 90px}
 .station-step .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;background:#ede7ff;color:#6b5b95;border:2px solid #ddd6fe;font-weight:800}
 .station-step.done .dot{background:#dcfce7;border-color:#86efac;color:#166534}
 .station-step.current .dot{background:#4318D1;border-color:#4318D1;color:#fff}
 .station-step .lbl{font-size:9px;color:#8a8a9a;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:74px}
 .station-step.current .lbl{color:#4318D1}
+/* Recurring student request: a way to browse/listen to every sentence in the
+   exercise at any time, from any station - pure passive listening exposure,
+   explicitly decoupled from scoring/progress (see openListenAll). Sits right
+   under the 4 station circles in the same fixed strip. */
+.listen-all-btn{width:100%;background:#ede7ff;color:#4318D1;border:1.5px solid #ddd6fe;border-radius:10px;padding:6px;font-weight:700;font-size:12.5px;cursor:pointer}
 /* Desktop: some students found the button pinned to the very bottom of the
    viewport awkward, far from the mic it follows - and desktop never had the
    "have to scroll to reach it" problem the mobile fixed bar solves (the whole
@@ -168,7 +174,7 @@ body.in-app .app-footer{display:none!important}
 }
 @media (min-width:760px){
   #nextBtn,#capChoice{margin-top:12px}
-  .wrap{padding-bottom:90px}
+  .wrap{padding-bottom:128px}
   .app-footer{display:block}
 }
 /* Connection banner: shown when a request fails/times out (e.g. tab left open
@@ -240,10 +246,13 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 <div id="mastery" class="banner mastery"></div>
 </div></div></div>
 <div id="stationBar" role="navigation" aria-label="ניווט בין תחנות">
-  <button type="button" class="station-step" data-station="1" onclick="jumpToStation(1)" aria-label="תחנה 1 — היכרות"><span class="dot">1</span><span class="lbl">היכרות</span></button>
-  <button type="button" class="station-step" data-station="2" onclick="jumpToStation(2)" aria-label="תחנה 2 — אמירת המשפט"><span class="dot">2</span><span class="lbl">אמירת המשפט</span></button>
-  <button type="button" class="station-step" data-station="3" onclick="jumpToStation(3)" aria-label="תחנה 3 — השלמת משפטים"><span class="dot">3</span><span class="lbl">השלמת משפטים</span></button>
-  <button type="button" class="station-step" data-station="4" onclick="jumpToStation(4)" aria-label="תחנה 4 — מבחן"><span class="dot">4</span><span class="lbl">מבחן</span></button>
+  <div class="station-row">
+    <button type="button" class="station-step" data-station="1" onclick="jumpToStation(1)" aria-label="תחנה 1 — היכרות"><span class="dot">1</span><span class="lbl">היכרות</span></button>
+    <button type="button" class="station-step" data-station="2" onclick="jumpToStation(2)" aria-label="תחנה 2 — אמירת המשפט"><span class="dot">2</span><span class="lbl">אמירת המשפט</span></button>
+    <button type="button" class="station-step" data-station="3" onclick="jumpToStation(3)" aria-label="תחנה 3 — השלמת משפטים"><span class="dot">3</span><span class="lbl">השלמת משפטים</span></button>
+    <button type="button" class="station-step" data-station="4" onclick="jumpToStation(4)" aria-label="תחנה 4 — מבחן"><span class="dot">4</span><span class="lbl">מבחן</span></button>
+  </div>
+  <button type="button" id="listenAllBtn" class="listen-all-btn" onclick="openListenAll()" aria-label="הצג ושמע את כל משפטי התרגיל">🔊 הצג</button>
 </div>
 </section>
 <div id="stationPicker" class="overlay" role="dialog" aria-modal="true" aria-labelledby="stationPickerTitle"><div class="card" style="width:min(460px,92vw);max-height:80vh;overflow:auto">
@@ -251,6 +260,12 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
   <p class="small">התחנה הזו כבר הושלמה — אפשר לבחור משפט ולתרגל אותו שוב. תרגול כאן לא משפיע על ההתקדמות או הציון.</p>
   <div id="stationPickerBody"></div>
   <button class="ghost" style="width:100%;margin-top:12px" onclick="document.getElementById('stationPicker').classList.remove('show')">סגור</button>
+</div></div>
+<div id="listenAll" class="overlay" role="dialog" aria-modal="true" aria-labelledby="listenAllTitle"><div class="card" style="width:min(460px,92vw);max-height:80vh;overflow:auto">
+  <h2 id="listenAllTitle">🔊 כל המשפטים</h2>
+  <p class="small">רשימת כל משפטי התרגיל — לחיצה על משפט תשמיע אותו. לצורך היכרות/האזנה בלבד, לא משפיע על ההתקדמות או הציון.</p>
+  <div id="listenAllBody"></div>
+  <button class="ghost" style="width:100%;margin-top:12px" onclick="document.getElementById('listenAll').classList.remove('show')">סגור</button>
 </div></div>
 <div id="appFooterEl" class="app-footer">🧠 מנוע למיומנות בשפה על פי שיטת פרופ' בלום ·  פותח על ידי עמיחי מייטליס ובהדרכת סולי תמרי · © כל הזכויות שמורות</div>
 <script>
@@ -698,6 +713,7 @@ document.addEventListener('keydown',e=>{
   if(document.getElementById('resumePrompt').classList.contains('show')){resumeChoice('continue');return}
   if(document.getElementById('history').classList.contains('show')){document.getElementById('history').classList.remove('show');return}
   if(document.getElementById('stationPicker').classList.contains('show')){document.getElementById('stationPicker').classList.remove('show');return}
+  if(document.getElementById('listenAll').classList.contains('show')){document.getElementById('listenAll').classList.remove('show');return}
   if(document.getElementById('login').classList.contains('show')){closeLogin();return}
 });
 function looksLikeEmail(v){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)}
@@ -1022,14 +1038,20 @@ function setSpeechRate(v){speechRate=parseFloat(v)||0.88;localStorage.setItem('e
 function setSpeechVoice(uri){preferredVoiceURI=uri||'';localStorage.setItem('ezra_voice_uri',preferredVoiceURI)}
 function playSentence(){
   if(!currentQ)return;
-  let text=currentQ.en;
+  speakText(currentQ.en, document.getElementById('play'));
+}
+// Generic "speak this English text" - extracted out of playSentence() so the
+// same warm-up-clipping fix and voice/rate settings can be reused for the
+// "listen to any sentence" list (see openListenAll) without needing a real
+// currentQ/#play button. btn (optional) just gets disabled while speaking so
+// a student can't spam-click it into overlapping utterances.
+function speakText(text, btn){
   speechSynthesis.cancel();
-  let playBtn=document.getElementById('play');
   // Guard against double-clicking "שמע שוב" while the engine is still
   // settling from cancel() above - a second overlapping speak() call while
   // the first hasn't started yet is exactly what was still clipping the
   // start of the sentence on repeat plays even with the delay below.
-  if(playBtn)playBtn.disabled=true;
+  if(btn)btn.disabled=true;
   setTimeout(()=>{
     speechSynthesis.resume();
     // Chrome/Edge's speech engine sometimes hasn't fully reset by the time
@@ -1045,7 +1067,7 @@ function playSentence(){
       let u=new SpeechSynthesisUtterance(text);
       u.lang='en-US';u.rate=speechRate;
       let v=pickVoice();if(v)u.voice=v;
-      let reenable=()=>{if(playBtn)playBtn.disabled=false};
+      let reenable=()=>{if(btn)btn.disabled=false};
       u.onend=reenable; u.onerror=reenable;
       speechSynthesis.speak(u);
     };
@@ -1512,6 +1534,27 @@ function pickPracticeSentence(i){
   if(window._pickerTarget===3){practiceClozeAgainNow(s);return}
   lastCompletedSentence={he:s.he,en:s.en};
   practiceAgainNow();
+}
+// Recurring student request (unrelated to scoring, purely a learning-support
+// feature): browse every sentence in the exercise in one scrolling list, from
+// any station, and hear any one of them on demand - NOT continuous
+// autoplay-through-all-of-them, each sentence plays only when tapped.
+function openListenAll(){
+  if(!studentId)return;
+  let body=document.getElementById('listenAllBody');
+  body.innerHTML='<p class="small">טוען משפטים…</p>';
+  document.getElementById('listenAll').classList.add('show');
+  apiFetch('/api/exercise-sentences?student='+encodeURIComponent(studentId),{},openListenAll).then(r=>r.json()).then(d=>{
+    let list=d.sentences||[];
+    if(!list.length){body.innerHTML='<p class="small">אין משפטים להצגה.</p>';return}
+    window._listenAllSentences=list;
+    body.innerHTML=list.map((s,i)=>'<button type="button" class="ghost" style="width:100%;text-align:right;margin-top:6px;display:flex;align-items:center;gap:8px" onclick="playListenAllSentence('+i+',this)"><span style="font-size:17px">🔊</span><span style="flex:1;min-width:0"><div style="font-weight:700">'+esc(s.he||'')+'</div><div dir="ltr" style="font-size:13px;color:#666">'+esc(s.en||'')+'</div></span></button>').join('');
+  }).catch(()=>{body.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
+}
+function playListenAllSentence(i,btn){
+  let s=(window._listenAllSentences||[])[i];
+  if(!s)return;
+  speakText(s.en, btn);
 }
 // Cloze-flavored twin of practiceAgainNow() - same ungraded practice-repeat
 // scoring underneath (matching by the full sentence), but shows the

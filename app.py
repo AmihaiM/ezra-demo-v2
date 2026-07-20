@@ -741,6 +741,7 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
                     content_mismatch = False
                     ts["csv_url"] = csv_url
                     save_state()
+                    _persist_teacher_exercise(teacher_id)
                 break
     _sessions[student_id] = {
         "student_id": student_id,
@@ -838,7 +839,7 @@ def extract_sheet_id(value):
 TEACHERS_HEADER = [
     "teacher_id", "name", "color", "color_light", "voice_gender",
     "student_password", "teacher_password", "threshold", "max_attempts",
-    "results_sheet_id", "created_at", "photo_url",
+    "results_sheet_id", "created_at", "photo_url", "exercise_name", "csv_url",
 ]
 
 def load_extra_teachers():
@@ -879,6 +880,13 @@ def load_extra_teachers():
                 "default_threshold": int(r.get("threshold") or 85),
                 "default_max_attempts": int(r.get("max_attempts") or 5),
                 "photo_url": clean_cell(r.get("photo_url", "")),
+                # Currently-selected exercise, durably saved here (see
+                # _upsert_teacher_row) instead of only in teacher_state.json
+                # on Render's ephemeral local disk, which is wiped on every
+                # redeploy - that's what silently reset every teacher back to
+                # the demo exercise after each push.
+                "_saved_exercise_name": clean_cell(r.get("exercise_name", "")),
+                "_saved_csv_url": clean_cell(r.get("csv_url", "")),
             }
             rsid = clean_cell(r.get("results_sheet_id", "")).strip()
             if rsid:
@@ -891,7 +899,13 @@ def _upsert_teacher_row(tid, entry, results_sheet_id):
     """Create OR update this teacher's row in the "Teachers" sheet tab, so
     both adding a new teacher and editing an existing one (including the two
     hardcoded ones, Dan/Sara) survive the next redeploy/restart (see
-    load_extra_teachers above). Creates the tab + header row on first use."""
+    load_extra_teachers above). Creates the tab + header row on first use.
+    entry may also carry "exercise_name"/"csv_url" - a teacher's CURRENTLY
+    SELECTED exercise used to live only in _teacher_state, saved only to a
+    local JSON file (teacher_state.json). Render's local disk does not
+    survive a redeploy, so every push silently reset every teacher back to
+    the demo exercise - this sheet row is now the durable source of truth
+    for that too, same as everything else here."""
     import gspread
     gc = get_gspread_client()
     sh = gc.open_by_key(ADMIN_SHEET_ID)
@@ -900,23 +914,80 @@ def _upsert_teacher_row(tid, entry, results_sheet_id):
     except gspread.WorksheetNotFound:
         ws = sh.add_worksheet(title=TEACHERS_TAB, rows=100, cols=len(TEACHERS_HEADER))
         ws.append_row(TEACHERS_HEADER, value_input_option="USER_ENTERED")
-    row_values = [
-        tid, entry.get("name", tid), entry.get("color", "#4318D1"), entry.get("color_light", "#ede7ff"),
-        entry.get("voice_gender", "female"), entry.get("student_password", "class2026"),
-        entry.get("teacher_password", tid + "2026"), entry.get("default_threshold", 85),
-        entry.get("default_max_attempts", 5), results_sheet_id or "", now_str(),
-        entry.get("photo_url", ""),
-    ]
+    # Sheets created before exercise_name/csv_url were added to TEACHERS_HEADER
+    # only have the older, shorter header row - extend it in place (append
+    # any missing columns at the end) rather than assuming every live sheet
+    # already matches the current TEACHERS_HEADER exactly.
+    header = ws.row_values(1)
+    missing = [h for h in TEACHERS_HEADER if h not in header]
+    if missing:
+        header = header + missing
+        last_col = chr(ord("A") + len(header) - 1)
+        ws.update(f"A1:{last_col}1", [header], value_input_option="USER_ENTERED")
+    values_by_key = {
+        "teacher_id": tid, "name": entry.get("name", tid), "color": entry.get("color", "#4318D1"),
+        "color_light": entry.get("color_light", "#ede7ff"), "voice_gender": entry.get("voice_gender", "female"),
+        "student_password": entry.get("student_password", "class2026"),
+        "teacher_password": entry.get("teacher_password", tid + "2026"),
+        "threshold": entry.get("default_threshold", 85), "max_attempts": entry.get("default_max_attempts", 5),
+        "results_sheet_id": results_sheet_id or "", "created_at": now_str(),
+        "photo_url": entry.get("photo_url", ""),
+        # entry (a plain teacher-profile dict: name/color/passwords/...) never
+        # actually carries these two - fall back to this server's current
+        # in-memory selection for that teacher instead of blanking the cell,
+        # so a routine admin profile edit (name/color/password) can never
+        # silently wipe out the teacher's already-selected exercise.
+        "exercise_name": entry.get("exercise_name") or _teacher_state.get(tid, {}).get("exercise_name", ""),
+        "csv_url": entry.get("csv_url") or _teacher_state.get(tid, {}).get("csv_url", ""),
+    }
+    row_values = [values_by_key.get(h, "") for h in header]
     cell = None
     try:
         cell = ws.find(tid, in_column=1)
     except Exception:
         cell = None
     if cell:
-        last_col = chr(ord("A") + len(TEACHERS_HEADER) - 1)
+        last_col = chr(ord("A") + len(header) - 1)
         ws.update(f"A{cell.row}:{last_col}{cell.row}", [row_values], value_input_option="USER_ENTERED")
     else:
         ws.append_row(row_values, value_input_option="USER_ENTERED")
+
+def _persist_teacher_exercise(tid):
+    """Durably save just this teacher's currently-selected exercise (name +
+    csv_url) into their existing row in the Teachers sheet, touching ONLY
+    those two cells - name/color/passwords/results_sheet_id/photo are left
+    completely untouched, so this can never clobber them even though it's a
+    much more frequent write than a full profile edit. Best-effort: must
+    never break exercise selection itself if the sheet write fails (the
+    in-memory _teacher_state change already happened and still works for the
+    rest of this server's lifetime - it just won't survive the next
+    redeploy)."""
+    try:
+        import gspread
+        gc = get_gspread_client()
+        sh = gc.open_by_key(ADMIN_SHEET_ID)
+        try:
+            ws = sh.worksheet(TEACHERS_TAB)
+        except gspread.WorksheetNotFound:
+            ws = sh.add_worksheet(title=TEACHERS_TAB, rows=100, cols=len(TEACHERS_HEADER))
+            ws.append_row(TEACHERS_HEADER, value_input_option="USER_ENTERED")
+        header = ws.row_values(1)
+        missing = [h for h in TEACHERS_HEADER if h not in header]
+        if missing:
+            header = header + missing
+            last_col = chr(ord("A") + len(header) - 1)
+            ws.update(f"A1:{last_col}1", [header], value_input_option="USER_ENTERED")
+        cell = ws.find(tid, in_column=1)
+        if not cell:
+            _upsert_teacher_row(tid, dict(TEACHERS.get(tid, {})), RESULTS_SHEET_IDS.get(tid, ""))
+            return
+        ts = _teacher_state.get(tid, {})
+        name_col = header.index("exercise_name") + 1
+        url_col = header.index("csv_url") + 1
+        ws.update_cell(cell.row, name_col, ts.get("exercise_name", ""))
+        ws.update_cell(cell.row, url_col, ts.get("csv_url", ""))
+    except Exception as e:
+        print("PERSIST TEACHER EXERCISE FAILED", tid, e)
 
 # Merge in any admin-added teachers now that get_gspread_client/load_extra_teachers
 # are defined above (this has to run after TEACHERS/_teacher_state's initial
@@ -947,7 +1018,8 @@ for _tid, _t in _extra_teachers.items():
     if _tid not in _teacher_state:
         _teacher_state[_tid] = {
             "threshold": _t["default_threshold"], "max_attempts": _t["default_max_attempts"],
-            "exercise_name": "תרגול דמו", "csv_url": "", "custom_exercises": [],
+            "exercise_name": _t.get("_saved_exercise_name") or "תרגול דמו",
+            "csv_url": _t.get("_saved_csv_url") or "", "custom_exercises": [],
             "allowed_students": [], "restrict_to_list": False, "silence_timeout_ms": 1200,
         }
 
@@ -2142,6 +2214,7 @@ def add_exercise():
     _teacher_state[tid]["exercise_name"] = item["name"]
     _teacher_state[tid]["csv_url"] = item["csv_url"]
     save_state()
+    _persist_teacher_exercise(tid)
     return jsonify(ok=True, exercise=item, sentence_count=len(sentences), teacher=teacher_public(tid))
 
 @app.post("/api/set-exercise")
@@ -2154,6 +2227,7 @@ def set_exercise():
     _teacher_state[tid]["exercise_name"] = clean_cell(data.get("name", "תרגול דמו")) or "תרגול דמו"
     _teacher_state[tid]["csv_url"] = csv_url
     save_state()
+    _persist_teacher_exercise(tid)
     # Always force a fresh pull from the sheet on (re)selection - a teacher
     # pressing "בחר" on the exercise they're already using is a natural,
     # expected way to say "I just edited the sheet, load the latest version",

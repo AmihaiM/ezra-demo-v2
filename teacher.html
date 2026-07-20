@@ -80,7 +80,22 @@ function isLowConfidence(r){
 }
 function loadResults(){api('/api/teacher-results').then(d=>{
   resultsRows=d.rows||[];
-  if(!resultsRows.length){resultsBody.textContent='אין תוצאות עדיין';return}
+  if(!resultsRows.length){
+    // The server already computes exactly why the sheet came back empty
+    // (sheet_error from a failed/unauthorized write, or sheet_configured
+    // false if GOOGLE_CREDENTIALS_JSON isn't set at all) - it just used to
+    // go nowhere but the server logs. Surface it here instead, so "why is
+    // my results table empty" is answerable from the dashboard itself.
+    let dbg=d.debug||{};
+    if(dbg.sheet_error){
+      resultsBody.innerHTML='<p style="color:#c62828;font-weight:700">⚠️ אין תוצאות — הקריאה/כתיבה מול Google Sheet נכשלה:</p><p dir="ltr" style="text-align:left;font-family:monospace;font-size:12px;color:#c62828;background:#fdeaea;padding:8px;border-radius:8px">'+esc(dbg.sheet_error)+'</p><p style="font-size:13px;color:#666">בדרך כלל זה אומר שהגיליון לא שותף עם חשבון השירות (Service Account) בתור עורך (Editor).</p>';
+    } else if(dbg.sheet_configured===false){
+      resultsBody.textContent='אין תוצאות עדיין (השרת רץ בלי חיבור ל-Google Sheets - GOOGLE_CREDENTIALS_JSON לא מוגדר בסביבה הזו)';
+    } else {
+      resultsBody.textContent='אין תוצאות עדיין';
+    }
+    return;
+  }
   let sel=document.getElementById('filterStudent');
   let current=sel.value;
   let students=Array.from(new Set(resultsRows.map(r=>r.student_name).filter(Boolean))).sort();
