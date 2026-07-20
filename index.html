@@ -269,7 +269,7 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 </div></div>
 <div id="appFooterEl" class="app-footer">🧠 מנוע למיומנות בשפה על פי שיטת פרופ' בלום ·  פותח על ידי עמיחי מייטליס ובהדרכת סולי תמרי · © כל הזכויות שמורות</div>
 <script>
-var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',studentPassword='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200,studentPhotoDataUrl='',lastCompletedSentence=null,practiceMode=false;
+var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',studentPassword='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200,studentPhotoDataUrl='',lastCompletedSentence=null,practiceMode=false,practiceModeFromExam=false;
 // A student's own photo is entirely optional, cosmetic, and per-device -
 // stored client-side in localStorage keyed by email (same pattern as the
 // XP/streak gamification data below), not on the server, so there's no new
@@ -1358,6 +1358,12 @@ function showResult(spoken,res){
 // server, so nothing about actual progress ever has to be rewound.
 function practiceAgainNow(){
   if(!lastCompletedSentence)return;
+  // Reachable from the free-practice picker while a live exam is up (jumped
+  // to station 4, then jumped back to browse 2/3). examMode must be
+  // suspended (not just left on) - startRecognition() checks examMode before
+  // practiceMode, so leaving it true would score this free attempt as if it
+  // were a real exam answer. exitPracticeMode() restores it below.
+  if(examMode){examMode=false;practiceModeFromExam=true}
   practiceMode=true;
   hideNextButton();
   document.getElementById('practiceAgainBtn').style.display='none';
@@ -1394,6 +1400,19 @@ function exitPracticeMode(){
   practiceMode=false;
   document.getElementById('nextBtn').textContent='▶️ הבא';
   hideNextButton();
+  if(practiceModeFromExam){
+    // Came from a live exam (see practiceAgainNow/practiceClozeAgainNow) -
+    // the server session is already marked done/completed from the earlier
+    // jump to station 4, so calling loadQuestion() here would fetch that
+    // "done" state again and rebuild the exam FROM SCRATCH via startExam(),
+    // silently discarding every real exam answer already collected in
+    // examResults. Just restore the exact in-progress exam question instead.
+    practiceModeFromExam=false;
+    examMode=true;
+    updateStationBar(4);
+    showExamQuestion();
+    return;
+  }
   loadQuestion();
 }
 function syncFooterVisibility(){
@@ -1476,9 +1495,21 @@ function jumpToStation(target){
     // visit) stuck there forever instead of actually returning to the exam.
     // Only skip rebuilding while genuinely mid-exam (examMode already true),
     // so a stray tap on the still-highlighted "4" icon can't wipe answers
-    // that are actively in progress.
+    // that are actively in progress. If we're in free practice that was
+    // itself entered FROM the exam (practiceModeFromExam - see
+    // practiceAgainNow/practiceClozeAgainNow), restore that exact exam
+    // question instead of either no-op'ing (the original bug report: "4"
+    // does nothing after closing the station-3 practice picker) or rebuilding
+    // the whole exam from scratch (which would silently wipe examResults).
     if(target===4){
       if(examMode)return;
+      if(practiceModeFromExam){
+        practiceMode=false;practiceModeFromExam=false;examMode=true;
+        hideNextButton();hideCapChoice();
+        updateStationBar(4);
+        showExamQuestion();
+        return;
+      }
       practiceMode=false;hideNextButton();hideCapChoice();
       startExamOverAllSentences();
       return;
@@ -1562,6 +1593,11 @@ function playListenAllSentence(i,btn){
 // station 3 actually rehearses completing a sentence instead of just
 // repeating it back like station 2 does.
 function practiceClozeAgainNow(s){
+  // See the matching comment in practiceAgainNow() - must suspend, not
+  // ignore, an already-active exam so this free attempt doesn't get scored
+  // as a real exam answer, and so exitPracticeMode() knows to restore the
+  // exam question afterward instead of rebuilding the exam from scratch.
+  if(examMode){examMode=false;practiceModeFromExam=true}
   practiceMode=true;
   hideNextButton();
   document.getElementById('practiceAgainBtn').style.display='none';
