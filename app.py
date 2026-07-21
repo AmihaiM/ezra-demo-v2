@@ -3,7 +3,7 @@ from urllib.parse import urlparse, parse_qs, quote
 from difflib import SequenceMatcher
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, g
 import requests
 
 app = Flask(__name__)
@@ -72,6 +72,147 @@ TEACHERS_TAB = "Teachers"
 _cache = {}
 _sessions = {}
 _pending_results = []
+
+# --- Durable session storage (Postgres) ---------------------------------
+# Root cause of the recurring "session not found" / "התחלה מחדש" bugs: a
+# student's LIVE in-progress state (which sentence, how many attempts,
+# mastery streak, review queue...) lived only in the _sessions dict above -
+# plain process memory. Every Render redeploy or free-tier spin-down wiped
+# it silently. Results already escaped this via Google Sheets; this mirrors
+# that same "durable copy outside the process" idea for the live session
+# itself. Entirely optional and backward compatible: with no DATABASE_URL
+# set, every function below is a no-op and the app behaves exactly as it
+# did before (memory-only) - so this can be deployed before the DB exists.
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+def _db_conn():
+    """Short-lived connection, opened per call. A long-lived pool would need
+    its own lifecycle per gunicorn worker process, which is unnecessary
+    complexity at this app's scale - a fresh psycopg connection is fast
+    enough to open per request."""
+    if not DATABASE_URL:
+        return None
+    try:
+        import psycopg
+    except ImportError:
+        print("DB SESSION PERSISTENCE DISABLED: psycopg not installed (pip install -r requirements.txt)")
+        return None
+    try:
+        return psycopg.connect(DATABASE_URL, connect_timeout=5)
+    except Exception as e:
+        print("DB CONNECT FAILED", e)
+        return None
+
+def db_init():
+    conn = _db_conn()
+    if not conn:
+        return
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS sessions ("
+                "student_id TEXT PRIMARY KEY, data JSONB NOT NULL, "
+                "updated_at TIMESTAMPTZ NOT NULL DEFAULT now())"
+            )
+    except Exception as e:
+        print("DB INIT FAILED", e)
+    finally:
+        conn.close()
+
+def _session_to_jsonable(s):
+    """finalized_indices is a Python set() - JSON has no set type, so store
+    it as a sorted list. accuracy_data is keyed by integer sentence index -
+    JSON object keys are always strings, so without the explicit str(k) here
+    (and the matching int(k) in _session_from_jsonable below) every
+    accuracy_data[s["current"]] lookup elsewhere in the code would silently
+    stop matching the instant a session reloads from the database."""
+    d = dict(s)
+    d["finalized_indices"] = sorted(d.get("finalized_indices") or [])
+    d["accuracy_data"] = {str(k): v for k, v in (d.get("accuracy_data") or {}).items()}
+    return d
+
+def _session_from_jsonable(d):
+    d = dict(d)
+    d["finalized_indices"] = set(d.get("finalized_indices") or [])
+    d["accuracy_data"] = {int(k): v for k, v in (d.get("accuracy_data") or {}).items()}
+    return d
+
+def save_session(student_id):
+    """Upsert one student's full session dict to Postgres. No-op if no DB is
+    configured or the id isn't currently in memory. Never called by hand
+    from individual endpoints - see the after_request hook below, which
+    persists every session an endpoint actually touched, so nothing can
+    forget to save."""
+    s = _sessions.get(student_id)
+    if s is None:
+        return
+    conn = _db_conn()
+    if not conn:
+        return
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO sessions (student_id, data, updated_at) VALUES (%s, %s, now()) "
+                "ON CONFLICT (student_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()",
+                (student_id, json.dumps(_session_to_jsonable(s))),
+            )
+    except Exception as e:
+        print("SAVE SESSION FAILED", student_id, e)
+    finally:
+        conn.close()
+
+def load_session(student_id):
+    """Read one student's session back from Postgres into the in-memory
+    cache - the fallback path the moment a redeploy/restart has wiped
+    _sessions, instead of that student hitting 'session not found'."""
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute("SELECT data FROM sessions WHERE student_id = %s", (student_id,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            s = _session_from_jsonable(row[0])
+            _sessions[student_id] = s
+            return s
+    except Exception as e:
+        print("LOAD SESSION FAILED", student_id, e)
+        return None
+    finally:
+        conn.close()
+
+def get_session(student_id):
+    """Drop-in replacement for the old _sessions.get(student_id) - checks
+    memory first (identical fast path to before), falls back to the
+    database only when missing there. Also marks the id as touched this
+    request so _persist_touched_sessions (after_request, below) saves any
+    change automatically without every endpoint needing its own save call."""
+    if not student_id:
+        return None
+    s = _sessions.get(student_id)
+    if s is None:
+        s = load_session(student_id)
+    if s is not None:
+        try:
+            g.touched_sessions.add(student_id)
+        except RuntimeError:
+            pass  # called outside a request context (shouldn't happen in practice)
+    return s
+
+@app.before_request
+def _init_touched_sessions():
+    g.touched_sessions = set()
+
+@app.after_request
+def _persist_touched_sessions(resp):
+    for sid in getattr(g, "touched_sessions", ()):
+        save_session(sid)
+    return resp
+
+db_init()
+# --------------------------------------------------------------------------
 # Cache of teacher_id -> that teacher's results worksheet gid (see
 # get_results_tab_gid below) - avoids one extra Google Sheets API round trip
 # on every single teacher login once it's been looked up once.
@@ -806,6 +947,11 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
         "created_at": int(time.time()),
         "updated_at": int(time.time()),
     }
+    # Self-persisting on creation (not just relying on the after_request
+    # hook) since new_session() assigns _sessions[student_id] directly
+    # rather than going through get_session() - this guarantees a brand-new
+    # student survives a restart even within their very first request.
+    save_session(student_id)
 
 
 def get_gspread_client():
@@ -1470,7 +1616,7 @@ def verify_student():
     # memory, not in a database - see the /api/answer 404 handling comment.)
     safe_email = re.sub(r"[^a-z0-9]", "_", email)
     sid = f"{tid}_{safe_email}"
-    existing = _sessions.get(sid)
+    existing = get_session(sid)
     same_unfinished_exercise = bool(
         existing and existing.get("csv_url", "") == ts.get("csv_url", "") and not existing.get("completed")
     )
@@ -1617,7 +1763,7 @@ def restart_exercise():
     wipe the resumed session's progress and rebuild it fresh, same as a
     brand-new login would, but without needing a new session id."""
     data = request.get_json(force=True)
-    s = _sessions.get(data.get("student", ""))
+    s = get_session(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     new_session(s["student_id"], s["teacher_id"], s["student_name"], student_email=s.get("student_email", ""))
@@ -1625,7 +1771,7 @@ def restart_exercise():
 
 @app.get("/api/question")
 def question():
-    s = _sessions.get(request.args.get("student", ""))
+    s = get_session(request.args.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     if s["stage"] == "preview":
@@ -1696,7 +1842,7 @@ def preview_nav():
     a no-op if the student has already left the preview stage (e.g. a stale
     button press after already moving on)."""
     data = request.get_json(force=True)
-    s = _sessions.get(data.get("student", ""))
+    s = get_session(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     if s["stage"] != "preview":
@@ -1746,7 +1892,7 @@ def cap_continue():
     as a skip/fail, queues the sentence for the pre-exam review round, and
     advances to the next sentence."""
     data = request.get_json(force=True)
-    s = _sessions.get(data.get("student", ""))
+    s = get_session(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     pc = s.get("cap_pending")
@@ -1765,7 +1911,7 @@ def cap_retry():
     batch of bonus attempts on the SAME sentence/station instead of forcing an
     advance, for cases where they feel close to a correct answer."""
     data = request.get_json(force=True)
-    s = _sessions.get(data.get("student", ""))
+    s = get_session(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     if not s.get("cap_pending"):
@@ -1779,7 +1925,7 @@ def answer():
     data = request.get_json(force=True)
     sid, spoken = data.get("student", ""), data.get("answer", "")
     metrics = data.get("metrics") or {}
-    s = _sessions.get(sid)
+    s = get_session(sid)
     if not s:
         # score=None (not 0) is deliberate: the front-end treats a missing/non-numeric
         # score as "couldn't check the answer" rather than a real failed attempt.
@@ -1924,7 +2070,7 @@ def answer():
 @app.post("/api/skip")
 def skip():
     data = request.get_json(force=True)
-    s = _sessions.get(data.get("student", ""))
+    s = get_session(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     if s["stage"] == "preview":
@@ -1964,7 +2110,7 @@ def exercise_sentences():
     results. cloze_display is the pre-blanked prompt for station 3's variant
     of that free practice (empty string if this sentence has no detectable
     blank, same as real cloze - it just never gets tested there either)."""
-    s = _sessions.get(request.args.get("student", ""))
+    s = get_session(request.args.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     return jsonify(sentences=[
@@ -1994,7 +2140,7 @@ def jump_station():
       scores are never touched.
     """
     data = request.get_json(force=True)
-    s = _sessions.get(data.get("student", ""))
+    s = get_session(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     try:
@@ -2063,7 +2209,7 @@ def practice_repeat():
 @app.post("/api/exam-result")
 def exam_result():
     data = request.get_json(force=True)
-    s = _sessions.get(data.get("student", ""))
+    s = get_session(data.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
     metrics = data.get("metrics") or {}
