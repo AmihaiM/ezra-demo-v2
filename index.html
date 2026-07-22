@@ -236,10 +236,16 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
    speed control, a running exam timer + live check/x list). Toggled by
    #privateModeBtn; state is per-device (localStorage), same pattern as the
    mute/speed/voice prefs above. See togglePrivateMode() in the script. */
-.pv-toggle{background:#1a1033;color:#fff}
-.pv-toggle .dot{background:#1a1033;border-color:#1a1033;color:#fff}
-.pv-toggle[aria-pressed="true"]{background:var(--tc,#4318D1)}
-.pv-toggle[aria-pressed="true"] .dot{background:var(--tc,#4318D1);border-color:var(--tc,#4318D1)}
+/* OFF state: neutral gray, unmistakably "not active". ON state: solid green
+   with a glow, the universal "this is switched on" signal - per explicit
+   feedback that the previous purple-vs-dark-navy contrast wasn't clear
+   enough. The label itself now also spells out "PRIVATE ON"/"PRIVATE OFF"
+   in words (see togglePrivateMode()/startApp()), not just an icon color. */
+.pv-toggle{background:#9ca3af;color:#fff}
+.pv-toggle .dot{background:#9ca3af;border-color:#9ca3af;color:#fff}
+.pv-toggle .lbl{color:#fff!important;font-weight:900}
+.pv-toggle[aria-pressed="true"]{background:#16a34a;box-shadow:0 0 0 2px #16a34a55}
+.pv-toggle[aria-pressed="true"] .dot{background:#16a34a;border-color:#16a34a}
 #pvHeader,#pvTimer,#pvChat,#pvActions{display:none}
 body.private-mode #pvHeader{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:var(--tc,#4318D1);font-size:13px;margin-bottom:10px;direction:ltr;text-align:left}
 body.private-mode #pvChat{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;max-height:56vh;overflow-y:auto;padding:2px}
@@ -294,6 +300,10 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 .pv-qa-row.bad{border-inline-end:5px solid #ef4444}
 .pv-bubble.pv-listen-row{display:flex;align-items:center;gap:10px;cursor:default;align-self:stretch;max-width:100%}
 .pv-speed-btn{background:#fff3;border:1px solid #fff5;color:#fff;border-radius:8px;padding:4px 8px;font-size:13px;flex:0 0 auto}
+/* The one row in a station 2/3 list that's genuinely the student's live,
+   unanswered question (see pvOpenStationList) - visually set apart from the
+   plain free-practice rows around it so it reads as "this one is real". */
+.pv-live-row{background:#16a34a;box-shadow:0 0 0 2px #16a34a55}
 </style></head><body>
 <div id="connBanner" role="alert"><span id="connBannerMsg">אין חיבור לשרת כרגע.</span><button onclick="connRetry()">🔄 נסה שוב</button></div>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards" id="teacherCards"></div></section>
@@ -330,7 +340,7 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
     <button type="button" class="station-step" data-station="2" onclick="jumpToStation(2)" aria-label="תחנה 2 — Practice"><span class="dot">2</span><span class="lbl">Practice</span></button>
     <button type="button" class="station-step" data-station="3" onclick="jumpToStation(3)" aria-label="תחנה 3 — Exercise"><span class="dot">3</span><span class="lbl">Exercise</span></button>
     <button type="button" class="station-step" data-station="4" onclick="jumpToStation(4)" aria-label="תחנה 4 — Speed Test"><span class="dot">4</span><span class="lbl">Speed Test</span></button>
-    <button type="button" id="privateModeBtn" class="station-step pv-toggle" onclick="togglePrivateMode()" aria-pressed="false" aria-label="הפעל/כבה מצב Private"><span class="dot">🕶️</span><span class="lbl">Private</span></button>
+    <button type="button" id="privateModeBtn" class="station-step pv-toggle" onclick="togglePrivateMode()" aria-pressed="false" aria-label="הפעל/כבה מצב Private"><span class="dot">🕶️</span><span class="lbl" id="privateModeBtnLbl">PRIVATE OFF</span></button>
   </div>
   <button type="button" id="listenAllBtn" class="listen-all-btn" onclick="openListenAll()" aria-label="הצג ושמע את כל משפטי התרגיל">🔊 הצג</button>
 </div>
@@ -928,6 +938,8 @@ function startApp(){
   document.body.classList.toggle('private-mode',privateMode);
   let pvBtn=document.getElementById('privateModeBtn');
   if(pvBtn)pvBtn.setAttribute('aria-pressed',privateMode?'true':'false');
+  let pvBtnLbl=document.getElementById('privateModeBtnLbl');
+  if(pvBtnLbl)pvBtnLbl.textContent=privateMode?'PRIVATE ON':'PRIVATE OFF';
   loadQuestion();
 }
 function loadQuestion(){busy=false;sentenceAttemptCount=0;
@@ -1635,12 +1647,19 @@ function updateStationBar(current){
 }
 function jumpToStation(target){
   if(!studentId||busy)return;
-  // Private mode's station 1 ("Listening") is a restyled read-only sentence
-  // list (see pvShowListening/loadQuestion's preview branch) - not the
-  // graded/paged preview stage the server's jump-station endpoint manages.
-  // Same non-scored nature as the existing "🔊 הצג" listen-all button, so it
-  // bypasses the server round-trip entirely, exactly like that button does.
-  if(target===1&&privateMode){examMode=false;practiceMode=false;hideNextButton();hideCapChoice();pvShowListening();return}
+  // Private mode's stations 1-3 all bypass the server jump-station round-trip
+  // entirely and go straight to a bubble-list view - station 1 (Listening) is
+  // always the read-only sentence list; stations 2/3 (Practice/Exercise) show
+  // the SAME kind of browsable list (explicit request: consistent with
+  // station 1), where tapping the one live/unanswered sentence resumes the
+  // real graded flow and tapping any other sentence enters free/ungraded
+  // practice - see pvOpenStationList(). Station 4 (Speed Test) still needs
+  // the real server round-trip below (exam pipeline).
+  if(privateMode&&(target===1||target===2||target===3)){
+    examMode=false;practiceMode=false;hideNextButton();hideCapChoice();
+    if(target===1)pvShowListening();else pvOpenStationList(target);
+    return;
+  }
   apiFetch('/api/jump-station',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,target:target})},()=>jumpToStation(target)).then(r=>r.json()).then(res=>{
     if(!res.ok)return;
     if(res.mode==='free_practice'){
@@ -1858,6 +1877,8 @@ function togglePrivateMode(){
   document.body.classList.toggle('private-mode',privateMode);
   let btn=document.getElementById('privateModeBtn');
   if(btn)btn.setAttribute('aria-pressed',privateMode?'true':'false');
+  let btnLbl=document.getElementById('privateModeBtnLbl');
+  if(btnLbl)btnLbl.textContent=privateMode?'PRIVATE ON':'PRIVATE OFF';
   if(document.getElementById('app').style.display!=='block')return;
   // Explicit requirement: the two modes must never hand off "current
   // position" to each other across the toggle - switching into Private mode
@@ -1952,24 +1973,33 @@ function pvShowListening(){
     actions.innerHTML='<button type="button" onclick="pvPlayAll()">▶️ Play all</button>';
   }).catch(()=>{chat.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
 }
-// Private-styled replacement for the old openStationPicker() overlay -
-// reached when jumping backward into an already-completed station 2/3.
-// Renders the same sentence list as a bubble list instead of an unstyled
-// modal dialog, and taps into the EXACT SAME pickPracticeSentence()/
-// practiceAgainNow()/practiceClozeAgainNow() flow the normal modal already
-// used (window._pickerTarget/_stationPickerSentences), which already
-// switches to the private bubble view on its own (see pvSyncPracticeAgain
-// hooks in those functions) - only the list itself is presented differently.
+// Reads the bottom station bar's OWN current-station marker (already kept
+// accurate by updateStationBar(), called from loadQuestion/showExamQuestion
+// etc.) - the one source of truth for "which station is the student ACTUALLY
+// on right now server-side", independent of which list they're browsing.
+function pvCurrentStationNum(){
+  let el=document.querySelector('#stationBar .station-step.current');
+  return el?Number(el.dataset.station):0;
+}
+// Private-styled bubble-list view for stations 2 (Practice) and 3 (Exercise) -
+// explicit request: consistent with station 1's list. Shows every sentence in
+// the station; tapping the ONE that's genuinely the student's current live/
+// unanswered question (matched against currentQ.en) resumes the real graded
+// flow (pvResumeLiveQuestion), tapping any other sentence enters the existing
+// ungraded practice-repeat flow via pickPracticeSentence() (same function the
+// old openStationPicker() modal already used) - no new scoring logic, only a
+// different way to reach the same two existing paths.
 function pvOpenStationList(target){
   pvGen++;
   pvAbortRecording();
-  pvHideMic();
   window._pickerTarget=target;
   updateStationBar(target);
   pvStopExamTimer();
   let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
   pvSetHeader('Step '+target+' - '+(target===3?'Exercise':'Practice')+' — choose a sentence','');
   pvClearActions();
+  let isLiveStation=pvCurrentStationNum()===target&&!!currentQ&&!!currentQ.en;
+  if(isLiveStation)pvShowMic();else pvHideMic();
   let chat=document.getElementById('pvChat');
   if(!chat)return;
   chat.innerHTML='<p class="small">טוען משפטים…</p>';
@@ -1977,8 +2007,18 @@ function pvOpenStationList(target){
     let list=d.sentences||[];
     window._stationPickerSentences=list;
     if(!list.length){chat.innerHTML='<p class="small">אין משפטים להצגה.</p>';return}
-    chat.innerHTML=list.map((s,i)=>'<div class="pv-bubble pv-prompt pv-listen-row" onclick="pickPracticeSentence('+i+')"><span style="flex:1;min-width:0"><b>'+esc(target===3?(s.he||''):(s.en||''))+'</b></span></div>').join('');
+    chat.innerHTML=list.map((s,i)=>{
+      let isLive=isLiveStation&&s.en===currentQ.en;
+      let label=esc(target===3?(s.he||''):(s.en||''));
+      return isLive
+        ? '<div class="pv-bubble pv-prompt pv-listen-row pv-live-row" onclick="pvResumeLiveQuestion()"><span style="flex:1;min-width:0"><b>▶ '+label+'</b><br><span style="opacity:.85;font-size:12px">Current — tap to answer</span></span></div>'
+        : '<div class="pv-bubble pv-prompt pv-listen-row" onclick="pickPracticeSentence('+i+')"><span style="flex:1;min-width:0">'+label+'</span></div>';
+    }).join('');
   }).catch(()=>{chat.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
+}
+function pvResumeLiveQuestion(){
+  if(!currentQ)return;
+  pvSyncQuestion(currentQ,window._pickerTarget||2);
 }
 function pvCycleSpeed(btn){
   let rates=[0.7,0.88,1.0,1.15];
@@ -2020,6 +2060,14 @@ function pvRenderResult(spoken,res){
   if(!res||typeof res.score!=='number')return;
   let chat=document.getElementById('pvChat');
   if(!chat)return;
+  // "Clean page" rule (explicit requirement): each new attempt REPLACES the
+  // previous attempt's transcript/feedback, it doesn't pile up underneath
+  // it - only the prompt bubble at the top stays put. Advancing to a genuinely
+  // new sentence already gets a full clean chat too (pvSyncQuestion rebuilds
+  // #pvChat from scratch), so this only needed to cover repeated attempts ON
+  // THE SAME sentence (wrong retries, and the "another round" cap-choice
+  // path, which doesn't itself call any pv render function - see pvCapRetry).
+  chat.querySelectorAll('.pv-transcript,.pv-feedback').forEach(el=>el.remove());
   let passed=!!res.passed;
   let transcriptHtml=(res.words&&res.words.length)?pvWordsHtml(res.words):esc(spoken||'');
   chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-transcript"><span class="pv-avatar">👤</span><span>'+transcriptHtml+'</span></div>');
@@ -2034,9 +2082,12 @@ function pvRenderResult(spoken,res){
   if(capChoice){
     // Mirrors the normal UI's showCapChoice()/capContinue()/capRetry() exactly
     // ("after N failed attempts, offer next sentence or another round") - same
-    // functions, just called from a Private-styled button instead.
+    // functions, just called from a Private-styled button instead. "Another
+    // round" goes through pvCapRetry() (not capRetry() directly) so the page
+    // clears immediately when chosen, instead of only clearing once the next
+    // attempt's result comes back.
     actions.classList.add('show');
-    actions.innerHTML='<button type="button" onclick="capContinue()">Next sentence ➡️</button><button type="button" onclick="capRetry()">Another round 🔁</button>';
+    actions.innerHTML='<button type="button" onclick="capContinue()">Next sentence ➡️</button><button type="button" onclick="pvCapRetry()">Another round 🔁</button>';
   } else if(res.advance&&passed){
     // Only appears once the sentence is genuinely done (server's res.advance),
     // not after every single mastery repeat - Redo/Next reuse the exact same
@@ -2047,6 +2098,16 @@ function pvRenderResult(spoken,res){
   } else {
     actions.classList.remove('show');
   }
+}
+// capRetry() itself doesn't touch the chat (it just re-arms the mic for
+// another round on the same sentence) - clear the previous attempt's
+// transcript/feedback immediately when the student chooses this, rather
+// than leaving it up until their NEXT attempt's result comes back.
+function pvCapRetry(){
+  let chat=document.getElementById('pvChat');
+  if(chat)chat.querySelectorAll('.pv-transcript,.pv-feedback').forEach(el=>el.remove());
+  pvClearActions();
+  capRetry();
 }
 function pvSyncPracticeAgain(isCloze){
   pvGen++;
@@ -2063,6 +2124,7 @@ function pvSyncPracticeAgain(isCloze){
 function pvRenderPracticeRepeatResult(spoken,res){
   let chat=document.getElementById('pvChat');
   if(!chat)return;
+  chat.querySelectorAll('.pv-transcript,.pv-feedback').forEach(el=>el.remove());
   let transcriptHtml=(res.words&&res.words.length)?pvWordsHtml(res.words):esc(spoken||'');
   chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-transcript"><span class="pv-avatar">👤</span><span>'+transcriptHtml+'</span></div>');
   chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback '+(res.passed?'ok':'bad')+'">'+(res.passed?'Correct answer ✔ well done! 😀':'Wrong answer ✗ Try again 😔')+'</div>');
