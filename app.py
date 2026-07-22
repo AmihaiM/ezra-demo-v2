@@ -183,6 +183,49 @@ def load_session(student_id):
     finally:
         conn.close()
 
+def delete_session_row(student_id):
+    """Remove one student's row from Postgres entirely (not just from
+    memory) - used by the admin/teacher "delete student" action below, and
+    by the rename path when a student's email or teacher changes (their
+    student_id is the primary key, so a rename is a delete-old +
+    insert-under-new-key, never an in-place key update)."""
+    conn = _db_conn()
+    if not conn:
+        return
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute("DELETE FROM sessions WHERE student_id = %s", (student_id,))
+    except Exception as e:
+        print("DELETE SESSION FAILED", student_id, e)
+    finally:
+        conn.close()
+
+def _list_all_sessions_from_db():
+    """Every persisted session from Postgres, keyed by student_id - the
+    complete historical roster. _sessions alone only has whoever has hit
+    this process since its last restart, which used to be the ONLY roster
+    the admin/teacher student lists could show (so a restart made students
+    who hadn't been active since briefly "disappear" from the list, even
+    though their progress was never actually lost). Merging this with
+    _sessions (see callers) gives a complete AND up-to-the-second roster."""
+    conn = _db_conn()
+    if not conn:
+        return {}
+    out = {}
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute("SELECT student_id, data FROM sessions")
+            for student_id, data in cur.fetchall():
+                try:
+                    out[student_id] = _session_from_jsonable(data)
+                except Exception:
+                    continue
+    except Exception as e:
+        print("LIST SESSIONS FAILED", e)
+    finally:
+        conn.close()
+    return out
+
 def get_session(student_id):
     """Drop-in replacement for the old _sessions.get(student_id) - checks
     memory first (identical fast path to before), falls back to the
@@ -1710,6 +1753,51 @@ def read_results_sheet_rows(tid):
         debug["sheet_error"] = str(e)
     return rows, debug
 
+def delete_student_rows_from_sheet(tid, email):
+    """Best-effort erasure of a student's historical result rows from their
+    teacher's results sheet, for the "delete student" admin/teacher action
+    (GDPR-style request). Scans the 'Student Email' column and removes every
+    matching row. This is deliberately separate from - and can fail
+    independently of - deleting the student's live session from Postgres:
+    the caller must report both outcomes rather than assuming one implies
+    the other, since a sheet permission issue must never look like a
+    successful full erasure when it wasn't."""
+    email = (email or "").strip().lower()
+    if not email:
+        return False, "no email given"
+    svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if not svc_json:
+        return False, "Google Sheets not configured"
+    if tid not in TEACHERS:
+        return False, "unknown teacher"
+    try:
+        import gspread
+        sheet_id = RESULTS_SHEET_IDS.get(tid, RESULTS_SHEET_ID)
+        sh = get_gspread_client().open_by_key(sheet_id)
+        tab = TEACHERS[tid]["results_tab"]
+        ws = sh.worksheet(tab)
+        values = ws.get_all_values()
+        if not values:
+            return True, None
+        header = values[0]
+        try:
+            email_col = header.index("Student Email")
+        except ValueError:
+            return False, "'Student Email' column not found in sheet"
+        # 1-indexed sheet row numbers, +1 to skip the header row. Delete from
+        # the bottom up so earlier deletions never shift the row numbers of
+        # matches still queued to be removed.
+        match_rows = [
+            i + 2 for i, r in enumerate(values[1:])
+            if email_col < len(r) and r[email_col].strip().lower() == email
+        ]
+        for row_num in reversed(match_rows):
+            ws.delete_rows(row_num)
+        return True, None
+    except Exception as e:
+        print("SHEET SCRUB FAILED", tid, email, e)
+        return False, str(e)
+
 def merge_with_pending(sheet_rows, tid, email=None):
     """Supplement sheet_rows with anything still only in _pending_results
     (written moments ago, or from a local run with no sheet configured at
@@ -2433,13 +2521,21 @@ def teacher_students():
     tid, password = data.get("teacher_id", ""), data.get("password", "")
     if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
         return jsonify(ok=False), 401
+    # Merge the durable Postgres roster with in-memory _sessions rather than
+    # reading _sessions alone - otherwise any student who hasn't made a
+    # request since the last restart would appear to have vanished from
+    # their own teacher's roster, even though their progress was never
+    # actually lost (see the DB-persistence work above).
+    combined = {**_list_all_sessions_from_db(), **_sessions}
     students = []
-    for s in _sessions.values():
+    for sid, s in combined.items():
         if s["teacher_id"] == tid:
             phase = _session_phase_label(s)
             done = phase == "סיים"
             students.append({
-                "name": s["student_name"], "index": s["current"], "total": len(s["sentences"]),
+                "student_id": sid,
+                "name": s["student_name"], "email": s.get("student_email", ""),
+                "index": s["current"], "total": len(s["sentences"]),
                 "done": done, "exercise": s["exercise_name"],
                 "teacher_current_exercise": _teacher_state[tid].get("exercise_name", ""),
                 "threshold": s["threshold"], "max_attempts": s["max_attempts"],
@@ -2454,6 +2550,19 @@ def teacher_students():
 
 def _is_admin(data):
     return bool(ADMIN_PASSWORD) and data.get("password") == ADMIN_PASSWORD
+
+def _admin_or_teacher_auth(data):
+    """Returns ('admin', None) for a valid admin password, ('teacher', tid)
+    for a valid teacher_id+password, or None if neither checks out. Shared
+    by the student-management endpoints below (view/edit/delete), which the
+    admin dashboard uses across every teacher and each teacher's own
+    dashboard uses scoped to just themselves."""
+    if _is_admin(data):
+        return ("admin", None)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if tid in TEACHERS and password == TEACHERS[tid]["teacher_password"]:
+        return ("teacher", tid)
+    return None
 
 @app.post("/api/admin-login")
 def admin_login():
@@ -2493,9 +2602,11 @@ def admin_students():
     data = request.get_json(force=True)
     if not _is_admin(data):
         return jsonify(ok=False), 401
+    combined = {**_list_all_sessions_from_db(), **_sessions}
     students = []
-    for s in _sessions.values():
+    for sid, s in combined.items():
         students.append({
+            "student_id": sid,
             "teacher_id": s["teacher_id"], "teacher_name": TEACHERS.get(s["teacher_id"], {}).get("name", s["teacher_id"]),
             "name": s["student_name"], "email": s.get("student_email", ""),
             "index": s["current"], "total": len(s["sentences"]),
@@ -2504,6 +2615,82 @@ def admin_students():
         })
     students.sort(key=lambda x: x.get("updated_at") or 0, reverse=True)
     return jsonify(ok=True, students=students)
+
+@app.post("/api/manage-student-update")
+def manage_student_update():
+    """Edit a student's display name, email, or (admin only) which teacher
+    they belong to. Name-only edits update the record in place. Changing
+    the email or teacher_id changes the student's primary key
+    (student_id = teacher_id + email), so those are handled as a rename:
+    copy the session under the new id, drop the old one, in both the
+    in-memory cache and Postgres. Refuses to silently overwrite an existing
+    student if the computed new id already belongs to someone else."""
+    data = request.get_json(force=True)
+    auth = _admin_or_teacher_auth(data)
+    if not auth:
+        return jsonify(ok=False, error="לא מורשה"), 401
+    role, scope_tid = auth
+    old_sid = data.get("student_id", "")
+    s = get_session(old_sid)
+    if not s:
+        return jsonify(ok=False, error="תלמיד לא נמצא"), 404
+    if role == "teacher" and s["teacher_id"] != scope_tid:
+        return jsonify(ok=False, error="אין הרשאה לתלמיד/ה של מורה אחר/ת"), 403
+    new_teacher_id = (data.get("teacher_id_new") or s["teacher_id"]).strip()
+    if new_teacher_id != s["teacher_id"]:
+        if role == "teacher":
+            return jsonify(ok=False, error="העברת תלמיד/ה למורה אחר/ת דורשת הרשאת admin"), 403
+        if new_teacher_id not in TEACHERS:
+            return jsonify(ok=False, error="מורה יעד לא קיים"), 400
+    new_email = (data.get("email") or s.get("student_email") or "").strip().lower()
+    new_name = data.get("name")
+    if new_name is not None and new_name.strip():
+        s["student_name"] = new_name.strip()
+    safe_email = re.sub(r"[^a-z0-9]", "_", new_email)
+    new_sid = f"{new_teacher_id}_{safe_email}"
+    if new_sid == old_sid:
+        s["updated_at"] = int(time.time())
+        save_session(old_sid)
+        return jsonify(ok=True, student_id=old_sid)
+    if new_sid in _sessions or load_session(new_sid):
+        return jsonify(ok=False, error="כבר קיים תלמיד/ה עם האימייל/מורה האלה - לא ניתן למזג אוטומטית"), 409
+    s["student_id"] = new_sid
+    s["teacher_id"] = new_teacher_id
+    s["student_email"] = new_email
+    if new_teacher_id in TEACHERS:
+        s["voice_gender"] = TEACHERS[new_teacher_id]["voice_gender"]
+    s["updated_at"] = int(time.time())
+    _sessions[new_sid] = s
+    _sessions.pop(old_sid, None)
+    save_session(new_sid)
+    delete_session_row(old_sid)
+    return jsonify(ok=True, student_id=new_sid)
+
+@app.post("/api/manage-student-delete")
+def manage_student_delete():
+    """Delete a student's live session (Postgres + memory). If
+    scrub_sheet is true, also best-effort deletes their historical result
+    rows from the teacher's Google Sheet - reported separately from the
+    session deletion since one can succeed while the other fails, and the
+    caller must know exactly which happened rather than assuming."""
+    data = request.get_json(force=True)
+    auth = _admin_or_teacher_auth(data)
+    if not auth:
+        return jsonify(ok=False, error="לא מורשה"), 401
+    role, scope_tid = auth
+    sid = data.get("student_id", "")
+    s = get_session(sid)
+    if not s:
+        return jsonify(ok=False, error="תלמיד לא נמצא"), 404
+    if role == "teacher" and s["teacher_id"] != scope_tid:
+        return jsonify(ok=False, error="אין הרשאה לתלמיד/ה של מורה אחר/ת"), 403
+    tid, email = s["teacher_id"], s.get("student_email", "")
+    _sessions.pop(sid, None)
+    delete_session_row(sid)
+    sheet_scrub_ok, sheet_scrub_error = (None, None)
+    if data.get("scrub_sheet"):
+        sheet_scrub_ok, sheet_scrub_error = delete_student_rows_from_sheet(tid, email)
+    return jsonify(ok=True, sheet_scrub_ok=sheet_scrub_ok, sheet_scrub_error=sheet_scrub_error)
 
 @app.post("/api/admin-add-teacher")
 def admin_add_teacher():

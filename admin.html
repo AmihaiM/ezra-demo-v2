@@ -112,20 +112,35 @@ table{width:100%;border-collapse:collapse}
   <section id="students" class="section">
     <div class="card">
       <h2>כל התלמידים הפעילים/שסיימו</h2>
+      <p class="hint">הרשימה כאן היא הרשימה המלאה והעמידה (מה-DB) - כוללת גם תלמידים שלא היו פעילים מאז ההפעלה האחרונה של השרת.</p>
       <div class="row">
         <button class="ghost" onclick="loadStudents()">רענן</button>
         <select id="teacherFilter" onchange="renderStudents()"><option value="">כל המורים</option></select>
       </div>
       <div class="t-wrap" style="margin-top:10px"><table class="t" id="studentsTable">
-        <thead><tr><th>תלמיד/ה</th><th>מורה</th><th>תרגיל</th><th>התקדמות</th><th>שלב</th><th>פעילות אחרונה</th></tr></thead>
-        <tbody id="studentsBody"><tr><td colspan="6">טוען...</td></tr></tbody>
+        <thead><tr><th>תלמיד/ה</th><th>מורה</th><th>תרגיל</th><th>התקדמות</th><th>שלב</th><th>פעילות אחרונה</th><th></th></tr></thead>
+        <tbody id="studentsBody"><tr><td colspan="7">טוען...</td></tr></tbody>
       </table></div>
+    </div>
+    <div class="card" id="editStudentCard" style="display:none">
+      <h2>✏️ עריכת תלמיד/ה: <span id="editStudentName"></span></h2>
+      <p class="hint">שדה ריק = לא משתנה. שינוי אימייל או מורה יוצר בפועל רשומה חדשה עם אותה היסטוריית תרגול - לא ניתן למזג עם רשומה קיימת אחרת.</p>
+      <input id="editStudentNameInput" placeholder="שם">
+      <input id="editStudentEmail" placeholder="אימייל" dir="ltr">
+      <label class="hint" style="display:block;margin-top:6px">העברה למורה אחר/ת (אופציונלי)</label>
+      <select id="editStudentTeacher"></select>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" onclick="saveEditStudent()">שמור שינויים</button>
+        <button class="ghost" onclick="closeEditStudent()">ביטול</button>
+      </div>
+      <div id="editStudentResult" style="margin-top:10px"></div>
     </div>
   </section>
 </main>
 <script>
 var adminPassword='';
 var allStudents=[];
+var allTeachers=[];
 // Named color palette for the "add teacher" form - swatches instead of a raw
 // HEX code, which most admins won't be able to picture just by reading
 // digits. Colors chosen to be visually distinct from each other and from
@@ -278,7 +293,9 @@ function loadTeachers(){
       '<td>'+(t.persisted?'✅':'<span style="color:#c62828;font-weight:800">⚠️ לא נשמר</span> <button class="ghost" style="padding:3px 9px;font-size:12px" onclick="retryPersist(\''+esc(t.teacher_id)+'\')">נסה שוב</button>')+'</td>'+
       '<td><button class="ghost" style="padding:5px 12px;font-size:12px" onclick="openEditTeacher(\''+esc(t.teacher_id)+'\')">✏️ ערוך</button></td></tr>'
     ).join('')||'<tr><td colspan="9">אין מורים עדיין</td></tr>';
-    // Keep the students-tab teacher filter in sync with whoever exists right now.
+    // Keep the students-tab teacher filter (and the student-edit "move to
+    // teacher" dropdown) in sync with whoever exists right now.
+    allTeachers=rows;
     let sel=document.getElementById('teacherFilter'),current=sel.value;
     sel.innerHTML='<option value="">כל המורים</option>'+rows.map(t=>'<option value="'+esc(t.teacher_id)+'">'+esc(t.name)+'</option>').join('');
     sel.value=rows.some(t=>t.teacher_id===current)?current:'';
@@ -341,8 +358,57 @@ function renderStudents(){
     '<td>'+esc(s.teacher_name)+'</td><td>'+esc(s.exercise||'')+'</td>'+
     '<td>'+s.index+'/'+s.total+'</td>'+
     '<td><span class="pill pill-gray">'+esc(s.phase)+'</span></td>'+
-    '<td>'+fmtTime(s.updated_at)+'</td></tr>'
-  ).join('')||'<tr><td colspan="6">אין תלמידים</td></tr>';
+    '<td>'+fmtTime(s.updated_at)+'</td>'+
+    '<td><div class="row" style="gap:6px;flex-wrap:nowrap">'+
+      '<button class="ghost" style="padding:5px 10px;font-size:12px" onclick="openEditStudent(\''+esc(s.student_id)+'\')">✏️</button>'+
+      '<button class="ghost" style="padding:5px 10px;font-size:12px;color:#c62828" onclick="deleteStudent(\''+esc(s.student_id)+'\',\''+esc(s.name)+'\')">🗑️</button>'+
+    '</div></td></tr>'
+  ).join('')||'<tr><td colspan="7">אין תלמידים</td></tr>';
+}
+function findStudent(sid){return allStudents.find(s=>s.student_id===sid)}
+function openEditStudent(sid){
+  let s=findStudent(sid);
+  if(!s){alert('תלמיד/ה לא נמצא/ה - נסה לרענן');return}
+  let card=document.getElementById('editStudentCard');
+  card.dataset.sid=sid;
+  document.getElementById('editStudentName').textContent=s.name;
+  document.getElementById('editStudentNameInput').value=s.name||'';
+  document.getElementById('editStudentEmail').value=s.email||'';
+  let tsel=document.getElementById('editStudentTeacher');
+  tsel.innerHTML=allTeachers.map(t=>'<option value="'+esc(t.teacher_id)+'"'+(t.teacher_id===s.teacher_id?' selected':'')+'>'+esc(t.name)+'</option>').join('');
+  document.getElementById('editStudentResult').innerHTML='';
+  card.style.display='block';
+  card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function closeEditStudent(){document.getElementById('editStudentCard').style.display='none'}
+function saveEditStudent(){
+  let sid=document.getElementById('editStudentCard').dataset.sid;
+  let resultBox=document.getElementById('editStudentResult');
+  resultBox.innerHTML='<p class="hint">שומר...</p>';
+  api('/api/manage-student-update',{
+    student_id:sid,
+    name:document.getElementById('editStudentNameInput').value.trim(),
+    email:document.getElementById('editStudentEmail').value.trim(),
+    teacher_id_new:document.getElementById('editStudentTeacher').value,
+  }).then(({ok,d})=>{
+    if(!ok||!d.ok){resultBox.innerHTML='<div class="err" style="display:block">'+esc(d.error||'שגיאה בשמירה')+'</div>';return}
+    resultBox.innerHTML='<div class="card" style="background:#f0fdf4;margin:0"><b>✅ נשמר בהצלחה</b></div>';
+    closeEditStudent();
+    loadStudents();
+  }).catch(()=>{resultBox.innerHTML='<div class="err" style="display:block">שגיאה בשמירה</div>'});
+}
+function deleteStudent(sid,name){
+  if(!confirm('למחוק את '+name+'? פעולה זו מוחקת את ההתקדמות השמורה שלו/ה ולא ניתנת לביטול.'))return;
+  let scrub=confirm('למחוק גם את שורות התוצאות ההיסטוריות שלו/ה מגיליון ה-Google Sheets של המורה? (אישור=כן, ביטול=רק למחוק את ההתקדמות החיה)');
+  api('/api/manage-student-delete',{student_id:sid,scrub_sheet:scrub}).then(({ok,d})=>{
+    if(!ok||!d.ok){alert('מחיקה נכשלה: '+(d.error||''));return}
+    let msg='נמחק בהצלחה.';
+    if(scrub){
+      msg+=d.sheet_scrub_ok?' גם שורות התוצאות בגיליון נמחקו.':' שים לב: מחיקת שורות התוצאות מהגיליון נכשלה ('+(d.sheet_scrub_error||'')+') - ייתכן שנשארו שם.';
+    }
+    alert(msg);
+    loadStudents();
+  }).catch(()=>alert('מחיקה נכשלה'));
 }
 </script>
 </body></html>
