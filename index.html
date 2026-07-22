@@ -879,6 +879,10 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip',
   } else if(q.cloze_active){
     setStation('cloze', q);
     showCloze(q.cloze_word,q.cloze_attempts_left,q.cloze_display);
+    // Auto-play the sentence audio as soon as a cloze question first loads -
+    // otherwise the student has no way to know what to say (the written
+    // sentence is hidden here by design). Mirrors the review_round branch above.
+    setTimeout(playSentence,350);
     // Show the gauge immediately when this station renders, not only after the
     // student's next submitted attempt - use their last known accuracy for this
     // sentence (mastery_score) with a neutral fluency/hesitation baseline until
@@ -922,6 +926,10 @@ function setStation(st,q){
   let group=stationGroupOf(st);
   let isFirstInStation=(group!==lastAnnouncedGroup);
   lastAnnouncedGroup=group;
+  // Exposed globally so showCloze() (a separately-rendered widget that setStation
+  // does not otherwise control) can apply the same "explain once" collapse rule
+  // to its own header - see showCloze() below.
+  window.stationIsFirstInGroup=isFirstInStation;
   if(st==='cloze'){
     // Hide the ENTIRE top sentence box (not just its children) - the cloze
     // widget below has its own header/instruction that repeats this, so
@@ -930,7 +938,12 @@ function setStation(st,q){
     // looked like a broken empty panel.
     document.getElementById('sentenceBox').style.display='none';
     document.getElementById('en').style.opacity='0';
-    play.style.display='none'; show.style.display='none';
+    // "show" (reveal English text) stays hidden - it would give away the blank
+    // outright. "play" (hear the sentence) must stay VISIBLE though: with the
+    // sentence box hidden, audio is the student's only way to know what to say.
+    // It's automatically disabled while actively recording via the existing
+    // global mic-recording guard, so this doesn't allow replay mid-recording.
+    show.style.display='none';
     document.getElementById('hint').textContent='אמור את המשפט המלא עם המילה החסרה';
   } else if(st==='preview'){
     // Ungraded exposure: read + listen only, no "hide English" toggle (there's
@@ -1271,7 +1284,7 @@ function showResult(spoken,res){
   let enteringCloze=res.cloze_mode&&res.passed&&!res.cloze_done;
   if(enteringCloze){
     hideMastery();
-    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5,res.cloze_display)});
+    showNextButton(function(){setStation('cloze', currentQ||{});showCloze(res.cloze_word,res.cloze_attempts_left||5,res.cloze_display);setTimeout(playSentence,350);});
   } else if(res.cloze_mode||res.cloze_active){
     // showCloze() below always clears #result first (it removes a stale box
     // left over from the PREVIOUS station) - so the cloze feedback box for
@@ -1459,7 +1472,18 @@ function showCloze(word,left,display){let el=document.getElementById('cloze');if
   // text instead of auto-computing a single-word blank - it may mark more than one
   // word and matches what the teacher actually authored.
   let blank=display?display:currentQ.en.split(' ').map(w=>w.toLowerCase().replace(/[^a-z]/g,'')===word?'______':w).join(' ');
-  setStation('cloze', currentQ);el.style.display='block';el.innerHTML='<h3>🧩 תחנה 3 — השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p><div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
+  // NOTE: setStation('cloze', currentQ) is deliberately NOT called again here -
+  // every caller already calls it immediately before calling showCloze(). Calling
+  // it a second time here would flip window.stationIsFirstInGroup to false even
+  // on the very first cloze sentence (group hasn't changed since the caller's
+  // call moments ago), breaking the "explain once" check just below.
+  el.style.display='block';
+  // "Explain once" rule (same as #phase elsewhere): the full header + instructional
+  // paragraph is shown only on the first cloze sentence of the station. From the
+  // second sentence onward only the remaining-attempts count stays, since that
+  // number actually changes and is useful to keep visible every time.
+  let header=window.stationIsFirstInGroup?'<h3>🧩 תחנה 3 — השלמת משפטים</h3><p>המשפט המלא באנגלית מוסתר. אמור את כל המשפט והשלם את המילה החסרה. ניסיונות קלוז שנותרו: '+left+'</p>':'<p>ניסיונות קלוז שנותרו: '+left+'</p>';
+  el.innerHTML=header+'<div dir="ltr" style="font-size:20px;font-weight:700">'+esc(blank)+'</div>'}
 function hideCloze(){document.getElementById('cloze').style.display='none';document.getElementById('play').style.display='';document.getElementById('show').style.display=''}
 function showMastery(consecutive,target,broken,attemptsLeft){let el=document.getElementById('mastery');if(!target)return;el.style.display='block';let dots='';for(let i=0;i<target;i++)dots+='<span class="dot '+(i<consecutive?'done':'')+'"></span>';
   // Combined onto one line (was a separate paragraph below the dots) - purely
