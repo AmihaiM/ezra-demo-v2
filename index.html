@@ -227,13 +227,73 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
    prompt instead of fine print. */
 .hint-cta{text-align:center;color:var(--tc,#4318D1);font-weight:800;font-size:15px;line-height:1.4;background:#f0ecff;border:1.5px solid #ddd6fe;border-radius:14px;padding:9px 16px;margin:10px auto 6px;max-width:360px}
 @media (max-width:759px){.hint-cta{font-size:13.5px;padding:7px 12px;margin:8px auto 4px}}
+
+/* ---------------------------------------------------------------------
+   "Private" mode: an optional, opt-in alternate skin over the SAME
+   underlying session/scoring logic (nothing about grading, mastery, cloze
+   or exam pipelines changes) - a clean chat-bubble presentation, English
+   station labels, and a few new station-1/4 conveniences (listen-all with
+   speed control, a running exam timer + live check/x list). Toggled by
+   #privateModeBtn; state is per-device (localStorage), same pattern as the
+   mute/speed/voice prefs above. See togglePrivateMode() in the script. */
+.pv-toggle{background:#1a1033;color:#fff}
+.pv-toggle .dot{background:#1a1033;border-color:#1a1033;color:#fff}
+.pv-toggle[aria-pressed="true"]{background:var(--tc,#4318D1)}
+.pv-toggle[aria-pressed="true"] .dot{background:var(--tc,#4318D1);border-color:var(--tc,#4318D1)}
+#pvHeader,#pvTimer,#pvChat,#pvActions{display:none}
+body.private-mode #pvHeader{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:var(--tc,#4318D1);font-size:13px;margin-bottom:10px;direction:ltr;text-align:left}
+body.private-mode #pvChat{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;max-height:56vh;overflow-y:auto;padding:2px}
+body.private-mode #pvActions{display:flex;gap:10px;margin-top:4px}
+/* Everything from the "normal" theme that Private mode replaces or doesn't
+   need: instructional headers/hints, the word-diff/mastery/gauge boxes, the
+   secondary control row, cloze's own header, audio settings, preview nav,
+   and the normal next/cap-choice buttons (Private mode has its own
+   pv-actions buttons that call the same underlying functions). The mic and
+   its recording timer/stop button are deliberately NOT in this list - they
+   stay exactly as-is, centered under the chat, in both themes. */
+body.private-mode .sentence-box,
+body.private-mode #cloze,
+body.private-mode #result,
+body.private-mode #mastery,
+body.private-mode .gauge-card,
+body.private-mode .row,
+body.private-mode #audioSettings,
+body.private-mode #hint,
+body.private-mode #prog,
+body.private-mode #previewNav,
+body.private-mode #nextBtn,
+body.private-mode #capChoice,
+body.private-mode #practiceAgainBtn{display:none!important}
+.pv-counter{background:#ede7ff;color:#6b5b95;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
+.pv-step{font-weight:800}
+.pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
+.pv-bubble.pv-prompt{background:var(--tc,#4318D1);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;cursor:pointer}
+.pv-bubble.pv-transcript{background:#eef0f4;color:#333;align-self:flex-start;border-bottom-left-radius:4px;display:flex;gap:8px;align-items:flex-start}
+.pv-bubble.pv-transcript .pv-avatar{font-size:17px;flex:0 0 auto}
+.pv-bubble.pv-feedback{align-self:flex-start;font-weight:800;display:flex;align-items:center;gap:8px}
+.pv-bubble.pv-feedback.ok{background:#e8f5e9;color:#1b5e20}
+.pv-bubble.pv-feedback.bad{background:#ffebee;color:#b71c1c}
+.pv-word-wrong{color:#dc2626;font-weight:800}
+#pvActions button{flex:1;background:#fff;border:2px solid var(--tc,#4318D1);color:var(--tc,#4318D1)}
+body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-size:20px;background:var(--tc,#4318D1);color:#fff;border-radius:12px;padding:6px 14px;margin:0 auto 12px;width:fit-content}
+#pvTimer:empty{display:none!important}
+.pv-qa-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border:1px solid #ede7ff;border-radius:12px;padding:10px 12px;direction:ltr;text-align:left}
+.pv-qa-row.ok{border-inline-end:5px solid #22c55e}
+.pv-qa-row.bad{border-inline-end:5px solid #ef4444}
+.pv-bubble.pv-listen-row{display:flex;align-items:center;gap:10px;cursor:default;align-self:stretch;max-width:100%}
+.pv-speed-btn{background:#fff3;border:1px solid #fff5;color:#fff;border-radius:8px;padding:4px 8px;font-size:13px;flex:0 0 auto}
 </style></head><body>
 <div id="connBanner" role="alert"><span id="connBannerMsg">אין חיבור לשרת כרגע.</span><button onclick="connRetry()">🔄 נסה שוב</button></div>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards" id="teacherCards"></div></section>
 <div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none"><label style="flex:1;font-size:12.5px;color:#666">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2 id="historyTitle">📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
 <div id="resumePrompt" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resumePromptTitle"><div class="card" style="width:min(380px,92vw)"><h2 id="resumePromptTitle">🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
-<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button><button id="logoutBtn" class="mute-btn" onclick="if(confirm('להתנתק ולהחליף תלמיד/ה? (יידרש להזין שם/אימייל/סיסמה מחדש בפעם הבאה)'))logoutStudent()" title="התנתק / החלף תלמיד (למחשב משותף)" aria-label="התנתק">🚪</button></div><span id="studentTag" class="student" role="button" tabindex="0" aria-label="הצג את התוצאות שלי" title="הצג את התוצאות שלי" onclick="showMyResultsFromApp()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyResultsFromApp()}"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box" id="sentenceBox"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="cloze" class="banner cloze"></div><div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><div id="recTimer" style="display:none;text-align:center;font-weight:800;color:var(--tc,#4318D1);font-size:14px;margin-top:4px" aria-live="off">0:00</div><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" class="hint-cta" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><button id="practiceAgainBtn" class="ghost" style="display:none;width:100%;margin-top:8px" onclick="practiceAgainNow()">🔁 תרגל שוב את המשפט הזה (לא משפיע על הציון)</button><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
+<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button><button id="logoutBtn" class="mute-btn" onclick="if(confirm('להתנתק ולהחליף תלמיד/ה? (יידרש להזין שם/אימייל/סיסמה מחדש בפעם הבאה)'))logoutStudent()" title="התנתק / החלף תלמיד (למחשב משותף)" aria-label="התנתק">🚪</button></div><span id="studentTag" class="student" role="button" tabindex="0" aria-label="הצג את התוצאות שלי" title="הצג את התוצאות שלי" onclick="showMyResultsFromApp()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyResultsFromApp()}"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box" id="sentenceBox"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="cloze" class="banner cloze"></div>
+<div id="pvHeader" class="pv-header"><span id="pvHello"></span><span id="pvCounter" class="pv-counter"></span><span id="pvStepLabel" class="pv-step"></span></div>
+<div id="pvTimer" class="pv-timer"></div>
+<div id="pvChat" class="pv-chat"></div>
+<div id="pvActions" class="pv-actions"></div>
+<div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><div id="recTimer" style="display:none;text-align:center;font-weight:800;color:var(--tc,#4318D1);font-size:14px;margin-top:4px" aria-live="off">0:00</div><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" class="hint-cta" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><button id="practiceAgainBtn" class="ghost" style="display:none;width:100%;margin-top:8px" onclick="practiceAgainNow()">🔁 תרגל שוב את המשפט הזה (לא משפיע על הציון)</button><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
 <div id="result" class="result" aria-live="polite"></div>
 <div id="masteryGauge" class="gauge-card" role="button" tabindex="0" aria-label="מד שטף - הרחב לפירוט" onclick="toggleGaugeExpanded()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGaugeExpanded()}">
   <div class="gauge-title">🎯 מד שטף חי — קצב ורציפות דיבור</div>
@@ -254,10 +314,11 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 </div></div></div>
 <div id="stationBar" role="navigation" aria-label="ניווט בין תחנות">
   <div class="station-row">
-    <button type="button" class="station-step" data-station="1" onclick="jumpToStation(1)" aria-label="תחנה 1 — היכרות"><span class="dot">1</span><span class="lbl">היכרות</span></button>
-    <button type="button" class="station-step" data-station="2" onclick="jumpToStation(2)" aria-label="תחנה 2 — אמירת המשפט"><span class="dot">2</span><span class="lbl">אמירת המשפט</span></button>
-    <button type="button" class="station-step" data-station="3" onclick="jumpToStation(3)" aria-label="תחנה 3 — השלמת משפטים"><span class="dot">3</span><span class="lbl">השלמת משפטים</span></button>
-    <button type="button" class="station-step" data-station="4" onclick="jumpToStation(4)" aria-label="תחנה 4 — מבחן"><span class="dot">4</span><span class="lbl">מבחן</span></button>
+    <button type="button" class="station-step" data-station="1" onclick="jumpToStation(1)" aria-label="תחנה 1 — Listening"><span class="dot">1</span><span class="lbl">Listening</span></button>
+    <button type="button" class="station-step" data-station="2" onclick="jumpToStation(2)" aria-label="תחנה 2 — Practice"><span class="dot">2</span><span class="lbl">Practice</span></button>
+    <button type="button" class="station-step" data-station="3" onclick="jumpToStation(3)" aria-label="תחנה 3 — Exercise"><span class="dot">3</span><span class="lbl">Exercise</span></button>
+    <button type="button" class="station-step" data-station="4" onclick="jumpToStation(4)" aria-label="תחנה 4 — Speed Test"><span class="dot">4</span><span class="lbl">Speed Test</span></button>
+    <button type="button" id="privateModeBtn" class="station-step pv-toggle" onclick="togglePrivateMode()" aria-pressed="false" aria-label="הפעל/כבה מצב Private"><span class="dot">🕶️</span><span class="lbl">Private</span></button>
   </div>
   <button type="button" id="listenAllBtn" class="listen-all-btn" onclick="openListenAll()" aria-label="הצג ושמע את כל משפטי התרגיל">🔊 הצג</button>
 </div>
@@ -277,6 +338,12 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 <div id="appFooterEl" class="app-footer">🧠 מנוע למיומנות בשפה על פי שיטת פרופ' בלום ·  פותח על ידי עמיחי מייטליס ובהדרכת סולי תמרי · © כל הזכויות שמורות</div>
 <script>
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',studentPassword='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200,studentPhotoDataUrl='',lastCompletedSentence=null,practiceMode=false,practiceModeFromExam=false;
+// "Private" mode: opt-in alternate chat-bubble skin, per-device (like the
+// mute/speed prefs above) - see the big block of pv* functions near the end
+// of this script, and the body.private-mode CSS rules.
+var privateMode=false;
+try{privateMode=(localStorage.getItem('ezra_private_mode')==='1')}catch(e){}
+var _pvRate=null, pvExamStartTime=null, pvTimerInterval=null;
 // A student's own photo is entirely optional, cosmetic, and per-device -
 // stored client-side in localStorage keyed by email (same pattern as the
 // XP/streak gamification data below), not on the server, so there's no new
@@ -839,15 +906,29 @@ function startApp(){
   // otherwise the actual avatar image already does that job, and showing
   // both together just looks like the photo upload silently failed.
   document.getElementById('studentTagText').textContent=(studentPhoto?'':'👤 ')+studentName;
-  document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';document.body.classList.add('in-app');populateAudioSettingsUI();loadQuestion()
+  document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';document.body.classList.add('in-app');populateAudioSettingsUI();
+  document.body.classList.toggle('private-mode',privateMode);
+  let pvBtn=document.getElementById('privateModeBtn');
+  if(pvBtn)pvBtn.setAttribute('aria-pressed',privateMode?'true':'false');
+  loadQuestion();
 }
 function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.error==='session not found'){showSessionExpired();return}if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
-  updateStationBar(q.stage==='preview'?1:(q.cloze_active||q.review_round)?3:2);
+  let _pvStationNum=q.stage==='preview'?1:(q.cloze_active||q.review_round)?3:2;
+  updateStationBar(_pvStationNum);
   let mw=document.getElementById('mismatchWarn');
   if(q.content_mismatch){mw.style.display='block';mw.textContent='⚠️ לא הצלחנו לטעון את התרגיל האמיתי ("'+q.exercise+'") מהגיליון של המורה, ולכן מוצג כרגע תרגיל לדוגמה במקום. בקש מהמורה לבדוק ששיתוף הגיליון הוגדר כ"כל מי שיש לו את הקישור — צפייה".'}else{mw.style.display='none'}
   // Ungraded preview sweep: just show the sentence + let them replay audio
   // and page back/forward - no mic, no score, no station logic below.
-  document.getElementById('previewNav').style.display=(q.stage==='preview')?'flex':'none';
+  document.getElementById('previewNav').style.display=(q.stage==='preview'&&!privateMode)?'flex':'none';
+  if(q.stage==='preview'&&privateMode){
+    // Private mode's station 1 ("Listening") is a restyled version of the
+    // existing "🔊 הצג" listen-all feature, not the graded/paged preview
+    // sweep - see pvShowListening(). It doesn't consume/advance q at all, so
+    // the underlying preview stage just sits idle until the student jumps to
+    // station 2, exactly like the normal listen-all button already does.
+    pvShowListening();
+    return;
+  }
   if(q.stage==='preview'){
     document.getElementById('prog').textContent='היכרות עם המשפטים '+(q.index+1)+' מתוך '+q.total+' | '+q.exercise;
     document.getElementById('previewBack').disabled=!q.can_go_back;
@@ -898,6 +979,7 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip',
     setStation('listen', q);
     setTimeout(playSentence,350);
   }
+  if(privateMode)pvSyncQuestion(q,_pvStationNum);
 }).catch(e=>document.getElementById('he').textContent='שגיאה בטעינת משפט')}
 // "Explain once, then clean" (per UX feedback): the progress line ("משפט X
 // מתוך Y | שם התרגיל") and the station header ("⭐ תחנה 2 — ...") are static
@@ -1065,7 +1147,7 @@ function playSentence(){
 // "listen to any sentence" list (see openListenAll) without needing a real
 // currentQ/#play button. btn (optional) just gets disabled while speaking so
 // a student can't spam-click it into overlapping utterances.
-function speakText(text, btn){
+function speakText(text, btn, rateOverride, onDone){
   speechSynthesis.cancel();
   // Guard against double-clicking "שמע שוב" while the engine is still
   // settling from cancel() above - a second overlapping speak() call while
@@ -1085,9 +1167,13 @@ function speakText(text, btn){
     primer.volume=0.01; primer.rate=2; primer.lang='en-US';
     let speakReal=()=>{
       let u=new SpeechSynthesisUtterance(text);
-      u.lang='en-US';u.rate=speechRate;
+      u.lang='en-US';
+      // rateOverride/onDone: used by Private mode's per-sentence speed icon
+      // and "play all sequentially" feature (station 1) - every other
+      // existing caller omits both, so behavior there is unchanged.
+      u.rate=(typeof rateOverride==='number'&&rateOverride>0)?rateOverride:speechRate;
       let v=pickVoice();if(v)u.voice=v;
-      let reenable=()=>{if(btn)btn.disabled=false};
+      let reenable=()=>{if(btn)btn.disabled=false;if(typeof onDone==='function')onDone()};
       u.onend=reenable; u.onerror=reenable;
       speechSynthesis.speak(u);
     };
@@ -1362,6 +1448,7 @@ function showResult(spoken,res){
     }
     showNextButton(loadQuestion);
   }
+  if(privateMode)pvRenderResult(spoken,res);
   // Auto-scroll so the fresh feedback is immediately in view - not "scroll to
   // the bottom of the page" (the next/continue button is pinned there now
   // regardless, via position:fixed, so that's never actually the problem),
@@ -1396,6 +1483,7 @@ function practiceAgainNow(){
   document.getElementById('phase').innerHTML='🔁 תרגול חופשי — לא משפיע על ההתקדמות או הציון';
   document.getElementById('hint').textContent='לחץ על המיקרופון ונסה שוב';
   setTimeout(playSentence,300);
+  if(privateMode)pvSyncPracticeAgain(false);
 }
 function submitPracticeRepeat(spoken){
   apiFetch('/api/practice-repeat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answer:spoken,correct:(lastCompletedSentence&&lastCompletedSentence.en)||''})}).then(r=>r.json()).then(res=>{
@@ -1407,6 +1495,7 @@ function submitPracticeRepeat(spoken){
     box.innerHTML='<h3>'+(res.passed?'✅ מצוין! 🎉':'💪 עדיין לא בדיוק')+'</h3><div>ציון: <b>'+res.score+'%</b> | אמרת: <span dir="ltr">'+esc(spoken)+'</span></div><div class="words">'+words+'</div><p class="small">תרגול חופשי — לא נשמר ולא משפיע על ההתקדמות.</p>';
     document.getElementById('hint').textContent=res.passed?'יפה! אפשר לנסות עוד פעם או לחזור לתרגול הרגיל':'נסה שוב, או חזור לתרגול הרגיל';
     showPracticeExitButton();
+    if(privateMode)pvRenderPracticeRepeatResult(spoken,res);
   }).catch(()=>{busy=false;document.getElementById('hint').textContent='שגיאה'});
 }
 function showPracticeExitButton(){
@@ -1495,7 +1584,7 @@ function hideMastery(){document.getElementById('mastery').style.display='none'}
 function hideAll(){document.getElementById('result').style.display='none';document.getElementById('en').style.opacity=0;document.getElementById('hint').textContent='לחץ על המיקרופון ואמור את המשפט באנגלית';document.getElementById('play').style.display='';document.getElementById('show').style.display='';document.getElementById('prog').style.display='';document.getElementById('phase').style.display='';document.getElementById('he').style.display='';document.getElementById('sentenceBox').style.display='';document.getElementById('recTimer').style.display='none';document.getElementById('practiceAgainBtn').style.display='none';exitRecordingFocus();hideCloze();hideMastery();hideMasteryGauge();hideNextButton();hideCapChoice()}
 function skipSentence(){apiFetch('/api/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})},skipSentence).then(()=>loadQuestion()).catch(()=>{})}
 function previewNavGo(direction){apiFetch('/api/preview-nav',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,direction:direction})},()=>previewNavGo(direction)).then(()=>loadQuestion()).catch(()=>{})}
-function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';updateStationBar(4);if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 תחנה 4 — מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
+function startExam(){examMode=true;examIndex=0;examResults=[];examSentences=practiceResults.filter(r=>!r.skipped).map(r=>({sentence:r.sentence,completion:r.completion||''})).filter(x=>x.sentence);document.getElementById('skip').style.display='none';updateStationBar(4);if(privateMode)pvFillExamHebrew();if(!examSentences.length){showExamSummary();return}document.getElementById('phase').innerHTML='<div class="exam" style="padding:12px;border-radius:12px">🎓 תחנה 4 — מבחן סיכום — אין משוב עד הסוף</div>';showExamQuestion()}
 // Persistent bottom step-bar: reflects current station + lets the student
 // jump freely, forward or back, at any moment (explicit, non-negotiable
 // request). Forward jumps fast-forward past intervening stations using the
@@ -1513,6 +1602,12 @@ function updateStationBar(current){
 }
 function jumpToStation(target){
   if(!studentId||busy)return;
+  // Private mode's station 1 ("Listening") is a restyled read-only sentence
+  // list (see pvShowListening/loadQuestion's preview branch) - not the
+  // graded/paged preview stage the server's jump-station endpoint manages.
+  // Same non-scored nature as the existing "🔊 הצג" listen-all button, so it
+  // bypasses the server round-trip entirely, exactly like that button does.
+  if(target===1&&privateMode){examMode=false;practiceMode=false;hideNextButton();hideCapChoice();pvShowListening();return}
   apiFetch('/api/jump-station',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,target:target})},()=>jumpToStation(target)).then(r=>r.json()).then(res=>{
     if(!res.ok)return;
     if(res.mode==='free_practice'){openStationPicker(target);return}
@@ -1554,7 +1649,7 @@ function startExamOverAllSentences(){
   apiFetch('/api/exercise-sentences?student='+encodeURIComponent(studentId),{},startExamOverAllSentences).then(r=>r.json()).then(d=>{
     let list=d.sentences||[];
     examMode=true;examIndex=0;examResults=[];
-    examSentences=list.map(s=>({sentence:s.en,completion:s.completion||''})).filter(x=>x.sentence);
+    examSentences=list.map(s=>({sentence:s.en,completion:s.completion||'',he:s.he||''})).filter(x=>x.sentence);
     document.getElementById('skip').style.display='none';
     // A direct jump can land here straight from the preview stage, which has
     // its own nav (forward/back, no mic) still showing and the mic itself
@@ -1642,6 +1737,7 @@ function practiceClozeAgainNow(s){
   document.getElementById('phase').innerHTML='🧩 תרגול חופשי — השלמת משפטים — לא משפיע על ההתקדמות או הציון';
   document.getElementById('hint').textContent='אמור את המשפט המלא כולל המילה החסרה';
   setTimeout(playSentence,300);
+  if(privateMode)pvSyncPracticeAgain(true);
 }
 function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentence;currentQ={en:s,he:''};hideAll();
   let heEl=document.getElementById('he');
@@ -1666,8 +1762,10 @@ function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentenc
   // question - the running "X מתוך Y" count (which students specifically
   // asked to always keep visible) stays up for every question, here too.
   document.getElementById('phase').style.display=(examIndex===0)?'':'none';
-  document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)}
-function submitExamAnswer(spoken,metrics){let correct=examSentences[examIndex].sentence;apiFetch('/api/score-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,spoken:spoken,correct:correct})},()=>submitExamAnswer(spoken,metrics)).then(r=>r.json()).then(res=>{examResults.push({sentence:correct,spoken:spoken,score:res.score,passed:res.passed});apiFetch('/api/exam-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,sentence:correct,spoken:spoken,score:res.score,passed:res.passed,metrics:metrics||{}})}).catch(()=>{});examIndex++;busy=false;if(examIndex>=examSentences.length)showExamSummary();else showExamQuestion()}).catch(()=>{busy=false})}
+  document.getElementById('bar').style.width=Math.round(examIndex/examSentences.length*100)+'%';setTimeout(playSentence,300)
+  if(privateMode)pvRenderExamQuestion(item);
+}
+function submitExamAnswer(spoken,metrics){let correct=examSentences[examIndex].sentence;apiFetch('/api/score-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,spoken:spoken,correct:correct})},()=>submitExamAnswer(spoken,metrics)).then(r=>r.json()).then(res=>{examResults.push({sentence:correct,spoken:spoken,score:res.score,passed:res.passed});apiFetch('/api/exam-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,sentence:correct,spoken:spoken,score:res.score,passed:res.passed,metrics:metrics||{}})}).catch(()=>{});if(privateMode)pvAppendExamRow({sentence:correct,he:(examSentences[examIndex]&&examSentences[examIndex].he)||'',spoken:spoken,score:res.score,passed:res.passed});examIndex++;busy=false;if(examIndex>=examSentences.length)showExamSummary();else showExamQuestion()}).catch(()=>{busy=false})}
 function showExamSummary(){
   examMode=false; currentQ=null; busy=true;
   // Tells the server the exam itself is genuinely finished - distinct from
@@ -1700,7 +1798,221 @@ function showExamSummary(){
   document.getElementById('prog').textContent='תחנה 4 הושלמה — סיכום אישי';
   let rows=examResults.map((r,i)=>'<div class="summary-row '+(r.passed?'pass':'fail')+'"><b>'+(i+1)+'. '+(Number(r.score)||0)+'%</b> — '+esc(r.sentence)+'<br><small>אמרת: '+esc(r.spoken||'')+'</small></div>').join('') || '<div class="summary-row">אין משפטים למבחן</div>';
   document.getElementById('en').innerHTML='<section class="summary-hero"><h2>🎉 סיימת!</h2><div class="score-circle" style="--score-deg:'+deg+'"><b>'+avg+'%</b></div><p>ציון סופי במבחן הרציף</p></section><div class="summary-grid"><div class="summary-card"><div class="num">'+passed+'/'+total+'</div><div>משפטים שעברו</div></div><div class="summary-card"><div class="num">'+avg+'%</div><div>ממוצע</div></div><div class="summary-card"><div class="num">⭐</div><div>Mastery נרשם בלוח המורה</div></div></div><div class="summary-actions"><button class="ghost" onclick="location.reload()">🔄 תרגול חדש</button><button class="primary" onclick="window.print()">🖨️ הדפס סיכום</button></div><div class="summary-list">'+rows+'</div>';
+  if(privateMode)pvRenderExamSummary(avg,total,passed);
 }
+// ---------------------------------------------------------------------------
+// "Private" mode rendering layer. Everything below is presentation only - it
+// reads state that the real session/scoring code above already computed
+// (currentQ, res.words/res.passed/res.advance/res.cap_choice, examSentences/
+// examIndex/examResults) and paints it into the #pvChat bubble list instead
+// of the normal #he/#en/#result/#mastery elements. No grading, mastery,
+// cloze-pass, or exam logic is duplicated or changed here - Redo/Next and the
+// cap-choice buttons below call the EXACT SAME functions the normal UI uses
+// (practiceAgainNow/goNext/capContinue/capRetry), so behavior is identical,
+// only the visual presentation differs. Station 1 ("Listening") is a restyled
+// version of the pre-existing "🔊 הצג" listen-all feature (same
+// /api/exercise-sentences endpoint), and Station 4 ("Speed Test") is a
+// restyled view over the existing exam pipeline, both explained inline below.
+function togglePrivateMode(){
+  privateMode=!privateMode;
+  try{localStorage.setItem('ezra_private_mode',privateMode?'1':'0')}catch(e){}
+  document.body.classList.toggle('private-mode',privateMode);
+  let btn=document.getElementById('privateModeBtn');
+  if(btn)btn.setAttribute('aria-pressed',privateMode?'true':'false');
+  if(!privateMode){pvStopExamTimer();return}
+  if(document.getElementById('app').style.display!=='block')return;
+  // Best-effort paint of whatever the student is currently doing into the
+  // private view - nothing here touches server/session state, so a wrong
+  // guess just means the visible bubble is briefly out of sync until the
+  // next real event (submit/next question) re-renders it correctly.
+  if(examMode){
+    pvRenderExamQuestion(examSentences[examIndex]);
+  } else if(practiceMode){
+    pvSyncPracticeAgain(window._pickerTarget===3);
+  } else if(currentQ){
+    pvSyncQuestion(currentQ, currentQ.cloze_active?3:2);
+  } else {
+    pvShowListening();
+  }
+}
+function pvSetHeader(stepLabel,counterText){
+  let hello=document.getElementById('pvHello'); if(hello)hello.textContent='Hello '+(studentName||'student');
+  let step=document.getElementById('pvStepLabel'); if(step)step.textContent=stepLabel||'';
+  let counter=document.getElementById('pvCounter'); if(counter)counter.textContent=counterText||'';
+}
+function pvClearActions(){
+  let actions=document.getElementById('pvActions');
+  if(actions){actions.style.display='none';actions.innerHTML=''}
+}
+function pvWordsHtml(words){
+  return (words||[]).filter(w=>w.status!=='extra').map(w=>'<span'+(w.status==='wrong'?' class="pv-word-wrong"':'')+'>'+esc(w.word)+'</span>').join(' ');
+}
+// --- Station 1: Listening ---------------------------------------------------
+function pvShowListening(){
+  updateStationBar(1);
+  pvStopExamTimer();
+  let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
+  pvSetHeader('Step 1 - Listening','');
+  pvClearActions();
+  let chat=document.getElementById('pvChat');
+  if(!chat)return;
+  if(!studentId){chat.innerHTML='';return}
+  chat.innerHTML='<p class="small">טוען משפטים…</p>';
+  apiFetch('/api/exercise-sentences?student='+encodeURIComponent(studentId),{},pvShowListening).then(r=>r.json()).then(d=>{
+    let list=d.sentences||[];
+    window._pvListenList=list;
+    if(!list.length){chat.innerHTML='<p class="small">אין משפטים להצגה.</p>';return}
+    chat.innerHTML=list.map((s,i)=>'<div class="pv-bubble pv-prompt pv-listen-row"><button type="button" class="pv-speed-btn" onclick="event.stopPropagation();pvCycleSpeed(this)" title="שנה מהירות">⏱️</button><span style="flex:1;min-width:0" onclick="pvPlayListenRow('+i+')"><b>'+esc(s.en||'')+'</b><br><span style="opacity:.85;font-size:13px">'+esc(s.he||'')+'</span></span></div>').join('');
+    let actions=document.getElementById('pvActions');
+    actions.style.display='flex';
+    actions.innerHTML='<button type="button" onclick="pvPlayAll()">▶️ Play all</button>';
+  }).catch(()=>{chat.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
+}
+function pvCycleSpeed(btn){
+  let rates=[0.7,0.88,1.0,1.15];
+  let cur=(_pvRate==null)?0.88:_pvRate;
+  let idx=(rates.indexOf(cur)+1)%rates.length;
+  _pvRate=rates[idx];
+  btn.textContent='⏱️'+_pvRate+'x';
+}
+function pvPlayListenRow(i){
+  let s=(window._pvListenList||[])[i];
+  if(!s)return;
+  speakText(s.en,null,_pvRate);
+}
+function pvPlayAll(){
+  let list=window._pvListenList||[];
+  let i=0;
+  function next(){ if(i>=list.length)return; let s=list[i++]; speakText(s.en,null,_pvRate,next); }
+  next();
+}
+// --- Stations 2 (Practice) & 3 (Exercise) -----------------------------------
+// Station 3's prompt shows the Hebrew translation instead of the blanked
+// English display (per explicit design decision: same underlying cloze
+// grading/CSV structure, only the visual prompt differs - see loadQuestion's
+// q.he/q.en handling above, which this mirrors).
+function pvSyncQuestion(q,stationNum){
+  pvStopExamTimer();
+  let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
+  let labels={2:'Practice',3:'Exercise'};
+  pvSetHeader('Step '+stationNum+' - '+(labels[stationNum]||''), (typeof q.index==='number'&&typeof q.total==='number')?(q.index+1)+'/'+q.total:'');
+  pvClearActions();
+  let promptText=stationNum===3?(q.he||q.en||''):(q.en||q.he||'');
+  let chat=document.getElementById('pvChat');
+  if(chat)chat.innerHTML='<div class="pv-bubble pv-prompt" onclick="pvReplayCurrent()" title="הקש כדי לשמוע שוב">'+esc(promptText)+'</div>';
+}
+function pvReplayCurrent(){ if(currentQ)speakText(currentQ.en,null); }
+function pvRenderResult(spoken,res){
+  if(!res||typeof res.score!=='number')return;
+  let chat=document.getElementById('pvChat');
+  if(!chat)return;
+  let passed=!!res.passed;
+  let transcriptHtml=(res.words&&res.words.length)?pvWordsHtml(res.words):esc(spoken||'');
+  chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-transcript"><span class="pv-avatar">👤</span><span>'+transcriptHtml+'</span></div>');
+  let capChoice=!!res.cap_choice;
+  let outOfAttempts=!passed&&!!res.skipped&&!!res.cap_reached;
+  let feedbackClass=passed?'ok':'bad';
+  let feedbackText=passed?'Correct answer ✔ well done! 😀':(capChoice?'Out of attempts this round ⏸️':(outOfAttempts?'Moving on ⏭️':'Wrong answer ✗ Try again 😔'));
+  chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback '+feedbackClass+'">'+esc(feedbackText)+'</div>');
+  chat.scrollTop=chat.scrollHeight;
+  let actions=document.getElementById('pvActions');
+  actions.innerHTML='';
+  if(capChoice){
+    // Mirrors the normal UI's showCapChoice()/capContinue()/capRetry() exactly
+    // ("after N failed attempts, offer next sentence or another round") - same
+    // functions, just called from a Private-styled button instead.
+    actions.style.display='flex';
+    actions.innerHTML='<button type="button" onclick="capContinue()">Next sentence ➡️</button><button type="button" onclick="capRetry()">Another round 🔁</button>';
+  } else if(res.advance&&passed){
+    // Only appears once the sentence is genuinely done (server's res.advance),
+    // not after every single mastery repeat - Redo/Next reuse the exact same
+    // practiceAgainNow()/goNext() the normal UI's "🔁 תרגל שוב" / "▶️ הבא"
+    // buttons already call.
+    actions.style.display='flex';
+    actions.innerHTML='<button type="button" onclick="practiceAgainNow()">Redo Exercise</button><button type="button" onclick="goNext()">Next Exercise</button>';
+  } else {
+    actions.style.display='none';
+  }
+}
+function pvSyncPracticeAgain(isCloze){
+  pvStopExamTimer();
+  let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
+  pvSetHeader((isCloze?'Exercise':'Practice')+' - Free practice','');
+  pvClearActions();
+  let text=isCloze?((currentQ&&currentQ.he)||''):((currentQ&&currentQ.en)||'');
+  let chat=document.getElementById('pvChat');
+  if(chat)chat.innerHTML='<div class="pv-bubble pv-prompt" onclick="pvReplayCurrent()">'+esc(text)+'</div>';
+}
+function pvRenderPracticeRepeatResult(spoken,res){
+  let chat=document.getElementById('pvChat');
+  if(!chat)return;
+  let transcriptHtml=(res.words&&res.words.length)?pvWordsHtml(res.words):esc(spoken||'');
+  chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-transcript"><span class="pv-avatar">👤</span><span>'+transcriptHtml+'</span></div>');
+  chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback '+(res.passed?'ok':'bad')+'">'+(res.passed?'Correct answer ✔ well done! 😀':'Wrong answer ✗ Try again 😔')+'</div>');
+  chat.scrollTop=chat.scrollHeight;
+  let actions=document.getElementById('pvActions');
+  actions.style.display='flex';
+  actions.innerHTML='<button type="button" onclick="exitPracticeMode()">Back to Exercise</button>';
+}
+// --- Station 4: Speed Test ---------------------------------------------------
+function pvFillExamHebrew(){
+  // startExam() (natural completion of stations 2/3) builds examSentences from
+  // practiceResults, which carries no Hebrew - unlike startExamOverAllSentences()
+  // (direct jump to station 4), which already gets it straight from
+  // /api/exercise-sentences. This one extra call backfills it for Private
+  // mode's Hebrew-prompt display only; nothing about the exam pipeline itself
+  // reads or needs this field.
+  if(!studentId)return;
+  apiFetch('/api/exercise-sentences?student='+encodeURIComponent(studentId),{}).then(r=>r.json()).then(d=>{
+    let map={};(d.sentences||[]).forEach(s=>{if(s.en)map[s.en]=s.he});
+    examSentences.forEach(item=>{ if(!item.he)item.he=map[item.sentence]||''; });
+    if(privateMode&&examMode&&examSentences[examIndex])pvRenderExamQuestion(examSentences[examIndex]);
+  }).catch(()=>{});
+}
+function pvRenderExamQuestion(item){
+  if(!item)return;
+  pvSetHeader('Step 4 - Speed Test', (examIndex+1)+'/'+examSentences.length);
+  if(examIndex===0&&!pvTimerInterval){
+    // Fresh test (not a re-render of question 1 after pvFillExamHebrew comes
+    // back, and not a toggle-mid-test resync) - clear any old rows and start
+    // the running timer once.
+    let chat=document.getElementById('pvChat'); if(chat)chat.innerHTML='';
+    pvStartExamTimer();
+  }
+  pvClearActions();
+}
+function pvStartExamTimer(){
+  pvStopExamTimer();
+  pvExamStartTime=performance.now();
+  let el=document.getElementById('pvTimer');
+  if(el)el.textContent='00:00';
+  pvTimerInterval=setInterval(()=>{
+    let sec=Math.floor((performance.now()-pvExamStartTime)/1000);
+    if(el)el.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
+  },250);
+}
+function pvStopExamTimer(){ if(pvTimerInterval){clearInterval(pvTimerInterval);pvTimerInterval=null} }
+function pvAppendExamRow(row){
+  let chat=document.getElementById('pvChat');
+  if(!chat)return;
+  let n=chat.querySelectorAll('.pv-qa-row').length+1;
+  let label=row.he||row.sentence||'';
+  chat.insertAdjacentHTML('beforeend','<div class="pv-qa-row '+(row.passed?'ok':'bad')+'"><span>'+n+'. '+esc(label)+'</span><span>'+(row.passed?'✔️':'❌')+'</span></div>');
+  chat.scrollTop=chat.scrollHeight;
+}
+function pvRenderExamSummary(avg,total,passed){
+  pvStopExamTimer();
+  pvSetHeader('Step 4 - Speed Test — Done', total+'/'+total);
+  let chat=document.getElementById('pvChat');
+  if(chat){
+    chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback '+(avg>=90?'ok':'bad')+'">Final score: '+avg+'% ('+passed+'/'+total+')</div>');
+    chat.scrollTop=chat.scrollHeight;
+  }
+  let actions=document.getElementById('pvActions');
+  actions.style.display='flex';
+  actions.innerHTML='<button type="button" onclick="pvRedoTest()">🔄 Redo test</button>';
+}
+function pvRedoTest(){ startExamOverAllSentences(); }
 function esc(s){return String(s==null?'':s).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
