@@ -987,6 +987,16 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
         "results": [],
         "exam_results": [],
         "completed": False,
+        # Distinct from "completed" above, which is set the moment the
+        # student merely REACHES station 4 (practice/cloze sweep done) -
+        # long before they've actually taken the exam. This flag is only set
+        # once the client explicitly reports the exam summary screen was
+        # shown (see /api/exam-complete), and is what login-resume logic and
+        # the "you just finished" message below key off - otherwise a
+        # student who skipped sentences in practice and hadn't started/
+        # finished the exam yet would get told they "just finished" with a
+        # misleading pre-exam average on their very next login.
+        "exam_completed": False,
         "created_at": int(time.time()),
         "updated_at": int(time.time()),
     }
@@ -1660,27 +1670,35 @@ def verify_student():
     safe_email = re.sub(r"[^a-z0-9]", "_", email)
     sid = f"{tid}_{safe_email}"
     existing = get_session(sid)
+    # Gate resuming on exam_completed, NOT completed - "completed" is set the
+    # moment the student merely REACHES station 4 (practice/cloze sweep
+    # done), well before they've actually taken the exam. Gating on it here
+    # meant a student who skipped a few sentences in practice and hadn't
+    # even started/finished the exam yet would, on their very next login, be
+    # silently reset into a brand-new attempt - reported bug: "I didn't
+    # really finish, but I got told I did and landed back on the same
+    # level". exam_completed is only set once the client explicitly reports
+    # the exam summary screen was shown (see /api/exam-complete) - until
+    # then this is still the same in-progress attempt.
     same_unfinished_exercise = bool(
-        existing and existing.get("csv_url", "") == ts.get("csv_url", "") and not existing.get("completed")
+        existing and existing.get("csv_url", "") == ts.get("csv_url", "") and not existing.get("exam_completed")
     )
     # Only worth asking "continue or restart?" if they actually got past the
     # very start - never got past the first ungraded preview sentence means
     # there's nothing meaningful to resume, so just carry on silently.
     resumable = same_unfinished_exercise and not (existing.get("stage") == "preview" and existing.get("current", 0) == 0)
-    # A session marked "completed" (see /api/question - this happens once the
-    # practice/cloze SWEEP finishes, BEFORE the exam, since the exam itself
-    # runs entirely client-side and never reports "the whole thing is truly
-    # over" back to the server) silently gets replaced by a brand-new
+    # A session marked exam_completed silently gets replaced by a brand-new
     # new_session() below. If that happens right after the student actually
-    # finished - e.g. the page reloads mid-exam or right after seeing their
-    # score, including via the auto-resume-on-refresh flow - they land back
-    # on station 1 of a fresh attempt with zero explanation, which reads as
-    # "why did it just go back to the same exercise". Capture what they just
-    # finished here so the client can show a one-time, honest explanation
-    # instead of looking like silent data loss.
+    # finished, they land back on station 1 of a fresh attempt with zero
+    # explanation, which reads as "why did it just go back to the same
+    # exercise". Capture what they just finished here so the client can show
+    # a one-time, honest explanation instead of looking like silent data
+    # loss. Prefer the actual exam results for the average shown - not the
+    # pre-exam practice-phase results - since that's what the student
+    # thinks of as "what I just did".
     just_completed = None
-    if existing and existing.get("completed"):
-        prev_results = existing.get("results", [])
+    if existing and existing.get("exam_completed"):
+        prev_results = existing.get("exam_results") or existing.get("results", [])
         prev_avg = int(sum(r.get("score", 0) for r in prev_results) / len(prev_results)) if prev_results else None
         just_completed = {"exercise": existing.get("exercise_name", ""), "avg_score": prev_avg}
     if same_unfinished_exercise:
@@ -2315,6 +2333,21 @@ def exam_result():
     }
     s["exam_results"].append(row)
     write_result(row)
+    return jsonify(ok=True)
+
+@app.post("/api/exam-complete")
+def exam_complete():
+    """Explicit signal that the student has actually finished the exam (the
+    client calls this from showExamSummary()) - see the exam_completed field
+    set in new_session() for why this must be tracked separately from
+    "completed" (reaching station 4), and how login-resume logic depends on
+    it."""
+    data = request.get_json(force=True)
+    s = get_session(data.get("student", ""))
+    if not s:
+        return jsonify(error="session not found"), 404
+    s["exam_completed"] = True
+    s["updated_at"] = int(time.time())
     return jsonify(ok=True)
 
 def get_results_tab_gid(tid, sheet_id):

@@ -1619,7 +1619,18 @@ function practiceClozeAgainNow(s){
   document.getElementById('hint').textContent='אמור את המשפט המלא כולל המילה החסרה';
   setTimeout(playSentence,300);
 }
-function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentence;currentQ={en:s,he:''};hideAll();document.getElementById('he').textContent='אמור את המשפט באנגלית';
+function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentence;currentQ={en:s,he:''};hideAll();
+  let heEl=document.getElementById('he');
+  heEl.textContent='אמור את המשפט באנגלית';
+  // "#he" doesn't hold a real Hebrew translation during the exam (examSentences
+  // only carries the English text) - it was showing this generic instruction
+  // on EVERY single question forever, which is exactly the kind of repeated
+  // instructional clutter the "explain once, then clean page" rule already
+  // applies to "#phase" two lines below. Bug report: by question 13/15 the
+  // screen still had this same instruction line sitting on top of the
+  // hint-cta pill underneath the mic, which already says the same thing.
+  // Fixed the same way "#phase" is handled: shown once on question 1 only.
+  heEl.style.display=(examIndex===0)?'':'none';
   // If the teacher's source sheet defined a fill-in-the-blank variant for this
   // sentence (e.g. an articles a/an/the drill with "____" markers), show that
   // exact text instead of the plain full sentence - the exam should reflect the
@@ -1635,6 +1646,15 @@ function showExamQuestion(){let item=examSentences[examIndex];let s=item.sentenc
 function submitExamAnswer(spoken,metrics){let correct=examSentences[examIndex].sentence;apiFetch('/api/score-only',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,spoken:spoken,correct:correct})},()=>submitExamAnswer(spoken,metrics)).then(r=>r.json()).then(res=>{examResults.push({sentence:correct,spoken:spoken,score:res.score,passed:res.passed});apiFetch('/api/exam-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,sentence:correct,spoken:spoken,score:res.score,passed:res.passed,metrics:metrics||{}})}).catch(()=>{});examIndex++;busy=false;if(examIndex>=examSentences.length)showExamSummary();else showExamQuestion()}).catch(()=>{busy=false})}
 function showExamSummary(){
   examMode=false; currentQ=null; busy=true;
+  // Tells the server the exam itself is genuinely finished - distinct from
+  // merely having reached station 4, which happens well before this point.
+  // Without this explicit signal, logging back in right after finishing
+  // practice (but before/during the exam) showed a misleading "you just
+  // finished!" message with a pre-exam average, and silently started a
+  // whole new attempt - reported bug: skipped sentences during practice +
+  // an imperfect exam still produced a "finished level 1" popup that didn't
+  // match what the student actually did.
+  fetch('/api/exam-complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId})}).catch(()=>{});
   let total=examResults.length;
   let avg=total?Math.round(examResults.reduce((a,b)=>a+(Number(b.score)||0),0)/total):0;
   let passed=examResults.filter(r=>r.passed).length;
