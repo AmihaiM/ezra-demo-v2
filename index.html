@@ -243,7 +243,19 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 #pvHeader,#pvTimer,#pvChat,#pvActions{display:none}
 body.private-mode #pvHeader{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:var(--tc,#4318D1);font-size:13px;margin-bottom:10px;direction:ltr;text-align:left}
 body.private-mode #pvChat{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;max-height:56vh;overflow-y:auto;padding:2px}
-body.private-mode #pvActions{display:flex;gap:10px;margin-top:4px}
+/* #pvActions' visibility is gated on BOTH the body class AND this .show
+   class (toggled via classList, never inline style) - if only inline style
+   controlled it, leaving Private mode wouldn't reliably hide it again, since
+   an inline style always overrides any stylesheet rule regardless of the
+   body class. This was a real reported bug (leftover "Play all" button after
+   turning Private mode off) - fixed by never writing .style.display on this
+   element anywhere in the script, only classList. */
+body.private-mode #pvActions.show{display:flex;gap:10px;margin-top:4px}
+/* Same reasoning for #mic: Private mode's Listening station hides it (no
+   recording there), but ALWAYS via classList('hidden-final') - the same
+   mechanism the rest of the app already uses for this exact button (see
+   showNextButton/showCapChoice) - never inline style, so it can never get
+   stuck hidden after leaving Private mode or switching stations. */
 /* Everything from the "normal" theme that Private mode replaces or doesn't
    need: instructional headers/hints, the word-diff/mastery/gauge boxes, the
    secondary control row, cloze's own header, audio settings, preview nav,
@@ -1819,20 +1831,23 @@ function togglePrivateMode(){
   document.body.classList.toggle('private-mode',privateMode);
   let btn=document.getElementById('privateModeBtn');
   if(btn)btn.setAttribute('aria-pressed',privateMode?'true':'false');
-  if(!privateMode){pvStopExamTimer();return}
   if(document.getElementById('app').style.display!=='block')return;
-  // Best-effort paint of whatever the student is currently doing into the
-  // private view - nothing here touches server/session state, so a wrong
-  // guess just means the visible bubble is briefly out of sync until the
-  // next real event (submit/next question) re-renders it correctly.
-  if(examMode){
-    pvRenderExamQuestion(examSentences[examIndex]);
-  } else if(practiceMode){
-    pvSyncPracticeAgain(window._pickerTarget===3);
-  } else if(currentQ){
-    pvSyncQuestion(currentQ, currentQ.cloze_active?3:2);
-  } else {
+  // Explicit requirement: the two modes must never hand off "current
+  // position" to each other across the toggle - switching into Private mode
+  // mid-exam/mid-practice must NOT drop the student into the private Speed
+  // Test/Practice view, and leaving Private mode mid-exam must NOT drop them
+  // into the normal exam view either. Every toggle, in either direction,
+  // always lands on station 1 of the mode just entered - the same safe,
+  // non-destructive default jumpToStation(1)/pvShowListening() already are -
+  // never wherever the OTHER mode happened to be.
+  pvStopExamTimer();
+  document.getElementById('pvActions').classList.remove('show');
+  examMode=false;practiceMode=false;hideNextButton();hideCapChoice();
+  if(privateMode){
     pvShowListening();
+  } else {
+    pvShowMic();
+    jumpToStation(1);
   }
 }
 function pvSetHeader(stepLabel,counterText){
@@ -1842,13 +1857,30 @@ function pvSetHeader(stepLabel,counterText){
 }
 function pvClearActions(){
   let actions=document.getElementById('pvActions');
-  if(actions){actions.style.display='none';actions.innerHTML=''}
+  if(actions){actions.classList.remove('show');actions.innerHTML=''}
 }
+// #mic is hidden/shown two ways elsewhere in this app: the 'hidden-final'
+// class (showNextButton/hideNextButton etc.) AND, in one place (the preview
+// stage's setStation branch), a direct inline style - normal-mode code
+// self-heals that via setStation()'s own top-of-function reset, but Private
+// mode's station 2/3/4 rendering never calls setStation() at all, so it must
+// clear BOTH here or a stale inline "display:none" from an earlier preview
+// visit could leave the mic invisible even after removing the class.
+function pvHideMic(){let m=document.getElementById('mic'); m.classList.add('hidden-final'); m.style.display='none'}
+function pvShowMic(){let m=document.getElementById('mic'); m.classList.remove('hidden-final'); m.style.display=''}
 function pvWordsHtml(words){
   return (words||[]).filter(w=>w.status!=='extra').map(w=>'<span'+(w.status==='wrong'?' class="pv-word-wrong"':'')+'>'+esc(w.word)+'</span>').join(' ');
 }
 // --- Station 1: Listening ---------------------------------------------------
 function pvShowListening(){
+  // Listening is explicitly listen-only, per report: no recording should be
+  // possible here at all. Belt and suspenders: the mic button is hidden
+  // (classList, see pvHideMic) AND currentQ/examMode/practiceMode are reset
+  // so that even a stray click couldn't fall through to startRecognition()'s
+  // own "(!currentQ&&!examMode)" guard and submit a stale answer.
+  examMode=false;practiceMode=false;currentQ=null;
+  pvHideMic();
+  document.getElementById('stopRec').style.display='none';
   updateStationBar(1);
   pvStopExamTimer();
   let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
@@ -1864,7 +1896,7 @@ function pvShowListening(){
     if(!list.length){chat.innerHTML='<p class="small">אין משפטים להצגה.</p>';return}
     chat.innerHTML=list.map((s,i)=>'<div class="pv-bubble pv-prompt pv-listen-row"><button type="button" class="pv-speed-btn" onclick="event.stopPropagation();pvCycleSpeed(this)" title="שנה מהירות">⏱️</button><span style="flex:1;min-width:0" onclick="pvPlayListenRow('+i+')"><b>'+esc(s.en||'')+'</b><br><span style="opacity:.85;font-size:13px">'+esc(s.he||'')+'</span></span></div>').join('');
     let actions=document.getElementById('pvActions');
-    actions.style.display='flex';
+    actions.classList.add('show');
     actions.innerHTML='<button type="button" onclick="pvPlayAll()">▶️ Play all</button>';
   }).catch(()=>{chat.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
 }
@@ -1892,6 +1924,7 @@ function pvPlayAll(){
 // grading/CSV structure, only the visual prompt differs - see loadQuestion's
 // q.he/q.en handling above, which this mirrors).
 function pvSyncQuestion(q,stationNum){
+  pvShowMic();
   pvStopExamTimer();
   let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
   let labels={2:'Practice',3:'Exercise'};
@@ -1921,20 +1954,21 @@ function pvRenderResult(spoken,res){
     // Mirrors the normal UI's showCapChoice()/capContinue()/capRetry() exactly
     // ("after N failed attempts, offer next sentence or another round") - same
     // functions, just called from a Private-styled button instead.
-    actions.style.display='flex';
+    actions.classList.add('show');
     actions.innerHTML='<button type="button" onclick="capContinue()">Next sentence ➡️</button><button type="button" onclick="capRetry()">Another round 🔁</button>';
   } else if(res.advance&&passed){
     // Only appears once the sentence is genuinely done (server's res.advance),
     // not after every single mastery repeat - Redo/Next reuse the exact same
     // practiceAgainNow()/goNext() the normal UI's "🔁 תרגל שוב" / "▶️ הבא"
     // buttons already call.
-    actions.style.display='flex';
+    actions.classList.add('show');
     actions.innerHTML='<button type="button" onclick="practiceAgainNow()">Redo Exercise</button><button type="button" onclick="goNext()">Next Exercise</button>';
   } else {
-    actions.style.display='none';
+    actions.classList.remove('show');
   }
 }
 function pvSyncPracticeAgain(isCloze){
+  pvShowMic();
   pvStopExamTimer();
   let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
   pvSetHeader((isCloze?'Exercise':'Practice')+' - Free practice','');
@@ -1951,7 +1985,7 @@ function pvRenderPracticeRepeatResult(spoken,res){
   chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback '+(res.passed?'ok':'bad')+'">'+(res.passed?'Correct answer ✔ well done! 😀':'Wrong answer ✗ Try again 😔')+'</div>');
   chat.scrollTop=chat.scrollHeight;
   let actions=document.getElementById('pvActions');
-  actions.style.display='flex';
+  actions.classList.add('show');
   actions.innerHTML='<button type="button" onclick="exitPracticeMode()">Back to Exercise</button>';
 }
 // --- Station 4: Speed Test ---------------------------------------------------
@@ -1971,13 +2005,27 @@ function pvFillExamHebrew(){
 }
 function pvRenderExamQuestion(item){
   if(!item)return;
+  pvShowMic();
   pvSetHeader('Step 4 - Speed Test', (examIndex+1)+'/'+examSentences.length);
+  let chat=document.getElementById('pvChat');
   if(examIndex===0&&!pvTimerInterval){
     // Fresh test (not a re-render of question 1 after pvFillExamHebrew comes
     // back, and not a toggle-mid-test resync) - clear any old rows and start
     // the running timer once.
-    let chat=document.getElementById('pvChat'); if(chat)chat.innerHTML='';
+    if(chat)chat.innerHTML='';
     pvStartExamTimer();
+  }
+  // Bug fix: this used to only set the header/timer and never actually show
+  // the CURRENT (unanswered) question's sentence anywhere - reported as "a
+  // timer with no sentence". Render it as a purple prompt bubble, tagged so
+  // it can be swapped out (not duplicated) once it's answered - see
+  // pvAppendExamRow, which removes this same element right before adding the
+  // permanent check/✗ row for it.
+  if(chat){
+    let old=chat.querySelector('.pv-current-prompt');
+    if(old)old.remove();
+    chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-prompt pv-current-prompt" onclick="pvReplayCurrent()" title="הקש כדי לשמוע שוב">'+esc(item.he||item.sentence||'')+'</div>');
+    chat.scrollTop=chat.scrollHeight;
   }
   pvClearActions();
 }
@@ -1995,6 +2043,11 @@ function pvStopExamTimer(){ if(pvTimerInterval){clearInterval(pvTimerInterval);p
 function pvAppendExamRow(row){
   let chat=document.getElementById('pvChat');
   if(!chat)return;
+  // Replace the big "awaiting answer" prompt bubble (see pvRenderExamQuestion)
+  // with the compact, permanent check/✗ row - otherwise the same question
+  // would be shown twice once it's answered.
+  let old=chat.querySelector('.pv-current-prompt');
+  if(old)old.remove();
   let n=chat.querySelectorAll('.pv-qa-row').length+1;
   let label=row.he||row.sentence||'';
   chat.insertAdjacentHTML('beforeend','<div class="pv-qa-row '+(row.passed?'ok':'bad')+'"><span>'+n+'. '+esc(label)+'</span><span>'+(row.passed?'✔️':'❌')+'</span></div>');
@@ -2005,11 +2058,13 @@ function pvRenderExamSummary(avg,total,passed){
   pvSetHeader('Step 4 - Speed Test — Done', total+'/'+total);
   let chat=document.getElementById('pvChat');
   if(chat){
+    let old=chat.querySelector('.pv-current-prompt');
+    if(old)old.remove();
     chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback '+(avg>=90?'ok':'bad')+'">Final score: '+avg+'% ('+passed+'/'+total+')</div>');
     chat.scrollTop=chat.scrollHeight;
   }
   let actions=document.getElementById('pvActions');
-  actions.style.display='flex';
+  actions.classList.add('show');
   actions.innerHTML='<button type="button" onclick="pvRedoTest()">🔄 Redo test</button>';
 }
 function pvRedoTest(){ startExamOverAllSentences(); }
