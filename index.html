@@ -2073,9 +2073,23 @@ function pvRenderResult(spoken,res){
   chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-transcript"><span class="pv-avatar">👤</span><span>'+transcriptHtml+'</span></div>');
   let capChoice=!!res.cap_choice;
   let outOfAttempts=!passed&&!!res.skipped&&!!res.cap_reached;
+  // A "correct" submission does NOT always mean the sentence is done - the
+  // server's mastery system (stations 2/3) requires several CONSECUTIVE
+  // correct repeats before res.advance turns true, same as the normal UI's
+  // dot meter (deliberately hidden here). Without distinguishing these two
+  // cases, "Correct answer ✔ well done!" on a mid-streak rep reads as final
+  // when it isn't, and the student has no idea a repeat is still expected -
+  // reported: "I said it right, now what? Where's the next sentence?".
+  let midStreak=passed&&!res.advance;
   let feedbackClass=passed?'ok':'bad';
-  let feedbackText=passed?'Correct answer ✔ well done! 😀':(capChoice?'Out of attempts this round ⏸️':(outOfAttempts?'Moving on ⏭️':'Wrong answer ✗ Try again 😔'));
+  let feedbackText=midStreak?'Correct ✔ — say it again to continue 🔁':(passed?'Correct answer ✔ well done! 😀':(capChoice?'Out of attempts this round ⏸️':(outOfAttempts?'Moving on ⏭️':'Wrong answer ✗ Try again 😔')));
   chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback '+feedbackClass+'">'+esc(feedbackText)+'</div>');
+  if(midStreak&&typeof res.mastery_remaining==='number'&&res.mastery_remaining>0){
+    // Give SOME orientation (how many more correct repeats) without exposing
+    // the full dot-meter/streak-broken detail the normal UI shows - that
+    // stays teacher-only/normal-mode-only by design.
+    chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback ok" style="opacity:.85">'+res.mastery_remaining+' more to go 💪</div>');
+  }
   chat.scrollTop=chat.scrollHeight;
   let actions=document.getElementById('pvActions');
   actions.innerHTML='';
