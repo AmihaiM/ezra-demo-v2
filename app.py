@@ -414,6 +414,13 @@ def _default_teacher_state():
             "allowed_students": [],
             "restrict_to_list": False,
             "silence_timeout_ms": 1200,
+            # Whether THIS teacher's students see the chat-bubble "Private"
+            # skin by default on their very first login (a student's own
+            # later toggle on their own device always overrides this - see
+            # index.html's privateMode init + startApp()). Off by default so
+            # existing teachers' students see no change until the teacher
+            # opts in via /api/teacher-settings.
+            "default_private_mode": False,
         } for tid, t in TEACHERS.items()
     }
 
@@ -436,6 +443,7 @@ def load_state():
         })
         state[tid]["restrict_to_list"] = bool(state[tid].get("restrict_to_list", False))
         state[tid]["silence_timeout_ms"] = max(400, min(3000, int(state[tid].get("silence_timeout_ms", 1200))))
+        state[tid]["default_private_mode"] = bool(state[tid].get("default_private_mode", False))
     return state
 
 def save_state():
@@ -487,6 +495,7 @@ def teacher_public(tid):
         "exercise_name": s.get("exercise_name", "תרגול דמו"),
         "silence_timeout_ms": s.get("silence_timeout_ms", 1200),
         "photo_url": t.get("photo_url", ""),
+        "default_private_mode": bool(s.get("default_private_mode", False)),
     }
 
 def load_catalog(lang_filter="en"):
@@ -2424,6 +2433,8 @@ def teacher_settings():
     _teacher_state[tid]["max_attempts"] = max(4, min(7, int(data.get("max_attempts", _teacher_state[tid]["max_attempts"]))))
     if "silence_timeout_ms" in data:
         _teacher_state[tid]["silence_timeout_ms"] = max(400, min(3000, int(data.get("silence_timeout_ms", 1200))))
+    if "default_private_mode" in data:
+        _teacher_state[tid]["default_private_mode"] = bool(data.get("default_private_mode"))
     save_state()
     return jsonify(ok=True, teacher=teacher_public(tid))
 

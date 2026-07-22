@@ -359,8 +359,24 @@ var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail=
 // "Private" mode: opt-in alternate chat-bubble skin, per-device (like the
 // mute/speed prefs above) - see the big block of pv* functions near the end
 // of this script, and the body.private-mode CSS rules.
-var privateMode=false;
-try{privateMode=(localStorage.getItem('ezra_private_mode')==='1')}catch(e){}
+// Default is Private ON for students who haven't chosen yet on this device
+// (explicit request: make Private the default). A student's own prior
+// choice on this device always wins over the default, whichever way they
+// set it. See also startApp(), which may override this default further
+// based on the signed-in teacher's own configured default before the first
+// question loads.
+var privateMode=true;
+// True once this specific device has an explicit, remembered choice (either
+// way) - lets startApp() tell "student already chose" apart from "nothing
+// saved yet, so the signed-in teacher's own configured default applies
+// instead of the app-wide default above." See startApp().
+var _pvHasDeviceChoice=false;
+try{
+  var _pvSaved=localStorage.getItem('ezra_private_mode');
+  if(_pvSaved==='1'){privateMode=true;_pvHasDeviceChoice=true}
+  else if(_pvSaved==='0'){privateMode=false;_pvHasDeviceChoice=true}
+  // else: nothing saved on this device yet - keep the default above.
+}catch(e){}
 var _pvRate=null, pvExamStartTime=null, pvTimerInterval=null;
 // Bumped by every Private-mode view switch (Listening, the free-practice
 // list, free-practice-again) - loadQuestion() snapshots this before issuing
@@ -931,6 +947,14 @@ function startApp(){
   // both together just looks like the photo upload silently failed.
   document.getElementById('studentTagText').textContent=(studentPhoto?'':'👤 ')+studentName;
   document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';loadXp();updateStreak();closeLogin();document.getElementById('select').style.display='none';document.getElementById('app').style.display='block';document.body.classList.add('in-app');populateAudioSettingsUI();
+  // If this device has never had its own explicit Private on/off choice,
+  // defer to the signed-in teacher's own configured default instead of the
+  // app-wide default - lets a teacher opt their whole class out (or in)
+  // without touching every student's device. A device's own past choice
+  // (see _pvHasDeviceChoice above) always wins over this.
+  if(!_pvHasDeviceChoice&&typeof t.default_private_mode==='boolean'){
+    privateMode=t.default_private_mode;
+  }
   document.body.classList.toggle('private-mode',privateMode);
   let pvBtn=document.getElementById('privateModeBtn');
   if(pvBtn)pvBtn.setAttribute('aria-pressed',privateMode?'true':'false');
@@ -1640,6 +1664,20 @@ function updateStationBar(current){
     btn.classList.toggle('current', n===current);
     btn.classList.toggle('done', n<current);
   });
+  pvSyncListenAllVisibility(current);
+}
+// The "🔊 הצג" button reads out every sentence in the exercise up front.
+// That's a useful learning aid on stations 1-2, but on stations 3
+// (fill-in-the-blank) and 4 (the exam) it would just hand the student the
+// correct answer, defeating the point of testing them - so it's hidden
+// there in both modes. In Private mode it's hidden everywhere, since
+// station 1 ("Listening") already covers the same need with its own
+// dedicated, better-suited view.
+function pvSyncListenAllVisibility(current){
+  let btn=document.getElementById('listenAllBtn');
+  if(!btn)return;
+  let show=!privateMode&&(current===1||current===2);
+  btn.style.display=show?'':'none';
 }
 function jumpToStation(target){
   if(!studentId||busy)return;
