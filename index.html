@@ -300,10 +300,6 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 .pv-qa-row.bad{border-inline-end:5px solid #ef4444}
 .pv-bubble.pv-listen-row{display:flex;align-items:center;gap:10px;cursor:default;align-self:stretch;max-width:100%}
 .pv-speed-btn{background:#fff3;border:1px solid #fff5;color:#fff;border-radius:8px;padding:4px 8px;font-size:13px;flex:0 0 auto}
-/* The one row in a station 2/3 list that's genuinely the student's live,
-   unanswered question (see pvOpenStationList) - visually set apart from the
-   plain free-practice rows around it so it reads as "this one is real". */
-.pv-live-row{background:#16a34a;box-shadow:0 0 0 2px #16a34a55}
 </style></head><body>
 <div id="connBanner" role="alert"><span id="connBannerMsg">אין חיבור לשרת כרגע.</span><button onclick="connRetry()">🔄 נסה שוב</button></div>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards" id="teacherCards"></div></section>
@@ -1647,26 +1643,19 @@ function updateStationBar(current){
 }
 function jumpToStation(target){
   if(!studentId||busy)return;
-  // Private mode's stations 1-3 all bypass the server jump-station round-trip
-  // entirely and go straight to a bubble-list view - station 1 (Listening) is
-  // always the read-only sentence list; stations 2/3 (Practice/Exercise) show
-  // the SAME kind of browsable list (explicit request: consistent with
-  // station 1), where tapping the one live/unanswered sentence resumes the
-  // real graded flow and tapping any other sentence enters free/ungraded
-  // practice - see pvOpenStationList(). Station 4 (Speed Test) still needs
-  // the real server round-trip below (exam pipeline).
-  if(privateMode&&(target===1||target===2||target===3)){
-    examMode=false;practiceMode=false;hideNextButton();hideCapChoice();
-    if(target===1)pvShowListening();else pvOpenStationList(target);
-    return;
-  }
+  // Private mode is a standalone mechanism, explicit requirement: stations
+  // 2/3 always show exactly ONE sentence, never a browsable list - only
+  // station 1 ("Listening") is list-based, since it's a restyled version of
+  // the pre-existing read-only listen-all feature, not a graded station.
+  if(target===1&&privateMode){examMode=false;practiceMode=false;hideNextButton();hideCapChoice();pvShowListening();return}
   apiFetch('/api/jump-station',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,target:target})},()=>jumpToStation(target)).then(r=>r.json()).then(res=>{
     if(!res.ok)return;
     if(res.mode==='free_practice'){
-      // Private mode never opens the old plain-list modal dialog - it has its
-      // own bubble-list view (pvOpenStationList) so a student never leaves
-      // the chat presentation for an unstyled overlay.
-      if(privateMode){pvOpenStationList(target);return}
+      // Private mode never opens the old plain-list modal dialog. It also
+      // never shows a picker of its own here - it silently opens free
+      // practice directly on the FIRST sentence in this already-completed
+      // station, so exactly one sentence is ever on screen at a time.
+      if(privateMode){pvOpenFirstSentence(target);return}
       openStationPicker(target);return
     }
     // Station 4 gets special handling BEFORE the generic "same station,
@@ -1973,52 +1962,21 @@ function pvShowListening(){
     actions.innerHTML='<button type="button" onclick="pvPlayAll()">▶️ Play all</button>';
   }).catch(()=>{chat.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
 }
-// Reads the bottom station bar's OWN current-station marker (already kept
-// accurate by updateStationBar(), called from loadQuestion/showExamQuestion
-// etc.) - the one source of truth for "which station is the student ACTUALLY
-// on right now server-side", independent of which list they're browsing.
-function pvCurrentStationNum(){
-  let el=document.querySelector('#stationBar .station-step.current');
-  return el?Number(el.dataset.station):0;
-}
-// Private-styled bubble-list view for stations 2 (Practice) and 3 (Exercise) -
-// explicit request: consistent with station 1's list. Shows every sentence in
-// the station; tapping the ONE that's genuinely the student's current live/
-// unanswered question (matched against currentQ.en) resumes the real graded
-// flow (pvResumeLiveQuestion), tapping any other sentence enters the existing
-// ungraded practice-repeat flow via pickPracticeSentence() (same function the
-// old openStationPicker() modal already used) - no new scoring logic, only a
-// different way to reach the same two existing paths.
-function pvOpenStationList(target){
-  pvGen++;
-  pvAbortRecording();
+// Reached when the student taps station 2/3's circle and that station is
+// already fully completed (server returns free_practice mode) - Private mode
+// never shows a picker/list for this (explicit requirement: standalone,
+// always exactly one sentence on screen). Silently opens ungraded free
+// practice directly on the FIRST sentence, via the EXACT SAME
+// pickPracticeSentence()/practiceAgainNow()/practiceClozeAgainNow() path the
+// old modal picker already used - just without ever rendering a list.
+function pvOpenFirstSentence(target){
   window._pickerTarget=target;
-  updateStationBar(target);
-  pvStopExamTimer();
-  let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
-  pvSetHeader('Step '+target+' - '+(target===3?'Exercise':'Practice')+' — choose a sentence','');
-  pvClearActions();
-  let isLiveStation=pvCurrentStationNum()===target&&!!currentQ&&!!currentQ.en;
-  if(isLiveStation)pvShowMic();else pvHideMic();
-  let chat=document.getElementById('pvChat');
-  if(!chat)return;
-  chat.innerHTML='<p class="small">טוען משפטים…</p>';
-  apiFetch('/api/exercise-sentences?student='+encodeURIComponent(studentId),{},()=>pvOpenStationList(target)).then(r=>r.json()).then(d=>{
+  apiFetch('/api/exercise-sentences?student='+encodeURIComponent(studentId),{},()=>pvOpenFirstSentence(target)).then(r=>r.json()).then(d=>{
     let list=d.sentences||[];
+    if(!list.length)return;
     window._stationPickerSentences=list;
-    if(!list.length){chat.innerHTML='<p class="small">אין משפטים להצגה.</p>';return}
-    chat.innerHTML=list.map((s,i)=>{
-      let isLive=isLiveStation&&s.en===currentQ.en;
-      let label=esc(target===3?(s.he||''):(s.en||''));
-      return isLive
-        ? '<div class="pv-bubble pv-prompt pv-listen-row pv-live-row" onclick="pvResumeLiveQuestion()"><span style="flex:1;min-width:0"><b>▶ '+label+'</b><br><span style="opacity:.85;font-size:12px">Current — tap to answer</span></span></div>'
-        : '<div class="pv-bubble pv-prompt pv-listen-row" onclick="pickPracticeSentence('+i+')"><span style="flex:1;min-width:0">'+label+'</span></div>';
-    }).join('');
-  }).catch(()=>{chat.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
-}
-function pvResumeLiveQuestion(){
-  if(!currentQ)return;
-  pvSyncQuestion(currentQ,window._pickerTarget||2);
+    pickPracticeSentence(0);
+  }).catch(()=>{});
 }
 function pvCycleSpeed(btn){
   let rates=[0.7,0.88,1.0,1.15];
