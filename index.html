@@ -356,6 +356,12 @@ var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail=
 var privateMode=false;
 try{privateMode=(localStorage.getItem('ezra_private_mode')==='1')}catch(e){}
 var _pvRate=null, pvExamStartTime=null, pvTimerInterval=null;
+// Bumped by every Private-mode view switch (Listening, the free-practice
+// list, free-practice-again) - loadQuestion() snapshots this before issuing
+// its fetch and only applies the response if it's still the same generation,
+// so a slow/in-flight request from a station the student has since left
+// can never clobber a view they've already navigated to. See loadQuestion().
+var pvGen=0;
 // A student's own photo is entirely optional, cosmetic, and per-device -
 // stored client-side in localStorage keyed by email (same pattern as the
 // XP/streak gamification data below), not on the server, so there's no new
@@ -924,7 +930,17 @@ function startApp(){
   if(pvBtn)pvBtn.setAttribute('aria-pressed',privateMode?'true':'false');
   loadQuestion();
 }
-function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.error==='session not found'){showSessionExpired();return}if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
+function loadQuestion(){busy=false;sentenceAttemptCount=0;
+  // Snapshot pvGen before this fetch goes out - if the student navigates to
+  // a different Private-mode view (Listening, the free-practice list, ...)
+  // while this request is still in flight, those views bump pvGen, and the
+  // guard below (right where the Private prompt would otherwise be
+  // re-rendered) silently drops this now-stale response instead of
+  // clobbering whatever the student is actually looking at now. Reported
+  // bug: switching to Private mode's Listening view, then having it snap
+  // back to the previous station's content a moment later.
+  let _myPvGen=pvGen;
+  ['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.error==='session not found'){showSessionExpired();return}if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
   let _pvStationNum=q.stage==='preview'?1:(q.cloze_active||q.review_round)?3:2;
   updateStationBar(_pvStationNum);
   let mw=document.getElementById('mismatchWarn');
@@ -938,7 +954,12 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip',
     // sweep - see pvShowListening(). It doesn't consume/advance q at all, so
     // the underlying preview stage just sits idle until the student jumps to
     // station 2, exactly like the normal listen-all button already does.
-    pvShowListening();
+    // The pvGen check guards against a stale response landing after the
+    // student has already navigated elsewhere (e.g. clicked a different
+    // station) while this request was still in flight - still returns
+    // early either way, so a stale response never falls through into the
+    // NORMAL (non-Private) preview rendering below it.
+    if(pvGen===_myPvGen)pvShowListening();
     return;
   }
   if(q.stage==='preview'){
@@ -991,7 +1012,7 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;['play','show','skip',
     setStation('listen', q);
     setTimeout(playSentence,350);
   }
-  if(privateMode)pvSyncQuestion(q,_pvStationNum);
+  if(privateMode&&pvGen===_myPvGen)pvSyncQuestion(q,_pvStationNum);
 }).catch(e=>document.getElementById('he').textContent='שגיאה בטעינת משפט')}
 // "Explain once, then clean" (per UX feedback): the progress line ("משפט X
 // מתוך Y | שם התרגיל") and the station header ("⭐ תחנה 2 — ...") are static
@@ -1622,7 +1643,13 @@ function jumpToStation(target){
   if(target===1&&privateMode){examMode=false;practiceMode=false;hideNextButton();hideCapChoice();pvShowListening();return}
   apiFetch('/api/jump-station',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,target:target})},()=>jumpToStation(target)).then(r=>r.json()).then(res=>{
     if(!res.ok)return;
-    if(res.mode==='free_practice'){openStationPicker(target);return}
+    if(res.mode==='free_practice'){
+      // Private mode never opens the old plain-list modal dialog - it has its
+      // own bubble-list view (pvOpenStationList) so a student never leaves
+      // the chat presentation for an unstyled overlay.
+      if(privateMode){pvOpenStationList(target);return}
+      openStationPicker(target);return
+    }
     // Station 4 gets special handling BEFORE the generic "same station,
     // nothing to do" short-circuit below. Reason: once the session first
     // reaches station 4, its server-side stage stays "done" from then on -
@@ -1840,6 +1867,7 @@ function togglePrivateMode(){
   // always lands on station 1 of the mode just entered - the same safe,
   // non-destructive default jumpToStation(1)/pvShowListening() already are -
   // never wherever the OTHER mode happened to be.
+  pvAbortRecording();
   pvStopExamTimer();
   document.getElementById('pvActions').classList.remove('show');
   examMode=false;practiceMode=false;hideNextButton();hideCapChoice();
@@ -1849,6 +1877,26 @@ function togglePrivateMode(){
     pvShowMic();
     jumpToStation(1);
   }
+}
+// Defense in depth: switching to a different Private-mode view while a
+// recording is still actively in progress (student pressed the mic, then
+// immediately tapped the Private toggle or a different station) must never
+// let that in-flight recognition session silently finish and submit into
+// whatever view is now on screen - reported bug: an active/red mic and
+// running timer still visible after arriving at Listening, and transcript/
+// feedback bubbles bleeding into the wrong view. Nulling the handlers before
+// abort() guarantees onend/onresult can never fire for a session we've
+// already abandoned (plain .stop() would still finalize and submit it).
+function pvAbortRecording(){
+  if(recognition){
+    try{recognition.onresult=null;recognition.onend=null;recognition.onerror=null;recognition.abort();}catch(e){}
+  }
+  recognition=null;
+  busy=false;
+  let mic=document.getElementById('mic'); if(mic)mic.classList.remove('on');
+  let stopBtn=document.getElementById('stopRec'); if(stopBtn)stopBtn.style.display='none';
+  let timer=document.getElementById('recTimer'); if(timer)timer.style.display='none';
+  exitRecordingFocus();
 }
 function pvSetHeader(stepLabel,counterText){
   let hello=document.getElementById('pvHello'); if(hello)hello.textContent='Hello '+(studentName||'student');
@@ -1874,10 +1922,14 @@ function pvWordsHtml(words){
 // --- Station 1: Listening ---------------------------------------------------
 function pvShowListening(){
   // Listening is explicitly listen-only, per report: no recording should be
-  // possible here at all. Belt and suspenders: the mic button is hidden
-  // (classList, see pvHideMic) AND currentQ/examMode/practiceMode are reset
-  // so that even a stray click couldn't fall through to startRecognition()'s
-  // own "(!currentQ&&!examMode)" guard and submit a stale answer.
+  // possible here at all. Belt and suspenders: any in-flight recording is
+  // force-aborted (not just hidden - see pvAbortRecording), the mic button
+  // is hidden (classList, see pvHideMic), AND currentQ/examMode/practiceMode
+  // are reset so that even a stray click couldn't fall through to
+  // startRecognition()'s own "(!currentQ&&!examMode)" guard and submit a
+  // stale answer.
+  pvGen++;
+  pvAbortRecording();
   examMode=false;practiceMode=false;currentQ=null;
   pvHideMic();
   document.getElementById('stopRec').style.display='none';
@@ -1898,6 +1950,34 @@ function pvShowListening(){
     let actions=document.getElementById('pvActions');
     actions.classList.add('show');
     actions.innerHTML='<button type="button" onclick="pvPlayAll()">▶️ Play all</button>';
+  }).catch(()=>{chat.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
+}
+// Private-styled replacement for the old openStationPicker() overlay -
+// reached when jumping backward into an already-completed station 2/3.
+// Renders the same sentence list as a bubble list instead of an unstyled
+// modal dialog, and taps into the EXACT SAME pickPracticeSentence()/
+// practiceAgainNow()/practiceClozeAgainNow() flow the normal modal already
+// used (window._pickerTarget/_stationPickerSentences), which already
+// switches to the private bubble view on its own (see pvSyncPracticeAgain
+// hooks in those functions) - only the list itself is presented differently.
+function pvOpenStationList(target){
+  pvGen++;
+  pvAbortRecording();
+  pvHideMic();
+  window._pickerTarget=target;
+  updateStationBar(target);
+  pvStopExamTimer();
+  let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
+  pvSetHeader('Step '+target+' - '+(target===3?'Exercise':'Practice')+' — choose a sentence','');
+  pvClearActions();
+  let chat=document.getElementById('pvChat');
+  if(!chat)return;
+  chat.innerHTML='<p class="small">טוען משפטים…</p>';
+  apiFetch('/api/exercise-sentences?student='+encodeURIComponent(studentId),{},()=>pvOpenStationList(target)).then(r=>r.json()).then(d=>{
+    let list=d.sentences||[];
+    window._stationPickerSentences=list;
+    if(!list.length){chat.innerHTML='<p class="small">אין משפטים להצגה.</p>';return}
+    chat.innerHTML=list.map((s,i)=>'<div class="pv-bubble pv-prompt pv-listen-row" onclick="pickPracticeSentence('+i+')"><span style="flex:1;min-width:0"><b>'+esc(target===3?(s.he||''):(s.en||''))+'</b></span></div>').join('');
   }).catch(()=>{chat.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
 }
 function pvCycleSpeed(btn){
@@ -1924,6 +2004,7 @@ function pvPlayAll(){
 // grading/CSV structure, only the visual prompt differs - see loadQuestion's
 // q.he/q.en handling above, which this mirrors).
 function pvSyncQuestion(q,stationNum){
+  pvAbortRecording();
   pvShowMic();
   pvStopExamTimer();
   let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
@@ -1968,6 +2049,8 @@ function pvRenderResult(spoken,res){
   }
 }
 function pvSyncPracticeAgain(isCloze){
+  pvGen++;
+  pvAbortRecording();
   pvShowMic();
   pvStopExamTimer();
   let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
@@ -2005,6 +2088,7 @@ function pvFillExamHebrew(){
 }
 function pvRenderExamQuestion(item){
   if(!item)return;
+  pvAbortRecording();
   pvShowMic();
   pvSetHeader('Step 4 - Speed Test', (examIndex+1)+'/'+examSentences.length);
   let chat=document.getElementById('pvChat');
