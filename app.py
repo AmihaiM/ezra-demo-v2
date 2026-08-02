@@ -1,4 +1,4 @@
-import os, json, time, re, csv, io, random
+import os, json, time, re, csv, io, random, threading
 from urllib.parse import urlparse, parse_qs, quote
 from difflib import SequenceMatcher
 from datetime import datetime
@@ -85,11 +85,93 @@ _pending_results = []
 # did before (memory-only) - so this can be deployed before the DB exists.
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
+_db_pool = None
+_db_pool_init_failed = False
+_db_pool_failed_at = 0
+_db_pool_lock = threading.Lock()
+# A transient hiccup at cold-start (DB provider still waking up, brief DNS
+# blip, ...) shouldn't permanently disable pooling for this worker's entire
+# lifetime - self-heal by allowing a retry after this cooldown, same "don't
+# get stuck failed forever" philosophy as the rest of this app. The one-off
+# _db_conn() fallback covers requests in between just fine either way.
+_DB_POOL_RETRY_COOLDOWN_SEC = 30
+
+def _get_db_pool():
+    """Lazily create ONE connection pool per gunicorn worker process (module-
+    level global, so it's created once on first use and reused for the life
+    of the process - not per request). Opening a fresh TCP+auth connection
+    on every single request that touches a session (which is nearly every
+    request, via the after_request persistence hook) was real, avoidable
+    overhead at any real concurrency - a pool hands out an already-open
+    connection instead. Falls back to returning None (caller then opens a
+    plain one-off connection, exactly the old behavior) if psycopg_pool isn't
+    installed, so this degrades gracefully rather than breaking DB access
+    entirely on an older/un-redeployed environment."""
+    global _db_pool, _db_pool_init_failed, _db_pool_failed_at
+    if not DATABASE_URL or _db_pool_init_failed:
+        return None
+    if _db_pool is not None:
+        return _db_pool
+    if _db_pool_failed_at and time.time() - _db_pool_failed_at < _DB_POOL_RETRY_COOLDOWN_SEC:
+        return None
+    # Guards against a double-init race if the WSGI server ever uses threaded
+    # workers (gthread/gevent) - two requests on two threads could otherwise
+    # both see _db_pool as None at the same moment and each construct their
+    # own pool. Sync workers (today's likely setup) never hit this race since
+    # each process handles one request at a time, but this makes the switch
+    # to threaded workers - one of the concurrency changes worth making -
+    # safe without a separate follow-up fix.
+    with _db_pool_lock:
+        if _db_pool is not None:
+            return _db_pool
+        if _db_pool_init_failed or (_db_pool_failed_at and time.time() - _db_pool_failed_at < _DB_POOL_RETRY_COOLDOWN_SEC):
+            return None
+        try:
+            from psycopg_pool import ConnectionPool
+            # min_size=1 so a cold worker doesn't hold idle connections it may
+            # never need; max_size is generous relative to a single worker's
+            # request concurrency but still bounded, so a burst of traffic
+            # can't open unbounded connections against Postgres's own
+            # connection limit. kwargs=connect_timeout mirrors the old
+            # one-off psycopg.connect(..., connect_timeout=5) behavior.
+            pool = ConnectionPool(
+                DATABASE_URL, min_size=1, max_size=10, timeout=5,
+                kwargs={"connect_timeout": 5}, open=False,
+            )
+            # Explicit open() (rather than open=True in the constructor) is
+            # the version-safe way to do this across psycopg_pool releases -
+            # it also means a slow/unreachable DB at startup raises HERE,
+            # inside our own try/except, instead of however the constructor
+            # itself would have handled it.
+            pool.open(wait=True, timeout=5)
+            _db_pool = pool
+            return _db_pool
+        except ImportError:
+            # Missing package, not a transient DB issue - retrying every
+            # cooldown window would never help until the next deploy anyway.
+            print("DB CONNECTION POOL DISABLED: psycopg_pool not installed (pip install -r requirements.txt) - falling back to one-off connections")
+            _db_pool_init_failed = True
+            return None
+        except Exception as e:
+            print("DB POOL INIT FAILED (will retry) ", e)
+            _db_pool_failed_at = time.time()
+            return None
+
 def _db_conn():
-    """Short-lived connection, opened per call. A long-lived pool would need
-    its own lifecycle per gunicorn worker process, which is unnecessary
-    complexity at this app's scale - a fresh psycopg connection is fast
-    enough to open per request."""
+    """Returns a live connection - from the pool when available, otherwise a
+    short-lived one-off connection (the original behavior). Callers must
+    always release what they get back via _db_release(conn), never conn.close()
+    directly, so a pooled connection is returned to the pool instead of being
+    torn down."""
+    pool = _get_db_pool()
+    if pool is not None:
+        try:
+            return pool.getconn()
+        except Exception as e:
+            print("DB POOL GETCONN FAILED", e)
+            # Fall through to a one-off connection rather than failing the
+            # whole request - the pool being momentarily exhausted/unhealthy
+            # shouldn't mean session persistence stops working entirely.
     if not DATABASE_URL:
         return None
     try:
@@ -103,6 +185,30 @@ def _db_conn():
         print("DB CONNECT FAILED", e)
         return None
 
+def _db_release(conn):
+    """Pairs with _db_conn() - returns a pooled connection to the pool, or
+    closes a one-off connection, whichever _db_conn() actually handed out.
+    Every _db_conn() caller must call this in a finally block instead of
+    conn.close() directly."""
+    if conn is None:
+        return
+    pool = _db_pool
+    if pool is not None:
+        try:
+            pool.putconn(conn)
+            return
+        except Exception as e:
+            print("DB POOL PUTCONN FAILED", e)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            return
+    try:
+        conn.close()
+    except Exception:
+        pass
+
 def db_init():
     conn = _db_conn()
     if not conn:
@@ -114,10 +220,25 @@ def db_init():
                 "student_id TEXT PRIMARY KEY, data JSONB NOT NULL, "
                 "updated_at TIMESTAMPTZ NOT NULL DEFAULT now())"
             )
+            # Durable outbox for results-sheet writes (see write_result/
+            # _flush_pending_results below). A finalized sentence used to
+            # write straight to Google Sheets inline, inside the same
+            # request the student was waiting on - 3-5 sequential Sheets API
+            # calls, ~1-3 blocking seconds, on every single finalized
+            # sentence. Queuing here instead means the student's request
+            # returns immediately once this one fast local INSERT commits;
+            # a background thread (any worker process, guarded by a Postgres
+            # advisory lock so only one of them actually does it at a time)
+            # drains this table in batches on its own schedule.
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS pending_results ("
+                "id BIGSERIAL PRIMARY KEY, row_data JSONB NOT NULL, "
+                "created_at TIMESTAMPTZ NOT NULL DEFAULT now())"
+            )
     except Exception as e:
         print("DB INIT FAILED", e)
     finally:
-        conn.close()
+        _db_release(conn)
 
 def _session_to_jsonable(s):
     """finalized_indices is a Python set() - JSON has no set type, so store
@@ -159,7 +280,7 @@ def save_session(student_id):
     except Exception as e:
         print("SAVE SESSION FAILED", student_id, e)
     finally:
-        conn.close()
+        _db_release(conn)
 
 def load_session(student_id):
     """Read one student's session back from Postgres into the in-memory
@@ -181,7 +302,7 @@ def load_session(student_id):
         print("LOAD SESSION FAILED", student_id, e)
         return None
     finally:
-        conn.close()
+        _db_release(conn)
 
 def delete_session_row(student_id):
     """Remove one student's row from Postgres entirely (not just from
@@ -198,7 +319,7 @@ def delete_session_row(student_id):
     except Exception as e:
         print("DELETE SESSION FAILED", student_id, e)
     finally:
-        conn.close()
+        _db_release(conn)
 
 def _list_all_sessions_from_db():
     """Every persisted session from Postgres, keyed by student_id - the
@@ -223,7 +344,7 @@ def _list_all_sessions_from_db():
     except Exception as e:
         print("LIST SESSIONS FAILED", e)
     finally:
-        conn.close()
+        _db_release(conn)
     return out
 
 def get_session(student_id):
@@ -1330,37 +1451,52 @@ def ensure_results_header(ws):
     except Exception:
         return RESULT_HEADERS
 
-def write_result(row):
-    _pending_results.append(row)
-    svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    if not svc_json:
-        print("RESULT STORED IN MEMORY ONLY", row)
-        return False
+def _result_row_to_values(header, row):
+    """One result dict -> one flat list of cell values, in the exact column
+    order of `header`. Shared by the single-row sync fallback and the
+    batched flush writer so there's only one place that knows how a result
+    dict maps onto sheet columns. Older sheets may still have a legacy
+    lowercase header row (timestamp, teacher, student, ... - from before the
+    20-column RESULT_HEADERS design) sitting to the left of the current
+    headers, because ensure_results_header only ever APPENDS missing columns
+    rather than replacing the row - so only write into columns whose header
+    is a real, recognized RESULT_HEADERS label, leaving any legacy column
+    blank rather than duplicating values into two side-by-side column sets.
+    """
+    out = []
+    for h in header:
+        if h in RESULT_HEADERS:
+            key = RESULT_KEY_ALIASES.get(h, h)
+            out.append(row.get(key, ""))
+        else:
+            out.append("")
+    return out
+
+def _open_results_worksheet(teacher_id):
+    """Open (creating if needed) the results tab for one teacher, and make
+    sure its header row is current. Returns (worksheet, header) or raises."""
+    import gspread
+    sheet_id = RESULTS_SHEET_IDS.get(teacher_id, RESULTS_SHEET_ID)
+    sh = get_gspread_client().open_by_key(sheet_id)
+    tab = TEACHERS[teacher_id]["results_tab"]
     try:
-        import gspread
-        sheet_id = RESULTS_SHEET_IDS.get(row["teacher_id"], RESULTS_SHEET_ID)
-        sh = get_gspread_client().open_by_key(sheet_id)
-        tab = TEACHERS[row["teacher_id"]]["results_tab"]
-        try:
-            ws = sh.worksheet(tab)
-        except gspread.WorksheetNotFound:
-            ws = sh.add_worksheet(title=tab, rows=1000, cols=24)
-            ws.append_row(RESULT_HEADERS, value_input_option="USER_ENTERED")
-        header = ensure_results_header(ws)
-        # Older sheets may still have a legacy lowercase header row (timestamp,
-        # teacher, student, ... - from before the 20-column RESULT_HEADERS design)
-        # sitting to the left of the current headers, because ensure_results_header
-        # only ever APPENDS missing columns rather than replacing the row. Do not
-        # keep filling those legacy columns going forward - only write into columns
-        # whose header is a real, recognized RESULT_HEADERS label. This stops new
-        # rows from duplicating every value into two side-by-side sets of columns.
-        out = []
-        for h in header:
-            if h in RESULT_HEADERS:
-                key = RESULT_KEY_ALIASES.get(h, h)
-                out.append(row.get(key, ""))
-            else:
-                out.append("")
+        ws = sh.worksheet(tab)
+    except gspread.WorksheetNotFound:
+        ws = sh.add_worksheet(title=tab, rows=1000, cols=24)
+        ws.append_row(RESULT_HEADERS, value_input_option="USER_ENTERED")
+    header = ensure_results_header(ws)
+    return ws, header
+
+def _write_result_sync(row):
+    """Original single-row, fully synchronous path straight to Google
+    Sheets - 3-5 sequential API calls, done inline. Kept as the fallback for
+    when there's no database configured at all (nothing to queue into) and
+    for the rare case the queue insert itself fails - so a result is never
+    silently dropped just because Postgres had a bad moment. NOT used for
+    the normal case anymore; see write_result()/_flush_pending_results()."""
+    try:
+        ws, header = _open_results_worksheet(row["teacher_id"])
+        out = _result_row_to_values(header, row)
         # IMPORTANT: do not use ws.append_row() here. It relies on Google Sheets'
         # own auto-detected "used range" of the ENTIRE tab to decide where the
         # next row goes - which silently breaks if a teacher adds any other
@@ -1378,6 +1514,170 @@ def write_result(row):
     except Exception as e:
         print("WRITE RESULT FAILED", e)
         return False
+
+def _write_results_batch_to_sheet(teacher_id, rows):
+    """Same anchored-to-column-A approach as _write_result_sync, but for
+    MANY rows from ONE teacher in a single pass: one header check, one
+    get_all_values() read to find the next free row, one ws.update() for the
+    whole batch - instead of repeating that whole sequence per row. This is
+    what actually cuts both the per-result latency AND the number of Google
+    Sheets API calls under load (each finalized sentence used to cost its
+    own 3-5 calls; now a whole batch of them shares one)."""
+    if not rows:
+        return True
+    try:
+        ws, header = _open_results_worksheet(teacher_id)
+        matrix = [_result_row_to_values(header, row) for row in rows]
+        next_row = len(ws.get_all_values()) + 1
+        last_col = chr(ord("A") + len(header) - 1)
+        ws.update(f"A{next_row}:{last_col}{next_row + len(matrix) - 1}", matrix, value_input_option="USER_ENTERED")
+        return True
+    except Exception as e:
+        print("WRITE RESULTS BATCH FAILED", teacher_id, len(rows), e)
+        return False
+
+def _enqueue_pending_result(row):
+    """Durably queue one result row in Postgres for the background flush
+    thread to pick up - an ordinary local INSERT, fast (single-digit
+    milliseconds) compared to the 1-3+ seconds a synchronous Sheets write
+    chain could take. Returns True only if the row is safely durable
+    somewhere (in the queue) - callers should fall back to a direct
+    synchronous write if this returns False, so a DB hiccup never means a
+    lost result."""
+    conn = _db_conn()
+    if not conn:
+        return False
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute("INSERT INTO pending_results (row_data) VALUES (%s)", (json.dumps(row),))
+        return True
+    except Exception as e:
+        print("ENQUEUE PENDING RESULT FAILED", e)
+        return False
+    finally:
+        _db_release(conn)
+
+def write_result(row):
+    # In-memory copy stays exactly as before - it's what my-history/teacher
+    # results reads use to show a result that hasn't reached the Sheet yet
+    # (see read_results_sheet_rows' callers), and that gap is now the norm
+    # for every write for a few seconds (queued, not yet flushed) rather
+    # than only on an outright failure - so this still needs to be populated
+    # unconditionally, immediately, regardless of how the write below goes.
+    _pending_results.append(row)
+    svc_json = os.getenv("GOOGLE_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if not svc_json:
+        print("RESULT STORED IN MEMORY ONLY", row)
+        return False
+    if _enqueue_pending_result(row):
+        return True
+    # No DB configured, or the queue insert itself failed - fall back to the
+    # old inline synchronous write rather than losing the result.
+    return _write_result_sync(row)
+
+# --- Background flush: drains pending_results into Google Sheets in batches,
+# on a timer, off the request path entirely. Only one worker PROCESS actually
+# does this at any moment (see the pg_advisory_lock below) even if several
+# gunicorn workers are running, so multiple processes can never race writing
+# the same rows twice. Deliberately uses its OWN one-off connection (not the
+# shared pool) for the whole lock+read+write+unlock sequence: a Postgres
+# advisory lock is tied to the specific database session that acquired it,
+# and returning that connection to a shared pool mid-lock (for some other
+# request to pick up) would be exactly the kind of subtle cross-purpose bug
+# this design needs to avoid. Closing this connection when done - even on an
+# unexpected error - also releases the lock automatically as a safety net,
+# on top of the explicit unlock call.
+_RESULTS_FLUSH_LOCK_KEY = 918273645
+_RESULTS_FLUSH_BATCH_SIZE = 200
+RESULTS_FLUSH_INTERVAL_SEC = float(os.getenv("RESULTS_FLUSH_INTERVAL_SEC", "4"))
+
+def _flush_pending_results():
+    if not DATABASE_URL:
+        return
+    try:
+        import psycopg
+    except ImportError:
+        return
+    conn = None
+    got_lock = False
+    try:
+        conn = psycopg.connect(DATABASE_URL, connect_timeout=5)
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_try_advisory_lock(%s)", (_RESULTS_FLUSH_LOCK_KEY,))
+            got_lock = cur.fetchone()[0]
+        if not got_lock:
+            return
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, row_data FROM pending_results ORDER BY id LIMIT %s",
+                (_RESULTS_FLUSH_BATCH_SIZE,),
+            )
+            batch = cur.fetchall()
+        if not batch:
+            return
+        by_teacher = {}
+        for pending_id, row_data in batch:
+            by_teacher.setdefault(row_data.get("teacher_id"), []).append((pending_id, row_data))
+        flushed_ids = []
+        for tid, items in by_teacher.items():
+            if tid not in TEACHERS:
+                # Teacher no longer exists (deleted/renamed) - nothing sane to
+                # write it into; drop rather than let it jam the queue forever.
+                flushed_ids += [pid for pid, _ in items]
+                continue
+            ok = _write_results_batch_to_sheet(tid, [r for _, r in items])
+            if ok:
+                flushed_ids += [pid for pid, _ in items]
+            # On failure, leave these rows in the queue untouched - the row
+            # data itself lives safely in Postgres either way, so the next
+            # tick just retries them along with whatever's arrived since.
+        if flushed_ids:
+            with conn, conn.cursor() as cur:
+                cur.execute("DELETE FROM pending_results WHERE id = ANY(%s)", (flushed_ids,))
+    except Exception as e:
+        print("FLUSH PENDING RESULTS FAILED", e)
+    finally:
+        if conn is not None:
+            if got_lock:
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT pg_advisory_unlock(%s)", (_RESULTS_FLUSH_LOCK_KEY,))
+                except Exception:
+                    pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+_results_flush_thread_started = False
+_results_flush_thread_lock = threading.Lock()
+
+def _start_results_flush_thread():
+    """Starts the periodic flush loop once per process. A no-op with no
+    DATABASE_URL configured - in that case write_result() never queues
+    anything in the first place (falls straight back to the old synchronous
+    write), so there would be nothing for this thread to do anyway."""
+    global _results_flush_thread_started
+    if not DATABASE_URL:
+        return
+    with _results_flush_thread_lock:
+        if _results_flush_thread_started:
+            return
+        _results_flush_thread_started = True
+        def _loop():
+            while True:
+                time.sleep(RESULTS_FLUSH_INTERVAL_SEC)
+                try:
+                    _flush_pending_results()
+                except Exception as e:
+                    print("RESULTS FLUSH LOOP ERROR", e)
+        threading.Thread(target=_loop, name="results-flush", daemon=True).start()
+
+# Started once here, at import time - by the point this line runs, db_init()
+# (called earlier in the module) has already created the pending_results
+# table, and every function _start_results_flush_thread/the loop it starts
+# depends on is already defined above.
+_start_results_flush_thread()
 
 STUDENT_LEVELS_TAB = "StudentLevels"
 STUDENT_LEVELS_HEADER = ["Student Email", "Current Level", "Updated At"]
