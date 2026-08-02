@@ -379,6 +379,10 @@ try{
   // else: nothing saved on this device yet - keep the default above.
 }catch(e){}
 var _pvRate=null, pvExamStartTime=null, pvTimerInterval=null;
+// True only while the one-time placement test (see showPlacementQuestion)
+// is on screen - guards togglePrivateMode() against trying to switch views
+// mid-test, when there's no real station to jump to yet.
+var inPlacementTest=false;
 // Bumped by every Private-mode view switch (Listening, the free-practice
 // list, free-practice-again) - loadQuestion() snapshots this before issuing
 // its fetch and only applies the response if it's still the same generation,
@@ -973,7 +977,25 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;
   // bug: switching to Private mode's Listening view, then having it snap
   // back to the previous station's content a moment later.
   let _myPvGen=pvGen;
-  ['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.error==='session not found'){showSessionExpired();return}if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
+  ['play','show','skip','mic'].forEach(id=>document.getElementById(id).classList.remove('hidden-final'));hideAll();apiFetch('/api/question?student='+encodeURIComponent(studentId),{},loadQuestion).then(r=>r.json()).then(q=>{if(q.error==='session not found'){showSessionExpired();return}if(q.done){practiceResults=q.results||[];if(q.leveled_up&&q.new_level){showLevelUpToast(q.new_level);setTimeout(startExam,700)}else{startExam()}return}
+  if(q.stage==='placement'){
+    // Runs once, before station 1, only for a level-track student who has
+    // never been placed before (see app.py new_session/placement_answer).
+    // Deliberately rendered with the plain (non-Private) recording UI even
+    // if Private mode is on - the bubble skin is themed entirely around the
+    // 4 stations, which this precedes, and forcing it in here would mean
+    // building a whole parallel bubble layout for a one-time, few-question
+    // flow. privateMode itself is untouched - just the body class is
+    // suspended for the duration - so the normal station UI resumes exactly
+    // as configured the moment placement hands off into the real session.
+    document.body.classList.remove('private-mode');
+    inPlacementTest=true;
+    showPlacementQuestion(q);
+    return;
+  }
+  inPlacementTest=false;
+  document.body.classList.toggle('private-mode', privateMode);
+  currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
   let _pvStationNum=q.stage==='preview'?1:(q.cloze_active||q.review_round)?3:2;
   updateStationBar(_pvStationNum);
   let mw=document.getElementById('mismatchWarn');
@@ -1047,6 +1069,61 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;
   }
   if(privateMode&&pvGen===_myPvGen)pvSyncQuestion(q,_pvStationNum);
 }).catch(e=>document.getElementById('he').textContent='שגיאה בטעינת משפט')}
+// --- Placement test (level track only, first-ever session - see app.py) ---
+// A short adaptive test that runs ONCE before station 1, so a student isn't
+// cold-started at A1 and left to re-practice levels they already know. Uses
+// the exact same recording/scoring pipeline as the real stations (same mic
+// button, same /api/answer, same word-level feedback) - only the framing
+// around it differs, and there's no station-bar circle for it (it precedes
+// station 1 entirely).
+function showPlacementQuestion(q){
+  currentQ=q;
+  document.getElementById('previewNav').style.display='none';
+  let vw=document.getElementById('voiceSelWrap'); if(vw)vw.style.display='none';
+  let settings=document.getElementById('audioSettings'); if(settings)settings.open=false;
+  document.getElementById('prog').textContent='מבחן רמות קצר — שאלה '+(q.index+1);
+  document.getElementById('prog').style.display='';
+  let phase=document.getElementById('phase');
+  phase.innerHTML='🎯 בודקים באיזו רמה כדאי להתחיל, כדי לא לבזבז זמן על רמות שכבר יודעים';
+  phase.style.display='';
+  document.getElementById('he').style.display='none';
+  document.getElementById('en').textContent=q.en;
+  document.getElementById('en').style.opacity='1';
+  document.getElementById('sentenceBox').style.display='';
+  document.getElementById('show').style.display='none';
+  document.getElementById('skip').style.display='none';
+  document.getElementById('mic').style.display='';
+  document.getElementById('stopRec').style.display='none';
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('capChoice').style.display='none';
+  document.getElementById('practiceAgainBtn').style.display='none';
+  hideCloze(); hideMastery(); hideMasteryGauge();
+  document.getElementById('hint').textContent='אמור את המשפט באנגלית';
+  document.getElementById('result').style.display='none';
+  document.getElementById('bar').style.width=Math.round((q.index/Math.max(q.total,1))*100)+'%';
+  // No station circle is lit - this happens before station 1. Passing 0
+  // (data-station values are 1-4) matches nothing, so every circle stays
+  // in its default, un-highlighted state; it also hides the "🔊 הצג"
+  // listen-all button, which wouldn't make sense before a level is chosen.
+  updateStationBar(0);
+  setTimeout(playSentence,350);
+}
+function showPlacementResult(spoken,res){
+  let box=document.getElementById('result');
+  let passed=!!res.passed;
+  box.style.display='block';
+  box.className='result '+(passed?'pass':'fail');
+  let words=(res.words||[]).filter(w=>w.status!=='extra').map(w=>'<span class="w '+(w.status==='correct'?'correct':'wrong')+'">'+esc(w.word)+'</span>').join(' ');
+  document.getElementById('mic').style.display='none';
+  document.getElementById('hint').textContent='';
+  if(res.placement_done){
+    box.innerHTML='<h3>🎯 שובצת לרמה: '+esc(res.placed_level_name||res.placed_level||'')+'</h3><div>אמרת: <span dir="ltr">'+esc(spoken)+'</span></div><div class="words">'+words+'</div><p>מתחילים לתרגל ברמה הזו עכשיו.</p>';
+    setTimeout(loadQuestion,1700);
+  } else {
+    box.innerHTML='<h3>'+(passed?'✅ נכון':'💪 לא בדיוק')+'</h3><div>אמרת: <span dir="ltr">'+esc(spoken)+'</span></div><div class="words">'+words+'</div>';
+    setTimeout(loadQuestion,1100);
+  }
+}
 // "Explain once, then clean" (per UX feedback): the progress line ("משפט X
 // מתוך Y | שם התרגיל") and the station header ("⭐ תחנה 2 — ...") are static
 // per station - repeating them verbatim on every single sentence is exactly
@@ -1412,6 +1489,7 @@ function showResult(spoken,res){
     document.getElementById('hint').textContent='נסה שוב';
     return;
   }
+  if(res.station==='placement'){showPlacementResult(spoken,res);return}
   let passed=!!res.passed;
   // Tally real mistakes only - a correct repeat that's still part of the
   // required mastery/cloze sequence has passed=true for that submission, so
@@ -1908,6 +1986,12 @@ function togglePrivateMode(){
   let btnLbl=document.getElementById('privateModeBtnLbl');
   if(btnLbl)btnLbl.textContent=privateMode?'PRIVATE ON':'PRIVATE OFF';
   if(document.getElementById('app').style.display!=='block')return;
+  // The placement test (see showPlacementQuestion) is rendered with the
+  // plain UI regardless of this toggle, and has no station to jump to yet -
+  // the preference above is still saved immediately, but the actual view
+  // switch is deferred until placement concludes and loadQuestion() re-syncs
+  // body.private-mode on its own (see loadQuestion()).
+  if(inPlacementTest)return;
   // Explicit requirement: the two modes must never hand off "current
   // position" to each other across the toggle - switching into Private mode
   // mid-exam/mid-practice must NOT drop the student into the private Speed

@@ -1,4 +1,4 @@
-import os, json, time, re, csv, io
+import os, json, time, re, csv, io, random
 from urllib.parse import urlparse, parse_qs, quote
 from difflib import SequenceMatcher
 from datetime import datetime
@@ -273,6 +273,16 @@ FALLBACK_SENTENCES = [
 # (see get_student_level/set_student_level + the auto-advance check in
 # /api/question) as they demonstrate strong, consistent mastery.
 CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+# Placement test (see new_session/placement_answer below): a brand-new
+# level-track student is never just dropped in at A1 and left to re-practice
+# levels they already know - a short adaptive test finds their real starting
+# level first. Starts at B1 (index 2) as a reasonable general anchor, moves
+# up a level on a pass / down a level on a fail, and stops as soon as the
+# result flips (that flip brackets the student's real level) or after
+# PLACEMENT_MAX_STEPS sentences, whichever comes first - fast by design,
+# since the whole point is not to waste the student's time.
+PLACEMENT_START_IDX = 2
+PLACEMENT_MAX_STEPS = 6
 
 LEVEL_NAMES_HE = {
     "A1": "רמה A1 — מתחילים",
@@ -900,13 +910,27 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
     csv_url = ts.get("csv_url", "")
     level_track = None
     level_exercise_name = None
+    placement_active = False
+    placement_sentence = None
     if not csv_url.strip():
-        # No teacher-selected exercise: fall back to the built-in, per-student
-        # CEFR leveled curriculum (starts at A1, advances automatically) instead
-        # of the old 3-sentence generic demo content.
-        sentences, level_track = load_level_track_sentences(teacher_id, student_email)
-        used_fallback = False
-        level_exercise_name = LEVEL_NAMES_HE.get(level_track, "תרגול דמו")
+        email_clean = (student_email or "").strip().lower()
+        if email_clean and not has_saved_student_level(teacher_id, email_clean):
+            # Brand new to the level track (no saved level yet, and we have
+            # an email to key it on) - run the short adaptive placement test
+            # first instead of cold-starting at A1. See placement_answer()
+            # for how this concludes and hands off into the real curriculum.
+            placement_active = True
+            sentences = []
+            used_fallback = False
+            level_exercise_name = "מבחן רמות"
+            placement_sentence = random.choice(LEVEL_SENTENCES[CEFR_LEVELS[PLACEMENT_START_IDX]])
+        else:
+            # No teacher-selected exercise: fall back to the built-in, per-student
+            # CEFR leveled curriculum (starts at their saved level, advances
+            # automatically) instead of the old 3-sentence generic demo content.
+            sentences, level_track = load_level_track_sentences(teacher_id, student_email)
+            used_fallback = False
+            level_exercise_name = LEVEL_NAMES_HE.get(level_track, "תרגול דמו")
     else:
         sentences, used_fallback = load_sentences_from_csv_ex(csv_url)
     # content_mismatch=True means a real exercise was selected (csv_url is set)
@@ -961,8 +985,16 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
         # hands off to the next one. Sessions with no loaded sentences skip
         # preview entirely (nothing to page through) so they fall straight
         # into the existing empty-exercise handling.
-        "stage": "preview" if sentences else "accuracy",
+        "stage": "placement" if placement_active else ("preview" if sentences else "accuracy"),
         "current": 0,
+        # Placement test state (see placement_answer below) - all no-ops
+        # once placement_active is False, which is the case for every
+        # session except a level-track student's very first one.
+        "placement_active": placement_active,
+        "placement_idx": PLACEMENT_START_IDX,
+        "placement_step": 0,
+        "placement_history": [],
+        "placement_current": placement_sentence,
         # Per-sentence accuracy-stage results (mastery reps/score/attempts),
         # cached here by index once a sentence finishes the accuracy sweep,
         # so the SINGLE result row for that sentence (still just one row per
@@ -1361,30 +1393,49 @@ def _student_levels_ws(tid):
         ws.append_row(STUDENT_LEVELS_HEADER, value_input_option="USER_ENTERED")
     return ws
 
-def get_student_level(tid, email):
-    """Look up a student's current CEFR level for this teacher. Defaults to
-    the first level (A1) whenever there's no record yet, or on any error -
-    a brand-new/never-seen student always starts at the beginning.
+def _lookup_student_level_row(tid, email):
+    """Returns the saved CEFR level for this student, or None if no row
+    exists yet - i.e. this student has never been placed on the level track
+    before (brand new). Shared by get_student_level (which falls back to A1)
+    and has_saved_student_level (which needs to tell "never placed" apart
+    from "was placed at A1") so there's only one Sheets lookup to maintain.
     """
     email = (email or "").strip().lower()
     if not email:
-        return CEFR_LEVELS[0]
-    key = f"studentlevel:{tid}:{email}"
+        return None
+    key = f"studentlevelrow:{tid}:{email}"
     if key in _cache and time.time() - _cache[key][0] < 300:
         return _cache[key][1]
-    level = CEFR_LEVELS[0]
+    found = None
     try:
         ws = _student_levels_ws(tid)
         for row in ws.get_all_values()[1:]:
             if len(row) >= 2 and row[0].strip().lower() == email:
                 candidate = row[1].strip().upper()
                 if candidate in CEFR_LEVELS:
-                    level = candidate
+                    found = candidate
                 break
     except Exception as e:
         print("GET STUDENT LEVEL FAILED", e)
-    _cache[key] = (time.time(), level)
-    return level
+    _cache[key] = (time.time(), found)
+    return found
+
+def get_student_level(tid, email):
+    """Look up a student's current CEFR level for this teacher. Defaults to
+    the first level (A1) whenever there's no record yet, or on any error -
+    a brand-new/never-seen student always starts at the beginning (in
+    practice this only happens if the placement test - see
+    has_saved_student_level/new_session - was skipped, e.g. no email)."""
+    return _lookup_student_level_row(tid, email) or CEFR_LEVELS[0]
+
+def has_saved_student_level(tid, email):
+    """True once this student has an actual saved level - either from a
+    completed placement test or from auto-advancement. False means this
+    student has never touched the level track before and should take the
+    short placement test first (see new_session) instead of always cold-
+    starting at A1 and wasting time re-practicing levels they already know.
+    """
+    return _lookup_student_level_row(tid, email) is not None
 
 def set_student_level(tid, email, level):
     """Persist a student's new CEFR level (e.g. after auto-advancement)."""
@@ -1403,7 +1454,7 @@ def set_student_level(tid, email, level):
             ws.update(f"A{row_idx}", [[email, level, now_str()]], value_input_option="USER_ENTERED")
         else:
             ws.append_row([email, level, now_str()], value_input_option="USER_ENTERED")
-        _cache[f"studentlevel:{tid}:{email}"] = (time.time(), level)
+        _cache[f"studentlevelrow:{tid}:{email}"] = (time.time(), level)
         return True
     except Exception as e:
         print("SET STUDENT LEVEL FAILED", e)
@@ -1731,10 +1782,15 @@ def verify_student():
     if resumable:
         sess = _sessions[sid]
         resp["resumed"] = True
-        resp["resume_progress"] = {
-            "index": sess.get("current", 0), "total": len(sess.get("sentences", [])),
-            "stage": sess.get("stage", "accuracy"),
-        }
+        if sess.get("placement_active"):
+            resp["resume_progress"] = {
+                "index": sess.get("placement_step", 0), "total": PLACEMENT_MAX_STEPS, "stage": "placement",
+            }
+        else:
+            resp["resume_progress"] = {
+                "index": sess.get("current", 0), "total": len(sess.get("sentences", [])),
+                "stage": sess.get("stage", "accuracy"),
+            }
     return jsonify(resp)
 
 def read_results_sheet_rows(tid):
@@ -1889,6 +1945,19 @@ def question():
     s = get_session(request.args.get("student", ""))
     if not s:
         return jsonify(error="session not found"), 404
+    if s.get("placement_active"):
+        # Short adaptive placement test, entirely separate from the normal
+        # preview/accuracy/cloze stage machine below - see new_session() and
+        # placement_answer(). The SAME sentence is returned on repeated polls
+        # until it's actually answered (placement_current only changes inside
+        # placement_answer), so a page refresh mid-test never loses the
+        # question the student is looking at.
+        q = s["placement_current"] or {"he": "", "en": ""}
+        return jsonify({
+            "done": False, "stage": "placement", "he": q.get("he", ""), "en": q.get("en", ""),
+            "index": s.get("placement_step", 0), "total": PLACEMENT_MAX_STEPS,
+            "exercise": s["exercise_name"], "voice_gender": s["voice_gender"],
+        })
     if s["stage"] == "preview":
         # Ungraded exposure sweep - no mic, no score, just the sentence text
         # and audio, with free back/forward navigation (see /api/preview-nav).
@@ -2035,6 +2104,62 @@ def cap_retry():
     s["bonus_attempts"] = int(s.get("bonus_attempts", 0)) + 3
     return jsonify(ok=True, **session_payload(s))
 
+def placement_answer(s, spoken, metrics):
+    """Score one placement-test attempt and either move to the next level to
+    test, or - once the result flips (bracketing the student's real level)
+    or PLACEMENT_MAX_STEPS is reached - finish the test, save the level, and
+    hand off straight into a normal session at that level. Uses the exact
+    same recording/scoring pipeline as regular practice (best_score_for_spoken,
+    word_level, 100%-match pass/fail) - only the level-selection logic around
+    it is new."""
+    q = s.get("placement_current") or {"he": "", "en": ""}
+    _, correct, score = best_score_for_spoken(spoken, q)
+    passed = score >= 100
+    words = word_level(spoken, correct)
+    level_tested = CEFR_LEVELS[s["placement_idx"]]
+    s["placement_history"].append({"level": level_tested, "passed": passed})
+    s["placement_step"] = int(s.get("placement_step", 0)) + 1
+    base = {
+        "correct": correct, "spoken": spoken, "score": score, "passed": passed,
+        "words": words, "advance": False, "station": "placement",
+        "index": s["placement_step"], "total": PLACEMENT_MAX_STEPS,
+    }
+    history = s["placement_history"]
+    # The first time a pass and a fail have BOTH been seen, the boundary is
+    # bracketed - that's enough to place the student without grinding
+    # through every level. Otherwise keep going up to the step cap.
+    converged = len(history) >= 2 and history[-1]["passed"] != history[-2]["passed"]
+    finished = converged or s["placement_step"] >= PLACEMENT_MAX_STEPS
+
+    if not finished:
+        if passed:
+            s["placement_idx"] = min(s["placement_idx"] + 1, len(CEFR_LEVELS) - 1)
+        else:
+            s["placement_idx"] = max(s["placement_idx"] - 1, 0)
+        next_level = CEFR_LEVELS[s["placement_idx"]]
+        s["placement_current"] = random.choice(LEVEL_SENTENCES[next_level])
+        return jsonify({**base, "placement_done": False})
+
+    # Final level = the highest level the student actually passed. A student
+    # who never passed even the easiest sentence tested still starts at A1
+    # (the floor), rather than being placed "below" the curriculum.
+    passed_indices = [CEFR_LEVELS.index(h["level"]) for h in history if h["passed"]]
+    final_level = CEFR_LEVELS[max(passed_indices)] if passed_indices else CEFR_LEVELS[0]
+    email = s.get("student_email", "")
+    set_student_level(s["teacher_id"], email, final_level)
+    real_sentences, _ = load_level_track_sentences(s["teacher_id"], email)
+    s["placement_active"] = False
+    s["placement_current"] = None
+    s["level_track"] = final_level
+    s["exercise_name"] = LEVEL_NAMES_HE.get(final_level, "תרגול דמו")
+    s["sentences"] = real_sentences
+    s["stage"] = "preview" if real_sentences else "accuracy"
+    s["current"] = 0
+    return jsonify({
+        **base, "placement_done": True, "placed_level": final_level,
+        "placed_level_name": LEVEL_NAMES_HE.get(final_level, final_level),
+    })
+
 @app.post("/api/answer")
 def answer():
     data = request.get_json(force=True)
@@ -2047,6 +2172,13 @@ def answer():
         # This happens when the server restarted (redeploy or free-tier spin-down)
         # and lost this student's in-memory session - it is NOT a real 0%.
         return jsonify(error="session not found", score=None, passed=False, words=[], advance=False), 404
+    if s.get("placement_active"):
+        # Bypasses the normal accuracy/mastery/cloze machinery entirely - see
+        # new_session()/placement_answer(). s["sentences"] is empty during
+        # placement, so this MUST be handled before the "current >= len
+        # (sentences)" early-return below, which would otherwise misread an
+        # empty sentence list as "session already done".
+        return placement_answer(s, spoken, metrics)
     if not s.get("in_review"):
         advance_stage_if_swept(s)
     if s["current"] >= len(s["sentences"]) and not s.get("in_review"):
