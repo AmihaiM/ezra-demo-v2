@@ -285,7 +285,8 @@ body.private-mode #practiceAgainBtn{display:none!important}
 .pv-counter{background:#ede7ff;color:#6b5b95;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
 .pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
-.pv-bubble.pv-prompt{background:var(--tc,#4318D1);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;cursor:pointer}
+.pv-bubble.pv-prompt{background:var(--tc,#4318D1);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.pv-bubble.pv-listen-cta{background:#ede7ff;color:var(--tc,#4318D1);align-self:flex-start;font-weight:800;cursor:pointer;border:1.5px solid #ddd6fe}
 .pv-bubble.pv-transcript{background:#eef0f4;color:#333;align-self:flex-start;border-bottom-left-radius:4px;display:flex;gap:8px;align-items:flex-start}
 .pv-bubble.pv-transcript .pv-avatar{font-size:17px;flex:0 0 auto}
 .pv-bubble.pv-feedback{align-self:flex-start;font-weight:800;display:flex;align-items:center;gap:8px}
@@ -2049,7 +2050,10 @@ function pvSyncQuestion(q,stationNum){
   pvClearActions();
   let promptText=stationNum===3?(q.he||q.en||''):(q.en||q.he||'');
   let chat=document.getElementById('pvChat');
-  if(chat)chat.innerHTML='<div class="pv-bubble pv-prompt" onclick="pvReplayCurrent()" title="הקש כדי לשמוע שוב">'+esc(promptText)+'</div>';
+  // Explicit requirement: stations 2/3 must NOT offer any way to hear the
+  // sentence up front - the prompt bubble is plain, unclickable text here.
+  // Audio only becomes available after a wrong answer (see pvRenderResult).
+  if(chat)chat.innerHTML='<div class="pv-bubble pv-prompt">'+esc(promptText)+'</div>';
 }
 function pvReplayCurrent(){ if(currentQ)speakText(currentQ.en,null); }
 function pvRenderResult(spoken,res){
@@ -2085,6 +2089,12 @@ function pvRenderResult(spoken,res){
     // the full dot-meter/streak-broken detail the normal UI shows - that
     // stays teacher-only/normal-mode-only by design.
     chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback ok" style="opacity:.85">'+res.mastery_remaining+' more to go 💪</div>');
+  }
+  if(!passed){
+    // Explicit requirement: no way to hear the sentence up front on stations
+    // 2/3 (see pvSyncQuestion) - audio only becomes available once a wrong
+    // answer shows the student actually needs it.
+    chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-listen-cta" onclick="pvReplayCurrent()">🔊 Listen again</div>');
   }
   chat.scrollTop=chat.scrollHeight;
   let actions=document.getElementById('pvActions');
@@ -2129,7 +2139,7 @@ function pvSyncPracticeAgain(isCloze){
   pvClearActions();
   let text=isCloze?((currentQ&&currentQ.he)||''):((currentQ&&currentQ.en)||'');
   let chat=document.getElementById('pvChat');
-  if(chat)chat.innerHTML='<div class="pv-bubble pv-prompt" onclick="pvReplayCurrent()">'+esc(text)+'</div>';
+  if(chat)chat.innerHTML='<div class="pv-bubble pv-prompt">'+esc(text)+'</div>';
 }
 function pvRenderPracticeRepeatResult(spoken,res){
   let chat=document.getElementById('pvChat');
@@ -2138,6 +2148,9 @@ function pvRenderPracticeRepeatResult(spoken,res){
   let transcriptHtml=(res.words&&res.words.length)?pvWordsHtml(res.words):esc(spoken||'');
   chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-transcript"><span class="pv-avatar">👤</span><span>'+transcriptHtml+'</span></div>');
   chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback '+(res.passed?'ok':'bad')+'">'+(res.passed?'Correct answer ✔ well done! 😀':'Wrong answer ✗ Try again 😔')+'</div>');
+  if(!res.passed){
+    chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-listen-cta" onclick="pvReplayCurrent()">🔊 Listen again</div>');
+  }
   chat.scrollTop=chat.scrollHeight;
   let actions=document.getElementById('pvActions');
   actions.classList.add('show');
