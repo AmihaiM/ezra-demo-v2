@@ -1291,6 +1291,14 @@ function playSentence(){
 // currentQ/#play button. btn (optional) just gets disabled while speaking so
 // a student can't spam-click it into overlapping utterances.
 function speakText(text, btn, rateOverride, onDone){
+  // Some exercises carry a fill-in-the-blank variant (marked with "___") in
+  // whichever field ends up here to speak - useful to SHOW as a hint of the
+  // sentence structure, but the speech engine has no concept of a blank and
+  // just reads the underscore characters literally ("underscore underscore"
+  // or similar, depending on the voice). Never actually correct to say out
+  // loud in any context this function is used from, so strip it here once,
+  // for every caller, rather than trying to catch it at each call site.
+  text = (text||'').replace(/_{2,}/g,' ').replace(/\s{2,}/g,' ').trim();
   speechSynthesis.cancel();
   // Guard against double-clicking "שמע שוב" while the engine is still
   // settling from cancel() above - a second overlapping speak() call while
