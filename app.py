@@ -1,4 +1,4 @@
-import os, json, time, re, csv, io, random, threading
+import os, json, time, re, csv, io, random, threading, hmac, hashlib, base64
 from urllib.parse import urlparse, parse_qs, quote
 from difflib import SequenceMatcher
 from datetime import datetime
@@ -38,6 +38,11 @@ TEACHERS = {
         "default_threshold": int(os.getenv("BEN_THRESHOLD", "85")),
         "default_max_attempts": int(os.getenv("BEN_MAX_ATTEMPTS", "5")),
         "photo_url": "",
+        # Gmail/Google Workspace address linked for Google Sign-In (see
+        # /api/teacher-login-google) - empty by default, meaning this teacher
+        # can only log in with the password until they link one (self-serve
+        # in teacher.html settings, or set here/in /admin).
+        "google_email": os.getenv("BEN_GOOGLE_EMAIL", ""),
     },
     "sara": {
         "name": "שרה", "color": "#be185d", "color_light": "#fce8f3", "voice_gender": "female",
@@ -46,8 +51,26 @@ TEACHERS = {
         "default_threshold": int(os.getenv("SARA_THRESHOLD", "85")),
         "default_max_attempts": int(os.getenv("SARA_MAX_ATTEMPTS", "5")),
         "photo_url": "",
+        "google_email": os.getenv("SARA_GOOGLE_EMAIL", ""),
     },
 }
+# Google Sign-In (OAuth). This is the app's OAuth 2.0 "Web application"
+# Client ID from Google Cloud Console - NOT a secret (it's embedded in the
+# frontend page, same as any Google Sign-In button on any website) so it's
+# fine to expose via /api/config. Without it set, Google Sign-In is simply
+# unavailable and the app falls back to the existing password login - see
+# verify_google_id_token() below.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+# Signs/verifies the short-lived teacher session token issued at login (see
+# make_teacher_token/verify_teacher_token below). A Google-authenticated
+# teacher never has a "password" to resend on every subsequent dashboard
+# request the way the password-login flow always has - this token is what
+# lets every OTHER teacher-only endpoint (settings, catalog, results, ...)
+# accept "I already proved who I am at login" instead of requiring the
+# actual password again. Falls back to a fixed dev value so local/dev runs
+# still work, but a real deployment should set SECRET_KEY explicitly - see
+# admin setup instructions.
+APP_SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-secret-change-me")
 CATALOG_SHEET_ID = os.getenv("CATALOG_SHEET_ID", "134GzKi9KWNCP_avNg5Z7drhHp3Re7RRALrNrDcOeFnk")
 RESULTS_SHEET_ID = os.getenv("RESULTS_SHEET_ID", "17a-y_-nL9L85Kl7zL1F1ovTGbQy7q5NlBX24C-a_6JU")
 # Each teacher writes results into their own separate spreadsheet file (not just a separate
@@ -235,8 +258,72 @@ def db_init():
                 "id BIGSERIAL PRIMARY KEY, row_data JSONB NOT NULL, "
                 "created_at TIMESTAMPTZ NOT NULL DEFAULT now())"
             )
+            # Payment scaffold (see /api/grow-webhook + get_subscription_status
+            # below) - one row per paying identity (keyed by email, the same
+            # stable identifier used everywhere else in the app). NOT YET
+            # ENFORCED anywhere: no existing endpoint currently checks this
+            # table before granting access. It exists so the mechanism is
+            # real and testable once there's an actual Grow account to
+            # connect it to - see the big comment on grow_webhook().
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS subscriptions ("
+                "email TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'inactive', "
+                "plan TEXT, grow_transaction_id TEXT, "
+                "updated_at TIMESTAMPTZ NOT NULL DEFAULT now())"
+            )
     except Exception as e:
         print("DB INIT FAILED", e)
+    finally:
+        _db_release(conn)
+
+def get_subscription_status(email):
+    """Returns the stored status string ('active', 'inactive', 'canceled',
+    ...) for this email, or None if either there's no row for them yet, the
+    email is blank, or no DB is configured at all. None is deliberately
+    treated the same as "don't know" rather than "not paid" by any future
+    caller - payment gating is not wired into anything yet (see
+    grow_webhook()), so returning None here should never itself block
+    access; it's a read helper waiting for a caller, not an enforcement
+    point."""
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT status FROM subscriptions WHERE email = %s", (email,))
+            row = cur.fetchone()
+            return row[0] if row else None
+    except Exception as e:
+        print("GET SUBSCRIPTION STATUS FAILED", e)
+        return None
+    finally:
+        _db_release(conn)
+
+def _upsert_subscription(email, status, plan=None, grow_transaction_id=None):
+    email = (email or "").strip().lower()
+    if not email:
+        return False
+    conn = _db_conn()
+    if not conn:
+        return False
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO subscriptions (email, status, plan, grow_transaction_id, updated_at) "
+                "VALUES (%s, %s, %s, %s, now()) "
+                "ON CONFLICT (email) DO UPDATE SET status = EXCLUDED.status, "
+                "plan = COALESCE(EXCLUDED.plan, subscriptions.plan), "
+                "grow_transaction_id = COALESCE(EXCLUDED.grow_transaction_id, subscriptions.grow_transaction_id), "
+                "updated_at = now()",
+                (email, status, plan, grow_transaction_id),
+            )
+        return True
+    except Exception as e:
+        print("UPSERT SUBSCRIPTION FAILED", e)
+        return False
     finally:
         _db_release(conn)
 
@@ -1201,6 +1288,7 @@ TEACHERS_HEADER = [
     "teacher_id", "name", "color", "color_light", "voice_gender",
     "student_password", "teacher_password", "threshold", "max_attempts",
     "results_sheet_id", "created_at", "photo_url", "exercise_name", "csv_url",
+    "google_email",
 ]
 
 def load_extra_teachers():
@@ -1241,6 +1329,7 @@ def load_extra_teachers():
                 "default_threshold": int(r.get("threshold") or 85),
                 "default_max_attempts": int(r.get("max_attempts") or 5),
                 "photo_url": clean_cell(r.get("photo_url", "")),
+                "google_email": clean_cell(r.get("google_email", "")),
                 # Currently-selected exercise, durably saved here (see
                 # _upsert_teacher_row) instead of only in teacher_state.json
                 # on Render's ephemeral local disk, which is wiped on every
@@ -1293,6 +1382,7 @@ def _upsert_teacher_row(tid, entry, results_sheet_id):
         "threshold": entry.get("default_threshold", 85), "max_attempts": entry.get("default_max_attempts", 5),
         "results_sheet_id": results_sheet_id or "", "created_at": now_str(),
         "photo_url": entry.get("photo_url", ""),
+        "google_email": entry.get("google_email", ""),
         # entry (a plain teacher-profile dict: name/color/passwords/...) never
         # actually carries these two - fall back to this server's current
         # in-memory selection for that teacher instead of blanking the cell,
@@ -1995,6 +2085,137 @@ def favicon_ico():
 def api_teachers():
     return jsonify({tid: teacher_public(tid) for tid in TEACHERS})
 
+@app.get("/api/config")
+def api_config():
+    # Public, non-secret runtime config the frontend needs before login -
+    # currently just whether Google Sign-In is set up (GOOGLE_CLIENT_ID is
+    # itself not a secret, so it's fine to hand back directly). Frontends use
+    # this to decide whether to render the "Sign in with Google" button at
+    # all, instead of showing a button that would just fail every time on a
+    # deployment where nobody has created a Google OAuth Client ID yet.
+    return jsonify(google_client_id=GOOGLE_CLIENT_ID)
+
+# --- Payment (Grow) scaffold -------------------------------------------
+# Grow (grow.business) is the recommended Israeli payment/clearing provider
+# for a future paid tier - it has a documented developer API + webhook
+# support suited to gating a custom app (not just a pre-built course page).
+# This endpoint + the subscriptions table/helpers above are the receiving
+# end of that integration, built now so the shape exists in code - but as
+# of this being written there is NO real Grow merchant/developer account
+# yet, so three things are explicitly NOT done here and need to happen
+# before this goes live:
+#   1. Create a Grow account, get real API/webhook credentials, and set
+#      GROW_WEBHOOK_SECRET (env var) to the real signing secret Grow issues.
+#   2. Replace the signature check below with Grow's actual documented
+#      scheme (header name + algorithm) - what's here is a reasonable
+#      generic HMAC placeholder, not verified against real Grow docs, since
+#      there's no account yet to check against.
+#   3. Decide the product shape (per-student subscription vs per-teacher/
+#      school license) and only then add an actual access check somewhere
+#      real (e.g. in verify_student/_complete_student_login) - right now
+#      NOTHING in the app reads this table to block anything, so turning
+#      this endpoint on cannot break the current free pilot.
+GROW_WEBHOOK_SECRET = os.getenv("GROW_WEBHOOK_SECRET", "")
+
+@app.post("/api/grow-webhook")
+def grow_webhook():
+    raw = request.get_data()
+    data = request.get_json(silent=True) or {}
+    if GROW_WEBHOOK_SECRET:
+        provided_sig = request.headers.get("X-Grow-Signature", "")
+        expected_sig = hmac.new(GROW_WEBHOOK_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+        if not provided_sig or not hmac.compare_digest(provided_sig, expected_sig):
+            return jsonify(ok=False, error="invalid signature"), 401
+    # Field names below are best-effort guesses (email/status under a few
+    # common aliases) pending real Grow webhook payload docs/examples once
+    # an account exists - update these once you have a real test payload.
+    email = (data.get("email") or data.get("customer_email") or data.get("payer_email") or "").strip().lower()
+    raw_status = (data.get("status") or data.get("event") or "").strip().lower()
+    if not email:
+        print("GROW WEBHOOK: no email in payload", data)
+        return jsonify(ok=False, error="no email in payload"), 400
+    active_statuses = {"paid", "active", "success", "completed", "subscription_created", "subscription_renewed"}
+    inactive_statuses = {"canceled", "cancelled", "failed", "refunded", "subscription_canceled", "expired"}
+    if raw_status in active_statuses:
+        status = "active"
+    elif raw_status in inactive_statuses:
+        status = "inactive"
+    else:
+        status = raw_status or "unknown"
+    saved = _upsert_subscription(
+        email, status,
+        plan=data.get("plan") or data.get("product"),
+        grow_transaction_id=data.get("transaction_id") or data.get("id"),
+    )
+    print("GROW WEBHOOK", email, status, "saved" if saved else "DB SAVE FAILED (no DB configured?)")
+    return jsonify(ok=True)
+
+# Verifies a Google Identity Services ID token entirely server-side against
+# Google's public signing keys - no client secret involved, just the OAuth
+# Client ID above. Returns the verified claims dict (email, email_verified,
+# name, ...) on success, or None if the token is invalid/expired/forged, or
+# if Google Sign-In isn't configured at all (GOOGLE_CLIENT_ID unset) - in
+# that last case callers should not treat this as "wrong credentials", the
+# feature is just not turned on yet for this deployment.
+_google_auth_request = None
+def verify_google_id_token(token):
+    if not GOOGLE_CLIENT_ID or not token:
+        return None
+    global _google_auth_request
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_auth_requests
+        if _google_auth_request is None:
+            _google_auth_request = google_auth_requests.Request()
+        return google_id_token.verify_oauth2_token(token, _google_auth_request, GOOGLE_CLIENT_ID)
+    except Exception as e:
+        print("GOOGLE ID TOKEN VERIFY FAILED", e)
+        return None
+
+# Stateless signed session token, issued once at successful teacher login
+# (password OR Google) and resent by the client on every later teacher-only
+# request instead of the real password. "Stateless" matters here: this app
+# has no server-side session store and no sticky-session guarantee across
+# gunicorn worker processes, so a token that only lived in one worker's
+# memory would randomly 401 depending which worker handled the next
+# request. Signing tid+expiry with HMAC instead means ANY worker can verify
+# ANY token on its own, with no shared state needed - same trick as a JWT,
+# just hand-rolled to avoid a new dependency for one field.
+def make_teacher_token(tid, ttl_seconds=60 * 60 * 24 * 30):
+    exp = int(time.time()) + ttl_seconds
+    payload = f"{tid}:{exp}"
+    sig = hmac.new(APP_SECRET_KEY.encode(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+    return base64.urlsafe_b64encode(f"{payload}:{sig}".encode()).decode()
+
+def verify_teacher_token(token):
+    try:
+        tid, exp, sig = base64.urlsafe_b64decode(token.encode()).decode().split(":", 2)
+        expected_sig = hmac.new(APP_SECRET_KEY.encode(), f"{tid}:{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+        if not hmac.compare_digest(sig, expected_sig) or int(exp) < int(time.time()) or tid not in TEACHERS:
+            return None
+        return tid
+    except Exception:
+        return None
+
+def _teacher_auth_ok(tid, data):
+    """Shared auth check for every teacher-only endpoint EXCEPT the login
+    endpoints themselves: accepts either the real teacher_password (the
+    original/always-available path) OR a valid session token from a prior
+    login (issued by _complete_teacher_login - see make_teacher_token
+    above), which is the only credential a Google-authenticated teacher
+    ever has. Replaces the old inline
+    `tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]`
+    check that every one of these endpoints used to duplicate."""
+    if tid not in TEACHERS:
+        return False
+    password = data.get("password", "")
+    if password and password == TEACHERS[tid]["teacher_password"]:
+        return True
+    token = data.get("token", "")
+    if token and verify_teacher_token(token) == tid:
+        return True
+    return False
+
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 @app.post("/api/verify-student")
@@ -2014,6 +2235,40 @@ def verify_student():
     expected = TEACHERS[tid]["student_password"]
     if expected and password != expected:
         return jsonify(ok=False, error="wrong password"), 401
+    return _complete_student_login(tid, name, email)
+
+@app.post("/api/verify-student-google")
+def verify_student_google():
+    # Google Sign-In path for students: instead of typing name+email+the
+    # shared class password, the student picks their Google account and we
+    # trust Google's own verification of who they are - the email comes
+    # straight from the verified token, never from a client-supplied field,
+    # so it can't be spoofed the way a typed email could be. Everything
+    # after identity is established (roster restriction, session
+    # resume/reset, response shape) is identical to the password path -
+    # see _complete_student_login(), shared by both.
+    data = request.get_json(force=True)
+    tid = data.get("teacher_id")
+    credential = data.get("credential", "")
+    if tid not in TEACHERS:
+        return jsonify(ok=False, error="bad request"), 400
+    ginfo = verify_google_id_token(credential)
+    if not ginfo:
+        return jsonify(ok=False, error="ההתחברות עם Google לא הוגדרה או שהאימות נכשל. נסה שוב או התחבר עם סיסמה."), 401
+    if not ginfo.get("email_verified"):
+        return jsonify(ok=False, error="חשבון ה-Google הזה אינו מאומת."), 401
+    email = (ginfo.get("email") or "").strip().lower()
+    name = (data.get("name") or ginfo.get("name") or email.split("@")[0]).strip()
+    if not email or not name:
+        return jsonify(ok=False, error="bad request"), 400
+    return _complete_student_login(tid, name, email)
+
+def _complete_student_login(tid, name, email):
+    # Everything after a student's identity is established (by password OR
+    # by verified Google token) - roster gate, resume-vs-restart detection,
+    # response shape - is identical, so both /api/verify-student and
+    # /api/verify-student-google funnel into this single implementation
+    # rather than duplicating it.
     ts = _teacher_state[tid]
     if ts.get("restrict_to_list"):
         allowed = {n.casefold() for n in ts.get("allowed_students", [])}
@@ -2076,7 +2331,16 @@ def verify_student():
         # No session yet, the exercise changed under them, or they already
         # finished this one before - start fresh, same as always.
         new_session(sid, tid, name, student_email=email)
-    resp = {"ok": True, "student_id": sid, "teacher": teacher_public(tid), "exercise": _sessions[sid]["exercise_name"]}
+    resp = {
+        "ok": True, "student_id": sid, "teacher": teacher_public(tid), "exercise": _sessions[sid]["exercise_name"],
+        # Echoed back explicitly (not just implied by what the client sent)
+        # so the Google Sign-In path - where the client may not have had a
+        # typed name/email to begin with - can pick up exactly what was
+        # actually used to log in, straight from the one place that
+        # resolved it (the verified token, for name/email; see
+        # /api/verify-student-google).
+        "student_name": name, "student_email": email,
+    }
     if just_completed:
         resp["just_completed"] = just_completed
     if resumable:
@@ -2819,8 +3083,32 @@ def get_results_tab_gid(tid, sheet_id):
 def teacher_login():
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
+    return _complete_teacher_login(tid)
+
+@app.post("/api/teacher-login-google")
+def teacher_login_google():
+    # Google Sign-In path for teachers: a teacher's account is linked to a
+    # specific Gmail/Google Workspace address via the "google_email" field
+    # (set in /admin - see TEACHERS schema and admin.html). If the verified
+    # token's email doesn't match any teacher's linked address, there is
+    # nothing to log into - most likely nobody has linked that teacher's
+    # account yet, which is a setup step for the admin, not a wrong password.
+    data = request.get_json(force=True)
+    credential = data.get("credential", "")
+    ginfo = verify_google_id_token(credential)
+    if not ginfo:
+        return jsonify(ok=False, error="ההתחברות עם Google לא הוגדרה או שהאימות נכשל. נסה שוב או התחבר עם סיסמה."), 401
+    if not ginfo.get("email_verified"):
+        return jsonify(ok=False, error="חשבון ה-Google הזה אינו מאומת."), 401
+    email = (ginfo.get("email") or "").strip().lower()
+    tid = next((t for t, cfg in TEACHERS.items() if (cfg.get("google_email") or "").strip().lower() == email), None)
+    if not tid:
+        return jsonify(ok=False, error="לא נמצא חשבון מורה המקושר לכתובת ה-Gmail הזו. יש לקשר אותה בעמוד הניהול (/admin) ואז לנסות שוב."), 403
+    return _complete_teacher_login(tid)
+
+def _complete_teacher_login(tid):
     s = _teacher_state[tid]
     sheet_id = RESULTS_SHEET_IDS.get(tid, RESULTS_SHEET_ID)
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
@@ -2832,13 +3120,18 @@ def teacher_login():
         allowed_students=s.get("allowed_students", []),
         restrict_to_list=bool(s.get("restrict_to_list", False)),
         results_sheet_url=sheet_url,
+        google_email=TEACHERS[tid].get("google_email", ""),
+        # Issued on every successful login (password or Google) so the
+        # client never has to resend the real password on subsequent
+        # requests - it can send this token instead. See _teacher_auth_ok.
+        token=make_teacher_token(tid),
     )
 
 @app.post("/api/teacher-allowed-students")
 def teacher_allowed_students():
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
     if "allowed_students" in data:
         raw = data.get("allowed_students", [])
@@ -2859,7 +3152,7 @@ def teacher_allowed_students():
 def teacher_settings():
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
     _teacher_state[tid]["threshold"] = max(80, min(100, int(data.get("threshold", _teacher_state[tid]["threshold"]))))
     _teacher_state[tid]["max_attempts"] = max(4, min(7, int(data.get("max_attempts", _teacher_state[tid]["max_attempts"]))))
@@ -2867,14 +3160,38 @@ def teacher_settings():
         _teacher_state[tid]["silence_timeout_ms"] = max(400, min(3000, int(data.get("silence_timeout_ms", 1200))))
     if "default_private_mode" in data:
         _teacher_state[tid]["default_private_mode"] = bool(data.get("default_private_mode"))
+    sheet_warning = None
+    if "google_email" in data:
+        # Self-service Google Sign-In linking: the teacher already proved
+        # they know the teacher_password to reach this endpoint, so letting
+        # them link/unlink their own Gmail here (rather than only via
+        # /admin) is the same trust level as changing any other setting.
+        # Written through to TEACHERS + the Teachers sheet (see
+        # _upsert_teacher_row) so it survives a redeploy, same as the
+        # admin-driven path.
+        google_email = (data.get("google_email") or "").strip().lower()
+        if google_email and not EMAIL_RE.match(google_email):
+            return jsonify(ok=False, error="כתובת ה-Gmail שהוזנה אינה תקינה"), 400
+        entry = dict(TEACHERS[tid])
+        entry["google_email"] = google_email
+        TEACHERS[tid] = entry
+        try:
+            _upsert_teacher_row(tid, entry, RESULTS_SHEET_IDS.get(tid, ""))
+            _persisted_teacher_ids.add(tid)
+        except Exception as e:
+            print("SAVE GOOGLE EMAIL FAILED", e)
+            sheet_warning = "הקישור פעיל כרגע, אך השמירה לגיליון נכשלה - ייתכן שהוא ייעלם אחרי ריסטארט הבא."
     save_state()
-    return jsonify(ok=True, teacher=teacher_public(tid))
+    resp = {"ok": True, "teacher": teacher_public(tid)}
+    if sheet_warning:
+        resp["sheet_warning"] = sheet_warning
+    return jsonify(resp)
 
 @app.post("/api/catalog")
 def api_catalog():
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
     # Option G: the Google Sheet is the single source of truth for the exercise catalog.
     # Legacy locally-saved exercises are intentionally not mixed into the main list,
@@ -2886,7 +3203,7 @@ def api_catalog():
 def add_exercise():
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
 
     name = clean_cell(data.get("name", ""))
@@ -2931,7 +3248,7 @@ def add_exercise():
 def set_exercise():
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
     csv_url = extract_csv_url(data.get("csv_url", ""))
     _teacher_state[tid]["exercise_name"] = clean_cell(data.get("name", "תרגול דמו")) or "תרגול דמו"
@@ -2956,7 +3273,7 @@ def refresh_exercise():
     already partway through."""
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
     csv_url = _teacher_state[tid].get("csv_url", "")
     if not csv_url.strip():
@@ -2969,7 +3286,7 @@ def refresh_exercise():
 def teacher_results():
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
     # Read from the Google Sheet (durable) instead of only _pending_results
     # (wiped on every server restart/redeploy) - same persistence model as
@@ -2995,7 +3312,7 @@ def _session_phase_label(s):
 def teacher_students():
     data = request.get_json(force=True)
     tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid not in TEACHERS or password != TEACHERS[tid]["teacher_password"]:
+    if not _teacher_auth_ok(tid, data):
         return jsonify(ok=False), 401
     # Merge the durable Postgres roster with in-memory _sessions rather than
     # reading _sessions alone - otherwise any student who hasn't made a
@@ -3035,8 +3352,8 @@ def _admin_or_teacher_auth(data):
     dashboard uses scoped to just themselves."""
     if _is_admin(data):
         return ("admin", None)
-    tid, password = data.get("teacher_id", ""), data.get("password", "")
-    if tid in TEACHERS and password == TEACHERS[tid]["teacher_password"]:
+    tid = data.get("teacher_id", "")
+    if _teacher_auth_ok(tid, data):
         return ("teacher", tid)
     return None
 
@@ -3210,11 +3527,15 @@ def admin_add_teacher():
     photo_url = (data.get("photo_url") or "").strip()
     if len(photo_url) > 45000:
         return jsonify(ok=False, error="התמונה גדולה מדי לשמירה - נסה תמונה קטנה/דחוסה יותר"), 400
+    google_email = (data.get("google_email") or "").strip().lower()
+    if google_email and not EMAIL_RE.match(google_email):
+        return jsonify(ok=False, error="כתובת ה-Gmail שהוזנה אינה תקינה"), 400
 
     entry = {
         "name": name, "color": color, "color_light": color_light, "voice_gender": gender,
         "results_tab": tid, "student_password": student_password, "teacher_password": teacher_password,
         "default_threshold": threshold, "default_max_attempts": max_attempts, "photo_url": photo_url,
+        "google_email": google_email,
     }
     TEACHERS[tid] = entry
     if results_sheet_id:
@@ -3285,6 +3606,7 @@ def admin_teacher_detail():
         "voice_gender": t.get("voice_gender", "female"),
         "student_password": t.get("student_password", ""), "teacher_password": t.get("teacher_password", ""),
         "photo_url": t.get("photo_url", ""),
+        "google_email": t.get("google_email", ""),
         "results_sheet_id": RESULTS_SHEET_IDS.get(tid, ""),
     })
 
@@ -3332,6 +3654,12 @@ def admin_update_teacher():
         if len(photo_url) > 45000:
             return jsonify(ok=False, error="התמונה גדולה מדי לשמירה - נסה תמונה קטנה/דחוסה יותר"), 400
         entry["photo_url"] = photo_url
+    google_email = data.get("google_email")
+    if google_email is not None:
+        google_email = google_email.strip().lower()
+        if google_email and not EMAIL_RE.match(google_email):
+            return jsonify(ok=False, error="כתובת ה-Gmail שהוזנה אינה תקינה"), 400
+        entry["google_email"] = google_email
     results_sheet_id = RESULTS_SHEET_IDS.get(tid, "")
     if (data.get("results_sheet_url") or "").strip():
         results_sheet_id = extract_sheet_id(data["results_sheet_url"])

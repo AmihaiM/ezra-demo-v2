@@ -4,6 +4,7 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *{box-sizing:border-box}html,body{overflow-x:hidden;max-width:100vw}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}button,input{font:inherit}button{border:0;border-radius:12px;padding:9px 14px;font-weight:700;cursor:pointer}
 /* Keyboard-focus visibility: nothing suppresses the browser default outline,
@@ -183,6 +184,18 @@ body.in-app .app-footer{display:none!important}
    top so it's visible regardless of which screen/overlay is showing. */
 #connBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#c62828;color:#fff;padding:10px 14px;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;text-align:center;font-size:14px;box-shadow:0 2px 10px #0004}
 #connBanner button{background:#fff;color:#c62828;border:none;border-radius:8px;padding:6px 14px;font-weight:700;cursor:pointer}
+/* iOS actively disables SpeechRecognition once the app is opened as an
+   installed home-screen PWA (standalone display mode) - it only works when
+   the SAME page is opened as a normal Safari tab. This is a WebKit-level
+   restriction, not something fixable from our own code - the honest fix is
+   telling the student clearly, before they hit a silent dead mic, rather
+   than letting them discover it as an unexplained "שגיאה - נסה שוב". Shown
+   above the connection banner (higher z-index isn't needed since they can't
+   both be visible at once in practice) and dismissible, since it shouldn't
+   nag someone who already knows / is on a laptop.*/
+#iosStandaloneBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:9998;background:#92400e;color:#fff;padding:10px 14px;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;text-align:center;font-size:13.5px;box-shadow:0 2px 10px #0004}
+#iosStandaloneBanner button{background:#fff;color:#92400e;border:none;border-radius:8px;padding:6px 14px;font-weight:700;cursor:pointer;flex:0 0 auto}
+#iosStandaloneBanner a{color:#fff;text-decoration:underline;font-weight:700}
 /* Practice-screen breathing room + a softer, more inviting backdrop. Feedback:
    the exercise card felt dense - phase label, sentence, English line, button
    row and the audio-settings toggle were all touching each other - and the
@@ -303,8 +316,9 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 .pv-speed-btn{background:#fff3;border:1px solid #fff5;color:#fff;border-radius:8px;padding:4px 8px;font-size:13px;flex:0 0 auto}
 </style></head><body>
 <div id="connBanner" role="alert"><span id="connBannerMsg">אין חיבור לשרת כרגע.</span><button onclick="connRetry()">🔄 נסה שוב</button></div>
+<div id="iosStandaloneBanner" role="alert"><span>🎤 באייפון, הקלטה לא עובדת כשהאפליקציה מותקנת על מסך הבית. פתחו את הקישור ב-Safari (לא כאפליקציה מותקנת) כדי שההקלטה תעבוד.</span><button onclick="document.getElementById('iosStandaloneBanner').style.display='none'">הבנתי</button></div>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards" id="teacherCards"></div></section>
-<div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none"><label style="flex:1;font-size:12.5px;color:#666">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
+<div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none"><label style="flex:1;font-size:12.5px;color:#666">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><div id="studentGoogleSignInWrap" style="display:none;margin-top:10px;text-align:center"><p class="small" style="margin:0 0 6px">או</p><div id="gSignInBtnStudent" style="display:flex;justify-content:center"></div></div><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2 id="historyTitle">📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
 <div id="resumePrompt" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resumePromptTitle"><div class="card" style="width:min(380px,92vw)"><h2 id="resumePromptTitle">🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
 <section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button><button id="logoutBtn" class="mute-btn" onclick="if(confirm('להתנתק ולהחליף תלמיד/ה? (יידרש להזין שם/אימייל/סיסמה מחדש בפעם הבאה)'))logoutStudent()" title="התנתק / החלף תלמיד (למחשב משותף)" aria-label="התנתק">🚪</button></div><span id="studentTag" class="student" role="button" tabindex="0" aria-label="הצג את התוצאות שלי" title="הצג את התוצאות שלי" onclick="showMyResultsFromApp()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyResultsFromApp()}"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box" id="sentenceBox"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="cloze" class="banner cloze"></div>
@@ -383,6 +397,40 @@ var _pvRate=null, pvExamStartTime=null, pvTimerInterval=null;
 // is on screen - guards togglePrivateMode() against trying to switch views
 // mid-test, when there's no real station to jump to yet.
 var inPlacementTest=false;
+// iOS Safari does not run SpeechRecognition (webkitSpeechRecognition) at all
+// when the page is opened as an installed/home-screen PWA (display-mode:
+// standalone) - it only works in a normal Safari browser tab. This is a
+// WebKit platform restriction, not a bug in this app, and there is no
+// JS-side workaround: the mic button will fail every single time for these
+// students unless they open the same link in Safari instead of the
+// installed icon. Detected once at load so init() can warn proactively
+// (rather than only after a confusing silent failure) and so rec.onerror
+// can give a specific, actionable message instead of the generic one.
+var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent||'') || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+var isStandalonePWA = (window.navigator.standalone===true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+function checkIOSStandaloneMic(){
+  if(!(isIOS&&isStandalonePWA))return;
+  let el=document.getElementById('iosStandaloneBanner');
+  if(el)el.style.display='flex';
+}
+// Google Sign-In for students (see selectTeacher() and
+// handleGoogleStudentCredential() below) - _googleClientId is fetched once
+// in init() from /api/config, _studentGSignInRendered guards against
+// re-initializing the button every time a student re-opens the teacher
+// picker (google.accounts.id.initialize should only run once per page).
+var _googleClientId='', _studentGSignInRendered=false;
+function initGoogleStudentSignIn(retries){
+  if(!_googleClientId)return;
+  if(_studentGSignInRendered)return;
+  if(window.google&&window.google.accounts&&window.google.accounts.id){
+    google.accounts.id.initialize({client_id:_googleClientId,callback:handleGoogleStudentCredential});
+    google.accounts.id.renderButton(document.getElementById('gSignInBtnStudent'),{theme:'outline',size:'large',text:'signin_with'});
+    document.getElementById('studentGoogleSignInWrap').style.display='block';
+    _studentGSignInRendered=true;
+  } else if((retries||0)<20){
+    setTimeout(()=>initGoogleStudentSignIn((retries||0)+1),150);
+  }
+}
 // Bumped by every Private-mode view switch (Listening, the free-practice
 // list, free-practice-again) - loadQuestion() snapshots this before issuing
 // its fetch and only applies the response if it's still the same generation,
@@ -776,6 +824,12 @@ function handleSentenceComplete(res){
 }
 document.addEventListener('DOMContentLoaded',init);
 function init(){
+  checkIOSStandaloneMic();
+  // Google Sign-In is only offered once we know GOOGLE_CLIENT_ID is set
+  // server-side - see /api/config and initGoogleStudentSignIn() below,
+  // triggered from selectTeacher() once a teacher (and therefore a
+  // teacher_id to log into) is actually chosen.
+  fetch('/api/config').then(r=>r.json()).then(c=>{_googleClientId=c.google_client_id||''}).catch(()=>{});
   apiFetch('/api/teachers',{},init,'אין חיבור לשרת כרגע - הוא אולי עדיין מתעורר. לחץ "נסה שוב" בעוד כמה שניות.').then(r=>r.json()).then(d=>{
     teacherData=d;
     // Cards are built here from whatever /api/teachers returns, rather than
@@ -822,7 +876,7 @@ function init(){
   };
   if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();populateAudioSettingsUI()};
 }
-function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#4318D1');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | נדרשת התאמה מלאה (100%) בכל משפט | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';setTimeout(()=>document.getElementById('name').focus(),100)}
+function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#4318D1');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | נדרשת התאמה מלאה (100%) בכל משפט | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';initGoogleStudentSignIn(0);setTimeout(()=>document.getElementById('name').focus(),100)}
 function closeLogin(){document.getElementById('login').classList.remove('show')}
 // Escape closes whichever overlay/dialog is currently open - keyboard and
 // screen-reader users have no mouse "click outside" affordance to fall back
@@ -854,7 +908,19 @@ function checkEmailField(name,email){
   el.style.display='none';
   return true;
 }
-function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;let _isConnErr=false;apiFetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})},submitLogin).then(r=>r.json().then(d=>({ok:r.ok,d})),e=>{_isConnErr=true;throw e}).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');studentId=d.student_id;studentName=name;studentEmail=email;studentPassword=pass;saveLastLogin(currentTeacher,name,email,pass);voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;if(d.just_completed)setTimeout(()=>showJustCompletedToast(d.just_completed),400);
+// Shared by both login paths - typed password (submitLogin) and Google
+// Sign-In (handleGoogleStudentCredential) - which differ only in how they
+// obtain d (the server's /api/verify-student or /api/verify-student-google
+// response) and whether there's a real password to remember for
+// auto-resume on this device (there isn't one for Google logins - see the
+// password!=='' guard below, which just means autoResumeLogin() won't fire
+// for them next time; they simply pick their teacher and tap the Google
+// button again, which is still far faster than retyping everything).
+function applyStudentLoginSuccess(d,name,email,password){
+  studentId=d.student_id;studentName=name;studentEmail=email;studentPassword=password;
+  if(password)saveLastLogin(currentTeacher,name,email,password);
+  voiceGender=(d.teacher&&d.teacher.voice_gender)||voiceGender;silenceTimeoutMs=(d.teacher&&d.teacher.silence_timeout_ms)||1200;
+  if(d.just_completed)setTimeout(()=>showJustCompletedToast(d.just_completed),400);
   if(d.resumed&&d.resume_progress){
     // A meaningfully in-progress session already exists for this student -
     // ask before silently dropping them back into it, instead of assuming.
@@ -865,8 +931,17 @@ function submitLogin(){let name=document.getElementById('name').value.trim(),ema
     setTimeout(()=>document.querySelector('#resumePrompt button.primary').focus(),50);
     return;
   }
-  startApp()
-}).catch(e=>{let el=document.getElementById('loginErr');el.textContent=_isConnErr?'אין חיבור לשרת כרגע - נסה שוב בעוד רגע (לחצן "נסה שוב" למעלה).':(e.message||'שם/סיסמה לא תקינים');el.style.display='block'})}
+  startApp();
+}
+function submitLogin(){let name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),pass=document.getElementById('pass').value;if(!name)return;if(!checkEmailField(name,email))return;let _isConnErr=false;apiFetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:name,email:email,password:pass})},submitLogin).then(r=>r.json().then(d=>({ok:r.ok,d})),e=>{_isConnErr=true;throw e}).then(({ok,d})=>{if(!ok)throw new Error((d&&d.error)||'');applyStudentLoginSuccess(d,name,email,pass)}).catch(e=>{let el=document.getElementById('loginErr');el.textContent=_isConnErr?'אין חיבור לשרת כרגע - נסה שוב בעוד רגע (לחצן "נסה שוב" למעלה).':(e.message||'שם/סיסמה לא תקינים');el.style.display='block'})}
+function handleGoogleStudentCredential(response){
+  let el=document.getElementById('loginErr');
+  fetch('/api/verify-student-google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,credential:response.credential,name:document.getElementById('name').value.trim()})}).then(r=>r.json().then(d=>({ok:r.ok,d})),()=>({ok:false,d:null})).then(({ok,d})=>{
+    if(!ok||!d||!d.ok){el.textContent=(d&&d.error)||'ההתחברות עם Google נכשלה - נסה שוב או התחבר עם סיסמה.';el.style.display='block';return}
+    el.style.display='none';
+    applyStudentLoginSuccess(d,d.student_name||'',d.student_email||'','');
+  }).catch(()=>{el.textContent='ההתחברות עם Google נכשלה - נסה שוב או התחבר עם סיסמה.';el.style.display='block'});
+}
 // Runs once on every page load (see init()) - if this device already has a
 // remembered login (see saveLastLogin), skip the teacher-select screen
 // entirely and silently re-verify with the server instead of making the
@@ -1461,7 +1536,28 @@ function startRecognition(){
     document.getElementById('hint').textContent='מעבד...';
     if(examMode)submitExamAnswer(spoken,metrics);else if(practiceMode)submitPracticeRepeat(spoken);else submitAnswer(spoken,metrics);
   };
-  rec.onerror=()=>{busy=false;submitted=true;clearTimeout(micColorTimer);stopRecTimer();exitRecordingFocus();let micEl=document.getElementById('mic');micEl.classList.remove('on');micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');document.getElementById('stopRec').style.display='none';document.getElementById('play').disabled=false;document.getElementById('play').classList.remove('hidden-final');document.getElementById('hint').textContent='שגיאה — נסה שוב'};
+  rec.onerror=(ev)=>{
+    busy=false;submitted=true;clearTimeout(micColorTimer);stopRecTimer();exitRecordingFocus();
+    let micEl=document.getElementById('mic');
+    micEl.classList.remove('on');
+    micEl.setAttribute('aria-label','התחל הקלטה — אמור את המשפט באנגלית');
+    document.getElementById('stopRec').style.display='none';
+    document.getElementById('play').disabled=false;
+    document.getElementById('play').classList.remove('hidden-final');
+    // On an installed iOS PWA, recognition can never actually work (see
+    // isStandalonePWA above) - it typically fails almost instantly with
+    // "not-allowed" or "service-not-allowed" rather than timing out like a
+    // real permission/network problem would. Surface the specific, fixable
+    // cause (open in Safari, not the home-screen icon) instead of the
+    // generic retry message, which would just send them in a loop.
+    let errType=ev&&ev.error;
+    if(isIOS&&isStandalonePWA&&(errType==='not-allowed'||errType==='service-not-allowed'||errType==='network'||errType==='audio-capture')){
+      document.getElementById('hint').textContent='ההקלטה לא עובדת כשהאפליקציה מותקנת על מסך הבית באייפון — פתחו את הקישור ב-Safari';
+      checkIOSStandaloneMic();
+    } else {
+      document.getElementById('hint').textContent='שגיאה — נסה שוב';
+    }
+  };
   rec.start();
 }
 // The server's in-memory session store (_sessions) does not survive a Render

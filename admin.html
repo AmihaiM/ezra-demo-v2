@@ -80,6 +80,8 @@ table{width:100%;border-collapse:collapse}
       <input type="hidden" id="newPhotoUrl">
       <input id="newSheetUrl" placeholder="קישור לגיליון Google Sheets לתוצאות (ריק = בלי שמירת תוצאות בינתיים)" dir="ltr">
       <p class="hint">חשוב: יש ליצור גיליון Google Sheets ריק, לשתף אותו עם חשבון השירות (service account) של האפליקציה בהרשאת עריכה, ולהדביק כאן את הקישור. אפשר גם להוסיף מורה בלי גיליון תוצאות כרגע ולהשלים זאת מאוחר יותר.</p>
+      <p class="hint" style="margin:10px 0 0">כתובת Gmail להתחברות עם Google (אופציונלי - אם ריק, המורה יכול/ה לקשר בעצמו/ה מעמוד ההגדרות שלו/ה)</p>
+      <input id="newGoogleEmail" placeholder="name@gmail.com" dir="ltr" type="email">
       <button class="primary" onclick="addTeacher()">הוסף מורה</button>
       <div id="addResult" style="margin-top:10px"></div>
     </div>
@@ -101,6 +103,8 @@ table{width:100%;border-collapse:collapse}
       </div>
       <input type="hidden" id="editPhotoUrl">
       <input id="editSheetUrl" placeholder="קישור לגיליון Google Sheets לתוצאות" dir="ltr">
+      <p class="hint" style="margin:10px 0 0">כתובת Gmail להתחברות עם Google</p>
+      <input id="editGoogleEmail" placeholder="name@gmail.com" dir="ltr" type="email">
       <div class="row" style="margin-top:10px">
         <button class="primary" onclick="saveEditTeacher()">שמור שינויים</button>
         <button class="ghost" onclick="closeEditTeacher()">ביטול</button>
@@ -215,6 +219,7 @@ function openEditTeacher(tid){
     document.getElementById('editPhotoUrl').value=t.photo_url||'';
     document.getElementById('editPhotoFile').value='';
     document.getElementById('editSheetUrl').value='';
+    document.getElementById('editGoogleEmail').value=t.google_email||'';
     let prev=document.getElementById('editPhotoPreview');
     if(t.photo_url){prev.src=t.photo_url;prev.style.display='inline-block'}else{prev.style.display='none';prev.src=''}
     renderSwatchesInto('editColorSwatches','editColor');
@@ -238,6 +243,7 @@ function saveEditTeacher(){
     student_password:document.getElementById('editStudentPass').value.trim(),
     color:document.getElementById('editColor').value.trim(),
     photo_url:document.getElementById('editPhotoUrl').value,
+    google_email:document.getElementById('editGoogleEmail').value.trim(),
     results_sheet_url:document.getElementById('editSheetUrl').value.trim(),
   }).then(({ok,d})=>{
     if(!ok||!d.ok){resultBox.innerHTML='<div class="err" style="display:block">'+esc(d.error||'שגיאה בשמירה')+'</div>';return}
@@ -319,6 +325,7 @@ function addTeacher(){
     student_password:document.getElementById('newStudentPass').value.trim(),
     color:document.getElementById('newColor').value.trim(),
     photo_url:document.getElementById('newPhotoUrl').value,
+    google_email:document.getElementById('newGoogleEmail').value.trim(),
     results_sheet_url:document.getElementById('newSheetUrl').value.trim(),
   }).then(({ok,d})=>{
     if(!ok||!d.ok){resultBox.innerHTML='<div class="err" style="display:block">'+esc(d.error||'שגיאה בהוספה')+'</div>';return}
@@ -336,6 +343,7 @@ function addTeacher(){
     document.getElementById('newTeacherPass').value='';document.getElementById('newStudentPass').value='';
     document.getElementById('newColor').value='';document.getElementById('newSheetUrl').value='';
     document.getElementById('newPhotoUrl').value='';document.getElementById('newPhotoFile').value='';
+    document.getElementById('newGoogleEmail').value='';
     document.getElementById('newPhotoPreview').style.display='none';document.getElementById('newPhotoPreview').src='';
     document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
     loadTeachers();
