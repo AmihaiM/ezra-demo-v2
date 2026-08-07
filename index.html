@@ -220,6 +220,7 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
    a glance. */
 .sentence-box{background:linear-gradient(160deg,#ffffff,#eef8ff);border:1px solid #dbeeff;border-radius:16px;padding:14px 16px;margin-bottom:12px;box-shadow:0 3px 12px #0284c710}
 .sentence-box .sentence{margin-top:0}
+.emoji-display{font-size:54px;line-height:1.1;text-align:center;margin:2px 0 8px}
 .en{font-weight:800}
 @media (max-width:759px){
   .wrap{padding-top:14px;padding-left:12px;padding-right:12px}
@@ -321,7 +322,7 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 <div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none"><label style="flex:1;font-size:12.5px;color:#666">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><div id="studentGoogleSignInWrap" style="display:none;margin-top:10px;text-align:center"><p class="small" style="margin:0 0 6px">או</p><div id="gSignInBtnStudent" style="display:flex;justify-content:center"></div></div><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2 id="historyTitle">📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
 <div id="resumePrompt" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resumePromptTitle"><div class="card" style="width:min(380px,92vw)"><h2 id="resumePromptTitle">🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
-<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button><button id="logoutBtn" class="mute-btn" onclick="if(confirm('להתנתק ולהחליף תלמיד/ה? (יידרש להזין שם/אימייל/סיסמה מחדש בפעם הבאה)'))logoutStudent()" title="התנתק / החלף תלמיד (למחשב משותף)" aria-label="התנתק">🚪</button></div><span id="studentTag" class="student" role="button" tabindex="0" aria-label="הצג את התוצאות שלי" title="הצג את התוצאות שלי" onclick="showMyResultsFromApp()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyResultsFromApp()}"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box" id="sentenceBox"><div id="phase"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="cloze" class="banner cloze"></div>
+<section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button><button id="logoutBtn" class="mute-btn" onclick="if(confirm('להתנתק ולהחליף תלמיד/ה? (יידרש להזין שם/אימייל/סיסמה מחדש בפעם הבאה)'))logoutStudent()" title="התנתק / החלף תלמיד (למחשב משותף)" aria-label="התנתק">🚪</button></div><span id="studentTag" class="student" role="button" tabindex="0" aria-label="הצג את התוצאות שלי" title="הצג את התוצאות שלי" onclick="showMyResultsFromApp()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyResultsFromApp()}"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box" id="sentenceBox"><div id="phase"></div><div id="emojiDisplay" class="emoji-display" style="display:none"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="cloze" class="banner cloze"></div>
 <div id="pvHeader" class="pv-header"><span id="pvHello"></span><span id="pvCounter" class="pv-counter"></span><span id="pvStepLabel" class="pv-step"></span></div>
 <div id="pvTimer" class="pv-timer"></div>
 <div id="pvChat" class="pv-chat"></div>
@@ -367,6 +368,12 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
   <p class="small">רשימת כל משפטי התרגיל — לחיצה על משפט תשמיע אותו. לצורך היכרות/האזנה בלבד, לא משפיע על ההתקדמות או הציון.</p>
   <div id="listenAllBody"></div>
   <button class="ghost" style="width:100%;margin-top:12px" onclick="document.getElementById('listenAll').classList.remove('show')">סגור</button>
+</div></div>
+<div id="placementResult" class="overlay" role="dialog" aria-modal="true" aria-labelledby="placementResultTitle"><div class="card" style="width:min(480px,94vw);max-height:86vh;overflow:auto">
+  <h2 id="placementResultTitle">🎯 תוצאות מבחן ההתאמה</h2>
+  <div id="placementResultLevel" style="font-size:1.15em;font-weight:700;margin:6px 0 12px"></div>
+  <div id="placementResultBody" class="small"></div>
+  <button class="primary" style="width:100%;margin-top:16px" onclick="confirmPlacementStart()">בואו נתחיל 🚀</button>
 </div></div>
 <div id="appFooterEl" class="app-footer">🧠 מנוע למיומנות בשפה על פי שיטת פרופ' בלום ·  פותח על ידי עמיחי מייטליס ובהדרכת סולי תמרי · © כל הזכויות שמורות</div>
 <script>
@@ -883,6 +890,7 @@ function closeLogin(){document.getElementById('login').classList.remove('show')}
 // on, so this is the only way for them to back out of a dialog otherwise.
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  if(document.getElementById('placementResult').classList.contains('show')){confirmPlacementStart();return}
   if(document.getElementById('resumePrompt').classList.contains('show')){resumeChoice('continue');return}
   if(document.getElementById('history').classList.contains('show')){document.getElementById('history').classList.remove('show');return}
   if(document.getElementById('stationPicker').classList.contains('show')){document.getElementById('stationPicker').classList.remove('show');return}
@@ -1071,6 +1079,12 @@ function loadQuestion(){busy=false;sentenceAttemptCount=0;
   inPlacementTest=false;
   document.body.classList.toggle('private-mode', privateMode);
   currentQ=q;voiceGender=q.voice_gender||voiceGender;document.getElementById('he').textContent=q.he;document.getElementById('en').textContent=q.en;document.getElementById('bar').style.width=Math.round(q.index/q.total*100)+'%';
+  // A0 (pre-beginner) items are vocabulary/short phrases paired with an
+  // emoji instead of a full sentence - show it big and prominent right
+  // above the text when present, so true beginners get a visual anchor
+  // instead of relying on reading alone.
+  let emojiEl=document.getElementById('emojiDisplay');
+  if(emojiEl){if(q.emoji){emojiEl.textContent=q.emoji;emojiEl.style.display=''}else{emojiEl.style.display='none'}}
   let _pvStationNum=q.stage==='preview'?1:(q.cloze_active||q.review_round)?3:2;
   updateStationBar(_pvStationNum);
   let mw=document.getElementById('mismatchWarn');
@@ -1192,12 +1206,30 @@ function showPlacementResult(spoken,res){
   document.getElementById('mic').style.display='none';
   document.getElementById('hint').textContent='';
   if(res.placement_done){
-    box.innerHTML='<h3>🎯 שובצת לרמה: '+esc(res.placed_level_name||res.placed_level||'')+'</h3><div>אמרת: <span dir="ltr">'+esc(spoken)+'</span></div><div class="words">'+words+'</div><p>מתחילים לתרגל ברמה הזו עכשיו.</p>';
-    setTimeout(loadQuestion,1700);
+    box.style.display='none';
+    box.innerHTML='';
+    openPlacementResult(res);
   } else {
     box.innerHTML='<h3>'+(passed?'✅ נכון':'💪 לא בדיוק')+'</h3><div>אמרת: <span dir="ltr">'+esc(spoken)+'</span></div><div class="words">'+words+'</div>';
     setTimeout(loadQuestion,1100);
   }
+}
+// Placement test is done: this replaces the old silent "show a toast, wait
+// 1.7s, auto-continue" behavior. The student now has to actually look at
+// where they were placed and the per-level breakdown, then deliberately
+// press "start" - important because a wrong/surprising placement (e.g.
+// landing at A0 or C1) should be something the student notices right away,
+// not something that flashes by while they're not looking.
+function openPlacementResult(res){
+  document.getElementById('placementResultLevel').textContent='🎯 שובצת לרמה: '+(res.placed_level_name||res.placed_level||'');
+  let hist=res.history||[];
+  let rows=hist.map(h=>'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd,#e5e5e5)"><span>'+esc(h.level_name||h.level)+'</span><span>'+(h.passed?'✅ עבר':'💪 עוד לא')+'</span></div>').join('');
+  document.getElementById('placementResultBody').innerHTML=(rows?('<div style="margin-bottom:8px">כך התקדם המבחן, רמה אחר רמה:</div>'+rows):'')+'<p style="margin-top:12px">מתחילים לתרגל ברמה הזו - כשתהיו מוכנים, לחצו על הכפתור.</p>';
+  document.getElementById('placementResult').classList.add('show');
+}
+function confirmPlacementStart(){
+  document.getElementById('placementResult').classList.remove('show');
+  loadQuestion();
 }
 // "Explain once, then clean" (per UX feedback): the progress line ("משפט X
 // מתוך Y | שם התרגיל") and the station header ("⭐ תחנה 2 — ...") are static
@@ -2241,7 +2273,11 @@ function pvSyncQuestion(q,stationNum){
   // Explicit requirement: stations 2/3 must NOT offer any way to hear the
   // sentence up front - the prompt bubble is plain, unclickable text here.
   // Audio only becomes available after a wrong answer (see pvRenderResult).
-  if(chat)chat.innerHTML='<div class="pv-bubble pv-prompt">'+esc(promptText)+'</div>';
+  // A0 items carry an emoji (see index.html's non-Private sentence-box) -
+  // shown here too so the visual anchor isn't lost just because Private
+  // mode is on.
+  let emojiPrefix=q.emoji?('<div style="font-size:40px;text-align:center;margin-bottom:4px">'+esc(q.emoji)+'</div>'):'';
+  if(chat)chat.innerHTML=emojiPrefix+'<div class="pv-bubble pv-prompt">'+esc(promptText)+'</div>';
 }
 function pvReplayCurrent(){ if(currentQ)speakText(currentQ.en,null); }
 function pvRenderResult(spoken,res){

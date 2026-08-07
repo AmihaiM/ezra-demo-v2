@@ -481,6 +481,18 @@ FALLBACK_SENTENCES = [
 # (see get_student_level/set_student_level + the auto-advance check in
 # /api/question) as they demonstrate strong, consistent mastery.
 CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+# A0 is a pre-beginner level, deliberately NOT part of CEFR_LEVELS/the
+# adaptive placement walk (which still only steps across real CEFR levels -
+# see placement_answer). It's reached two ways: (1) a placement test where
+# the student fails even the easiest sentence tested (see the final_level
+# fallback in placement_answer), or (2) a teacher/admin assigning it by
+# hand. ALL_STUDENT_LEVELS is the full set of values a student's saved
+# level is allowed to take (used by set_student_level's validation and
+# _lookup_student_level_row's sheet-value check) - CEFR_LEVELS itself stays
+# untouched so every existing index/order-based calculation (placement
+# up/down steps, next_cefr_level, the "never placed, default A1" rule) keeps
+# working exactly as before.
+ALL_STUDENT_LEVELS = ["A0"] + CEFR_LEVELS
 # Placement test (see new_session/placement_answer below): a brand-new
 # level-track student is never just dropped in at A1 and left to re-practice
 # levels they already know - a short adaptive test finds their real starting
@@ -493,6 +505,7 @@ PLACEMENT_START_IDX = 2
 PLACEMENT_MAX_STEPS = 6
 
 LEVEL_NAMES_HE = {
+    "A0": "רמה A0 — צעד ראשון באנגלית",
     "A1": "רמה A1 — מתחילים",
     "A2": "רמה A2 — בסיסי",
     "B1": "רמה B1 — בינוני",
@@ -501,108 +514,282 @@ LEVEL_NAMES_HE = {
     "C2": "רמה C2 — שליטה מלאה",
 }
 
+# The 7 grammar topics every CEFR level (A1-C2) is organized around, in a
+# fixed teaching order - each one repeats at every level (with vocabulary
+# scaling up), and pronoun/person (I/you/he/she/it/we/they) rotates WITHIN
+# a topic rather than being its own separate topic axis. "general" tags the
+# original pre-existing sentences (mixed topics, kept as-is for continuity);
+# "vocab" tags A0's single-word/short-phrase items.
+GRAMMAR_TOPIC_ORDER = [
+    "present_simple_statement", "present_simple_question", "present_continuous",
+    "past_simple_statement", "past_simple_question", "future", "imperative",
+]
+GRAMMAR_TOPIC_NAMES_HE = {
+    "present_simple_statement": "הווה פשוט — משפט חיווי",
+    "present_simple_question": "הווה פשוט — משפט שאלה",
+    "present_continuous": "הווה מתמשך",
+    "past_simple_statement": "עבר פשוט — משפט חיווי",
+    "past_simple_question": "עבר פשוט — משפט שאלה",
+    "future": "עתיד",
+    "imperative": "ציווי",
+    "general": "כללי",
+    "vocab": "אוצר מילים",
+}
+
 LEVEL_SENTENCES = {
+    "A0": [
+        {"en": "Hello", "he": "שלום", "topic": "vocab", "emoji": "👋"},
+        {"en": "Thank you", "he": "תודה", "topic": "vocab", "emoji": "🙏"},
+        {"en": "Yes", "he": "כן", "topic": "vocab", "emoji": "👍"},
+        {"en": "No", "he": "לא", "topic": "vocab", "emoji": "👎"},
+        {"en": "Water", "he": "מים", "topic": "vocab", "emoji": "💧"},
+        {"en": "Apple", "he": "תפוח", "topic": "vocab", "emoji": "🍎"},
+        {"en": "Bread", "he": "לחם", "topic": "vocab", "emoji": "🍞"},
+        {"en": "Milk", "he": "חלב", "topic": "vocab", "emoji": "🥛"},
+        {"en": "Dog", "he": "כלב", "topic": "vocab", "emoji": "🐶"},
+        {"en": "Cat", "he": "חתול", "topic": "vocab", "emoji": "🐱"},
+        {"en": "Book", "he": "ספר", "topic": "vocab", "emoji": "📖"},
+        {"en": "House", "he": "בית", "topic": "vocab", "emoji": "🏠"},
+        {"en": "Car", "he": "מכונית", "topic": "vocab", "emoji": "🚗"},
+        {"en": "Sun", "he": "שמש", "topic": "vocab", "emoji": "☀️"},
+        {"en": "Big", "he": "גדול", "topic": "vocab", "emoji": "🐘"},
+        {"en": "Small", "he": "קטן", "topic": "vocab", "emoji": "🐜"},
+        {"en": "Mother", "he": "אמא", "topic": "vocab", "emoji": "👩"},
+        {"en": "Father", "he": "אבא", "topic": "vocab", "emoji": "👨"},
+        {"en": "One", "he": "אחת", "topic": "vocab", "emoji": "1️⃣"},
+        {"en": "Two", "he": "שתיים", "topic": "vocab", "emoji": "2️⃣"},
+        {"en": "Three", "he": "שלוש", "topic": "vocab", "emoji": "3️⃣"},
+        {"en": "Good morning", "he": "בוקר טוב", "topic": "vocab", "emoji": "🌅"},
+        {"en": "I am hungry", "he": "אני רעב", "topic": "vocab", "emoji": "🍽️"},
+        {"en": "I am happy", "he": "אני שמח", "topic": "vocab", "emoji": "😊"},
+    ],
     "A1": [
-        {"en": "I am a student", "he": "אני תלמיד"},
-        {"en": "This is my book", "he": "זה הספר שלי"},
-        {"en": "She has a red car", "he": "יש לה מכונית אדומה"},
-        {"en": "We live in Tel Aviv", "he": "אנחנו גרים בתל אביב"},
-        {"en": "He likes coffee", "he": "הוא אוהב קפה"},
-        {"en": "The cat is on the table", "he": "החתול על השולחן"},
-        {"en": "I am hungry now", "he": "אני רעב עכשיו"},
-        {"en": "My name is David", "he": "קוראים לי דוד"},
-        {"en": "They are my friends", "he": "הם החברים שלי"},
-        {"en": "Can you help me, please", "he": "אתה יכול לעזור לי, בבקשה"},
-        {"en": "What time is it", "he": "מה השעה"},
-        {"en": "I have two brothers", "he": "יש לי שני אחים"},
-        {"en": "The weather is nice today", "he": "מזג האוויר נעים היום"},
-        {"en": "She works in a bank", "he": "היא עובדת בבנק"},
-        {"en": "We eat breakfast at eight", "he": "אנחנו אוכלים ארוחת בוקר בשמונה"},
+        {"en": "I am a student", "he": "אני תלמיד", "topic": "general"},
+        {"en": "This is my book", "he": "זה הספר שלי", "topic": "general"},
+        {"en": "She has a red car", "he": "יש לה מכונית אדומה", "topic": "general"},
+        {"en": "We live in Tel Aviv", "he": "אנחנו גרים בתל אביב", "topic": "general"},
+        {"en": "He likes coffee", "he": "הוא אוהב קפה", "topic": "general"},
+        {"en": "The cat is on the table", "he": "החתול על השולחן", "topic": "general"},
+        {"en": "I am hungry now", "he": "אני רעב עכשיו", "topic": "general"},
+        {"en": "My name is David", "he": "קוראים לי דוד", "topic": "general"},
+        {"en": "They are my friends", "he": "הם החברים שלי", "topic": "general"},
+        {"en": "Can you help me, please", "he": "אתה יכול לעזור לי, בבקשה", "topic": "general"},
+        {"en": "What time is it", "he": "מה השעה", "topic": "general"},
+        {"en": "I have two brothers", "he": "יש לי שני אחים", "topic": "general"},
+        {"en": "The weather is nice today", "he": "מזג האוויר נעים היום", "topic": "general"},
+        {"en": "She works in a bank", "he": "היא עובדת בבנק", "topic": "general"},
+        {"en": "We eat breakfast at eight", "he": "אנחנו אוכלים ארוחת בוקר בשמונה", "topic": "general"},
+        {"en": "I eat breakfast every morning", "he": "אני אוכל ארוחת בוקר כל בוקר", "topic": "present_simple_statement"},
+        {"en": "She likes ice cream", "he": "היא אוהבת גלידה", "topic": "present_simple_statement"},
+        {"en": "They live in a small house", "he": "הם גרים בבית קטן", "topic": "present_simple_statement"},
+        {"en": "Do you like coffee", "he": "האם אתה אוהב קפה", "topic": "present_simple_question"},
+        {"en": "Does he play soccer", "he": "האם הוא משחק כדורגל", "topic": "present_simple_question"},
+        {"en": "Where do they work", "he": "איפה הם עובדים", "topic": "present_simple_question"},
+        {"en": "I am reading a book now", "he": "אני קורא ספר עכשיו", "topic": "present_continuous"},
+        {"en": "She is cooking dinner", "he": "היא מבשלת ארוחת ערב", "topic": "present_continuous"},
+        {"en": "We are watching a movie", "he": "אנחנו צופים בסרט", "topic": "present_continuous"},
+        {"en": "I walked to school yesterday", "he": "הלכתי לבית הספר אתמול", "topic": "past_simple_statement"},
+        {"en": "He played tennis last week", "he": "הוא שיחק טניס בשבוע שעבר", "topic": "past_simple_statement"},
+        {"en": "They visited their grandmother", "he": "הם ביקרו את סבתא שלהם", "topic": "past_simple_statement"},
+        {"en": "Did you see that movie", "he": "האם ראית את הסרט הזה", "topic": "past_simple_question"},
+        {"en": "Did she call you yesterday", "he": "האם היא התקשרה אליך אתמול", "topic": "past_simple_question"},
+        {"en": "What did they eat for lunch", "he": "מה הם אכלו לארוחת צהריים", "topic": "past_simple_question"},
+        {"en": "I will visit my friend tomorrow", "he": "אני אבקר את החבר שלי מחר", "topic": "future"},
+        {"en": "She will study English next year", "he": "היא תלמד אנגלית בשנה הבאה", "topic": "future"},
+        {"en": "We will travel to Israel soon", "he": "אנחנו ניסע לישראל בקרוב", "topic": "future"},
+        {"en": "Please close the door", "he": "בבקשה סגור את הדלת", "topic": "imperative"},
+        {"en": "Sit down, please", "he": "שב בבקשה", "topic": "imperative"},
+        {"en": "Don't touch that", "he": "אל תיגע בזה", "topic": "imperative"},
     ],
     "A2": [
-        {"en": "Yesterday I went to school", "he": "אתמול הלכתי לבית הספר"},
-        {"en": "We will meet at six o'clock", "he": "ניפגש בשעה שש"},
-        {"en": "I bought a new phone last week", "he": "קניתי טלפון חדש בשבוע שעבר"},
-        {"en": "She was very tired after work", "he": "היא הייתה עייפה מאוד אחרי העבודה"},
-        {"en": "Can I have the bill, please", "he": "אפשר לקבל את החשבון, בבקשה"},
-        {"en": "He is going to visit his parents", "he": "הוא הולך לבקר את ההורים שלו"},
-        {"en": "I usually wake up early in the morning", "he": "אני בדרך כלל קם מוקדם בבוקר"},
-        {"en": "They watched a movie last night", "he": "הם צפו בסרט אמש"},
-        {"en": "Do you know where the station is", "he": "אתה יודע איפה התחנה"},
-        {"en": "It was raining all day yesterday", "he": "ירד גשם כל היום אתמול"},
-        {"en": "We are planning a trip to Eilat", "he": "אנחנו מתכננים טיול לאילת"},
-        {"en": "I need to buy some vegetables", "he": "אני צריך לקנות ירקות"},
-        {"en": "My sister is learning to drive", "he": "אחותי לומדת לנהוג"},
-        {"en": "He never eats breakfast", "he": "הוא אף פעם לא אוכל ארוחת בוקר"},
-        {"en": "Please turn off the lights before you leave", "he": "בבקשה כבה את האורות לפני שאתה יוצא"},
+        {"en": "Yesterday I went to school", "he": "אתמול הלכתי לבית הספר", "topic": "general"},
+        {"en": "We will meet at six o'clock", "he": "ניפגש בשעה שש", "topic": "general"},
+        {"en": "I bought a new phone last week", "he": "קניתי טלפון חדש בשבוע שעבר", "topic": "general"},
+        {"en": "She was very tired after work", "he": "היא הייתה עייפה מאוד אחרי העבודה", "topic": "general"},
+        {"en": "Can I have the bill, please", "he": "אפשר לקבל את החשבון, בבקשה", "topic": "general"},
+        {"en": "He is going to visit his parents", "he": "הוא הולך לבקר את ההורים שלו", "topic": "general"},
+        {"en": "I usually wake up early in the morning", "he": "אני בדרך כלל קם מוקדם בבוקר", "topic": "general"},
+        {"en": "They watched a movie last night", "he": "הם צפו בסרט אמש", "topic": "general"},
+        {"en": "Do you know where the station is", "he": "אתה יודע איפה התחנה", "topic": "general"},
+        {"en": "It was raining all day yesterday", "he": "ירד גשם כל היום אתמול", "topic": "general"},
+        {"en": "We are planning a trip to Eilat", "he": "אנחנו מתכננים טיול לאילת", "topic": "general"},
+        {"en": "I need to buy some vegetables", "he": "אני צריך לקנות ירקות", "topic": "general"},
+        {"en": "My sister is learning to drive", "he": "אחותי לומדת לנהוג", "topic": "general"},
+        {"en": "He never eats breakfast", "he": "הוא אף פעם לא אוכל ארוחת בוקר", "topic": "general"},
+        {"en": "Please turn off the lights before you leave", "he": "בבקשה כבה את האורות לפני שאתה יוצא", "topic": "general"},
+        {"en": "My brother works at a hospital every day", "he": "אחי עובד בבית חולים כל יום", "topic": "present_simple_statement"},
+        {"en": "We usually have dinner at seven o'clock", "he": "אנחנו בדרך כלל אוכלים ארוחת ערב בשבע", "topic": "present_simple_statement"},
+        {"en": "She often reads books before she sleeps", "he": "היא לעתים קרובות קוראת ספרים לפני שהיא ישנה", "topic": "present_simple_statement"},
+        {"en": "How often do you exercise", "he": "כמה פעמים אתה מתאמן", "topic": "present_simple_question"},
+        {"en": "What time does the train leave", "he": "באיזו שעה הרכבת יוצאת", "topic": "present_simple_question"},
+        {"en": "Do your parents speak English", "he": "האם ההורים שלך מדברים אנגלית", "topic": "present_simple_question"},
+        {"en": "He is learning to drive this month", "he": "הוא לומד לנהוג החודש", "topic": "present_continuous"},
+        {"en": "The children are playing in the garden", "he": "הילדים משחקים בגינה", "topic": "present_continuous"},
+        {"en": "I am waiting for the bus right now", "he": "אני מחכה לאוטובוס כרגע", "topic": "present_continuous"},
+        {"en": "We traveled to Eilat last summer", "he": "נסענו לאילת בקיץ שעבר", "topic": "past_simple_statement"},
+        {"en": "She finished her homework before dinner", "he": "היא סיימה את שיעורי הבית לפני ארוחת הערב", "topic": "past_simple_statement"},
+        {"en": "They bought a new car last month", "he": "הם קנו מכונית חדשה בחודש שעבר", "topic": "past_simple_statement"},
+        {"en": "Where did you go on vacation", "he": "לאן נסעת בחופשה", "topic": "past_simple_question"},
+        {"en": "Did he finish his project on time", "he": "האם הוא סיים את הפרויקט בזמן", "topic": "past_simple_question"},
+        {"en": "How did she learn to swim", "he": "איך היא למדה לשחות", "topic": "past_simple_question"},
+        {"en": "I am going to start a new job next week", "he": "אני עומד להתחיל עבודה חדשה בשבוע הבא", "topic": "future"},
+        {"en": "They will move to a bigger apartment", "he": "הם יעברו לדירה גדולה יותר", "topic": "future"},
+        {"en": "We won't be late if we leave now", "he": "לא נאחר אם נצא עכשיו", "topic": "future"},
+        {"en": "Turn left at the next corner", "he": "פנה שמאלה בפינה הבאה", "topic": "imperative"},
+        {"en": "Remember to bring your passport", "he": "זכור להביא את הדרכון שלך", "topic": "imperative"},
+        {"en": "Never leave the stove on", "he": "לעולם אל תשאיר את הכיריים דלוקים", "topic": "imperative"},
     ],
     "B1": [
-        {"en": "I have never been to Paris", "he": "מעולם לא הייתי בפריז"},
-        {"en": "If it rains, we will stay home", "he": "אם ירד גשם, נישאר בבית"},
-        {"en": "She has already finished her homework", "he": "היא כבר סיימה את שיעורי הבית שלה"},
-        {"en": "I think this restaurant is too expensive", "he": "אני חושב שהמסעדה הזאת יקרה מדי"},
-        {"en": "Have you ever tried sushi before", "he": "ניסית פעם סושי"},
-        {"en": "We have been living here for five years", "he": "אנחנו גרים כאן כבר חמש שנים"},
-        {"en": "If I had more time, I would travel more", "he": "אם היה לי יותר זמן, הייתי מטייל יותר"},
-        {"en": "He apologized for being late to the meeting", "he": "הוא התנצל על האיחור לפגישה"},
-        {"en": "I'm not sure if I agree with your opinion", "he": "אני לא בטוח שאני מסכים עם הדעה שלך"},
-        {"en": "They have decided to move to a bigger apartment", "he": "הם החליטו לעבור לדירה גדולה יותר"},
-        {"en": "She would like to become a doctor someday", "he": "היא הייתה רוצה להיות רופאה יום אחד"},
-        {"en": "It seems like the traffic is getting worse", "he": "נראה שהתנועה נהיית גרועה יותר"},
-        {"en": "I should have called you earlier", "he": "הייתי צריך להתקשר אליך קודם"},
-        {"en": "We were supposed to meet an hour ago", "he": "היינו אמורים להיפגש לפני שעה"},
-        {"en": "Although it was expensive, we bought the tickets", "he": "למרות שזה היה יקר, קנינו את הכרטיסים"},
+        {"en": "I have never been to Paris", "he": "מעולם לא הייתי בפריז", "topic": "general"},
+        {"en": "If it rains, we will stay home", "he": "אם ירד גשם, נישאר בבית", "topic": "general"},
+        {"en": "She has already finished her homework", "he": "היא כבר סיימה את שיעורי הבית שלה", "topic": "general"},
+        {"en": "I think this restaurant is too expensive", "he": "אני חושב שהמסעדה הזאת יקרה מדי", "topic": "general"},
+        {"en": "Have you ever tried sushi before", "he": "ניסית פעם סושי", "topic": "general"},
+        {"en": "We have been living here for five years", "he": "אנחנו גרים כאן כבר חמש שנים", "topic": "general"},
+        {"en": "If I had more time, I would travel more", "he": "אם היה לי יותר זמן, הייתי מטייל יותר", "topic": "general"},
+        {"en": "He apologized for being late to the meeting", "he": "הוא התנצל על האיחור לפגישה", "topic": "general"},
+        {"en": "I'm not sure if I agree with your opinion", "he": "אני לא בטוח שאני מסכים עם הדעה שלך", "topic": "general"},
+        {"en": "They have decided to move to a bigger apartment", "he": "הם החליטו לעבור לדירה גדולה יותר", "topic": "general"},
+        {"en": "She would like to become a doctor someday", "he": "היא הייתה רוצה להיות רופאה יום אחד", "topic": "general"},
+        {"en": "It seems like the traffic is getting worse", "he": "נראה שהתנועה נהיית גרועה יותר", "topic": "general"},
+        {"en": "I should have called you earlier", "he": "הייתי צריך להתקשר אליך קודם", "topic": "general"},
+        {"en": "We were supposed to meet an hour ago", "he": "היינו אמורים להיפגש לפני שעה", "topic": "general"},
+        {"en": "Although it was expensive, we bought the tickets", "he": "למרות שזה היה יקר, קנינו את הכרטיסים", "topic": "general"},
+        {"en": "Most people believe that exercise improves health", "he": "רוב האנשים מאמינים שפעילות גופנית משפרת את הבריאות", "topic": "present_simple_statement"},
+        {"en": "The company offers several types of insurance", "he": "החברה מציעה כמה סוגי ביטוח", "topic": "present_simple_statement"},
+        {"en": "He usually manages his time very well", "he": "הוא בדרך כלל מנהל את זמנו היטב", "topic": "present_simple_statement"},
+        {"en": "What do you think about this new policy", "he": "מה אתה חושב על המדיניות החדשה הזאת", "topic": "present_simple_question"},
+        {"en": "Why does she always arrive early", "he": "למה היא תמיד מגיעה מוקדם", "topic": "present_simple_question"},
+        {"en": "How much does it cost to rent an apartment here", "he": "כמה עולה לשכור דירה כאן", "topic": "present_simple_question"},
+        {"en": "The government is discussing new environmental laws", "he": "הממשלה דנה בחוקים סביבתיים חדשים", "topic": "present_continuous"},
+        {"en": "I am currently working on an important project", "he": "אני עובד כרגע על פרויקט חשוב", "topic": "present_continuous"},
+        {"en": "Prices are rising because of inflation", "he": "המחירים עולים בגלל האינפלציה", "topic": "present_continuous"},
+        {"en": "The team worked hard to finish the project on time", "he": "הצוות עבד קשה כדי לסיים את הפרויקט בזמן", "topic": "past_simple_statement"},
+        {"en": "She explained the situation clearly to everyone", "he": "היא הסבירה את המצב בבירור לכולם", "topic": "past_simple_statement"},
+        {"en": "They negotiated a better deal with the supplier", "he": "הם ניהלו משא ומתן על עסקה טובה יותר עם הספק", "topic": "past_simple_statement"},
+        {"en": "Why did the meeting start late", "he": "למה הישיבה התחילה מאוחר", "topic": "past_simple_question"},
+        {"en": "What decision did the committee make", "he": "איזו החלטה קיבלה הוועדה", "topic": "past_simple_question"},
+        {"en": "Did the plan work as expected", "he": "האם התוכנית עבדה כמצופה", "topic": "past_simple_question"},
+        {"en": "The economy will probably improve next year", "he": "הכלכלה ככל הנראה תשתפר בשנה הבאה", "topic": "future"},
+        {"en": "If we plan carefully, we will succeed", "he": "אם נתכנן בקפידה, נצליח", "topic": "future"},
+        {"en": "I will let you know as soon as I decide", "he": "אני אודיע לך ברגע שאחליט", "topic": "future"},
+        {"en": "Please consider all the options before deciding", "he": "אנא שקול את כל האפשרויות לפני שתחליט", "topic": "imperative"},
+        {"en": "Make sure to double-check your work", "he": "הקפד לבדוק שוב את העבודה שלך", "topic": "imperative"},
+        {"en": "Don't hesitate to ask for help if needed", "he": "אל תהסס לבקש עזרה אם צריך", "topic": "imperative"},
     ],
     "B2": [
-        {"en": "The report was submitted before the deadline", "he": "הדוח הוגש לפני המועד האחרון"},
-        {"en": "She said that she would call me later", "he": "היא אמרה שהיא תתקשר אליי מאוחר יותר"},
-        {"en": "The building is being renovated this month", "he": "הבניין משופץ בחודש הזה"},
-        {"en": "He mentioned that the project had been delayed", "he": "הוא ציין שהפרויקט התעכב"},
-        {"en": "It's not worth arguing about such a small issue", "he": "זה לא שווה להתווכח על עניין כל כך קטן"},
-        {"en": "The decision was made without consulting the team", "he": "ההחלטה התקבלה בלי להתייעץ עם הצוות"},
-        {"en": "I'm afraid I have to disagree with that statement", "he": "אני חושש שאני צריך לחלוק על ההצהרה הזאת"},
-        {"en": "The company was founded over twenty years ago", "he": "החברה נוסדה לפני יותר מעשרים שנה"},
-        {"en": "Despite the challenges, the team met its goals", "he": "למרות האתגרים, הצוות עמד ביעדים שלו"},
-        {"en": "He was accused of breaking the rules", "he": "הוא הואשם בהפרת הכללים"},
-        {"en": "The manager insisted that changes be made immediately", "he": "המנהל התעקש שהשינויים ייעשו מיד"},
-        {"en": "I wish I had studied harder for the exam", "he": "הלוואי שהייתי לומד יותר בשקידה למבחן"},
-        {"en": "The new policy will be implemented next quarter", "he": "המדיניות החדשה תיושם ברבעון הבא"},
-        {"en": "She's been putting off the decision for weeks", "he": "היא דוחה את ההחלטה כבר שבועות"},
-        {"en": "It turned out that the rumor was completely false", "he": "התברר שהשמועה הייתה שקרית לחלוטין"},
+        {"en": "The report was submitted before the deadline", "he": "הדוח הוגש לפני המועד האחרון", "topic": "general"},
+        {"en": "She said that she would call me later", "he": "היא אמרה שהיא תתקשר אליי מאוחר יותר", "topic": "general"},
+        {"en": "The building is being renovated this month", "he": "הבניין משופץ בחודש הזה", "topic": "general"},
+        {"en": "He mentioned that the project had been delayed", "he": "הוא ציין שהפרויקט התעכב", "topic": "general"},
+        {"en": "It's not worth arguing about such a small issue", "he": "זה לא שווה להתווכח על עניין כל כך קטן", "topic": "general"},
+        {"en": "The decision was made without consulting the team", "he": "ההחלטה התקבלה בלי להתייעץ עם הצוות", "topic": "general"},
+        {"en": "I'm afraid I have to disagree with that statement", "he": "אני חושש שאני צריך לחלוק על ההצהרה הזאת", "topic": "general"},
+        {"en": "The company was founded over twenty years ago", "he": "החברה נוסדה לפני יותר מעשרים שנה", "topic": "general"},
+        {"en": "Despite the challenges, the team met its goals", "he": "למרות האתגרים, הצוות עמד ביעדים שלו", "topic": "general"},
+        {"en": "He was accused of breaking the rules", "he": "הוא הואשם בהפרת הכללים", "topic": "general"},
+        {"en": "The manager insisted that changes be made immediately", "he": "המנהל התעקש שהשינויים ייעשו מיד", "topic": "general"},
+        {"en": "I wish I had studied harder for the exam", "he": "הלוואי שהייתי לומד יותר בשקידה למבחן", "topic": "general"},
+        {"en": "The new policy will be implemented next quarter", "he": "המדיניות החדשה תיושם ברבעון הבא", "topic": "general"},
+        {"en": "She's been putting off the decision for weeks", "he": "היא דוחה את ההחלטה כבר שבועות", "topic": "general"},
+        {"en": "It turned out that the rumor was completely false", "he": "התברר שהשמועה הייתה שקרית לחלוטין", "topic": "general"},
+        {"en": "Research shows that sleep affects concentration significantly", "he": "מחקרים מראים ששינה משפיעה משמעותית על ריכוז", "topic": "present_simple_statement"},
+        {"en": "The organization relies heavily on volunteer support", "he": "הארגון נשען רבות על תמיכת מתנדבים", "topic": "present_simple_statement"},
+        {"en": "Modern technology constantly reshapes how we communicate", "he": "הטכנולוגיה המודרנית מעצבת מחדש כל הזמן את הדרך שבה אנו מתקשרים", "topic": "present_simple_statement"},
+        {"en": "What factors influence consumer behavior the most", "he": "אילו גורמים משפיעים הכי הרבה על התנהגות הצרכנים", "topic": "present_simple_question"},
+        {"en": "How does the new regulation affect small businesses", "he": "איך התקנה החדשה משפיעה על עסקים קטנים", "topic": "present_simple_question"},
+        {"en": "Why do so many people struggle with time management", "he": "למה כל כך הרבה אנשים מתקשים בניהול זמן", "topic": "present_simple_question"},
+        {"en": "Scientists are developing new methods to fight climate change", "he": "מדענים מפתחים שיטות חדשות להילחם בשינויי האקלים", "topic": "present_continuous"},
+        {"en": "The company is expanding its operations overseas", "he": "החברה מרחיבה את פעילותה בחו\"ל", "topic": "present_continuous"},
+        {"en": "More people are choosing to work remotely nowadays", "he": "יותר אנשים בוחרים לעבוד מרחוק בימינו", "topic": "present_continuous"},
+        {"en": "The government introduced new measures to reduce unemployment", "he": "הממשלה הנהיגה אמצעים חדשים כדי להפחית את האבטלה", "topic": "past_simple_statement"},
+        {"en": "Researchers discovered an unexpected link between diet and mood", "he": "חוקרים גילו קשר בלתי צפוי בין תזונה למצב רוח", "topic": "past_simple_statement"},
+        {"en": "The company faced significant challenges during the crisis", "he": "החברה התמודדה עם אתגרים משמעותיים במהלך המשבר", "topic": "past_simple_statement"},
+        {"en": "What caused the sudden increase in prices", "he": "מה גרם לעלייה הפתאומית במחירים", "topic": "past_simple_question"},
+        {"en": "How did the team overcome such a difficult obstacle", "he": "איך הצוות התגבר על מכשול כה קשה", "topic": "past_simple_question"},
+        {"en": "Why did the negotiations fail in the end", "he": "למה המשא ומתן נכשל בסופו של דבר", "topic": "past_simple_question"},
+        {"en": "Unless something changes, costs will continue to rise", "he": "אלא אם משהו ישתנה, העלויות ימשיכו לעלות", "topic": "future"},
+        {"en": "Experts predict that demand will increase significantly", "he": "מומחים חוזים שהביקוש יגדל משמעותית", "topic": "future"},
+        {"en": "The new policy will likely affect thousands of employees", "he": "המדיניות החדשה תשפיע ככל הנראה על אלפי עובדים", "topic": "future"},
+        {"en": "Consider the long-term consequences before making a decision", "he": "שקול את ההשלכות ארוכות הטווח לפני קבלת החלטה", "topic": "imperative"},
+        {"en": "Avoid making assumptions without sufficient evidence", "he": "הימנע מהנחות ללא ראיות מספקות", "topic": "imperative"},
+        {"en": "Always verify your sources before sharing information", "he": "תמיד ודא את המקורות שלך לפני שיתוף מידע", "topic": "imperative"},
     ],
     "C1": [
-        {"en": "Rarely have I seen such dedication to a project", "he": "לעיתים רחוקות ראיתי מסירות כזאת לפרויקט"},
-        {"en": "Had I known earlier, I would have acted differently", "he": "אילו ידעתי מוקדם יותר, הייתי פועל אחרת"},
-        {"en": "Not only did she finish first, but she also broke the record", "he": "היא לא רק סיימה ראשונה, אלא גם שברה את השיא"},
-        {"en": "It is essential that every detail be verified beforehand", "he": "חיוני שכל פרט ייבדק מראש"},
-        {"en": "Little did they know how much the decision would cost them", "he": "הם לא ידעו כמה ההחלטה תעלה להם"},
-        {"en": "The committee recommended that the policy be reconsidered", "he": "הוועדה המליצה שהמדיניות תישקל מחדש"},
-        {"en": "Seldom do we encounter such a compelling argument", "he": "לעיתים רחוקות אנו נתקלים בטיעון משכנע כל כך"},
-        {"en": "Were it not for her guidance, the project would have failed", "he": "לולא ההדרכה שלה, הפרויקט היה נכשל"},
-        {"en": "The findings, though preliminary, suggest a clear trend", "he": "הממצאים, אף שהם ראשוניים, מצביעים על מגמה ברורה"},
-        {"en": "He is said to have influenced an entire generation of writers", "he": "אומרים שהוא השפיע על דור שלם של סופרים"},
-        {"en": "Under no circumstances should this document be shared externally", "he": "בשום פנים ואופן אין לשתף את המסמך הזה מחוץ לארגון"},
-        {"en": "So convincing was her argument that no one objected", "he": "הטיעון שלה היה משכנע עד כדי כך שאיש לא התנגד"},
-        {"en": "The proposal warrants further consideration before approval", "he": "ההצעה מצדיקה שיקול נוסף לפני האישור"},
-        {"en": "Given the circumstances, the outcome was hardly surprising", "he": "לאור הנסיבות, התוצאה בקושי הפתיעה"},
-        {"en": "He acted as though nothing unusual had happened", "he": "הוא נהג כאילו לא קרה שום דבר יוצא דופן"},
+        {"en": "Rarely have I seen such dedication to a project", "he": "לעיתים רחוקות ראיתי מסירות כזאת לפרויקט", "topic": "general"},
+        {"en": "Had I known earlier, I would have acted differently", "he": "אילו ידעתי מוקדם יותר, הייתי פועל אחרת", "topic": "general"},
+        {"en": "Not only did she finish first, but she also broke the record", "he": "היא לא רק סיימה ראשונה, אלא גם שברה את השיא", "topic": "general"},
+        {"en": "It is essential that every detail be verified beforehand", "he": "חיוני שכל פרט ייבדק מראש", "topic": "general"},
+        {"en": "Little did they know how much the decision would cost them", "he": "הם לא ידעו כמה ההחלטה תעלה להם", "topic": "general"},
+        {"en": "The committee recommended that the policy be reconsidered", "he": "הוועדה המליצה שהמדיניות תישקל מחדש", "topic": "general"},
+        {"en": "Seldom do we encounter such a compelling argument", "he": "לעיתים רחוקות אנו נתקלים בטיעון משכנע כל כך", "topic": "general"},
+        {"en": "Were it not for her guidance, the project would have failed", "he": "לולא ההדרכה שלה, הפרויקט היה נכשל", "topic": "general"},
+        {"en": "The findings, though preliminary, suggest a clear trend", "he": "הממצאים, אף שהם ראשוניים, מצביעים על מגמה ברורה", "topic": "general"},
+        {"en": "He is said to have influenced an entire generation of writers", "he": "אומרים שהוא השפיע על דור שלם של סופרים", "topic": "general"},
+        {"en": "Under no circumstances should this document be shared externally", "he": "בשום פנים ואופן אין לשתף את המסמך הזה מחוץ לארגון", "topic": "general"},
+        {"en": "So convincing was her argument that no one objected", "he": "הטיעון שלה היה משכנע עד כדי כך שאיש לא התנגד", "topic": "general"},
+        {"en": "The proposal warrants further consideration before approval", "he": "ההצעה מצדיקה שיקול נוסף לפני האישור", "topic": "general"},
+        {"en": "Given the circumstances, the outcome was hardly surprising", "he": "לאור הנסיבות, התוצאה בקושי הפתיעה", "topic": "general"},
+        {"en": "He acted as though nothing unusual had happened", "he": "הוא נהג כאילו לא קרה שום דבר יוצא דופן", "topic": "general"},
+        {"en": "Economic instability often undermines public confidence in institutions", "he": "חוסר יציבות כלכלית פוגע לעתים קרובות באמון הציבור במוסדות", "topic": "present_simple_statement"},
+        {"en": "The evidence suggests a correlation rather than a direct cause", "he": "הראיות מרמזות על מתאם ולא על סיבה ישירה", "topic": "present_simple_statement"},
+        {"en": "Effective leadership requires balancing competing priorities", "he": "מנהיגות אפקטיבית דורשת איזון בין עדיפויות מתחרות", "topic": "present_simple_statement"},
+        {"en": "To what extent does government policy shape economic outcomes", "he": "עד כמה מדיניות הממשלה מעצבת תוצאות כלכליות", "topic": "present_simple_question"},
+        {"en": "What underlying assumptions does this argument rely on", "he": "על אילו הנחות יסוד מסתמכת הטענה הזו", "topic": "present_simple_question"},
+        {"en": "How do cultural differences influence negotiation strategies", "he": "איך הבדלים תרבותיים משפיעים על אסטרטגיות משא ומתן", "topic": "present_simple_question"},
+        {"en": "Analysts are reassessing their forecasts in light of new data", "he": "אנליסטים בוחנים מחדש את התחזיות שלהם לאור נתונים חדשים", "topic": "present_continuous"},
+        {"en": "The industry is undergoing a fundamental transformation", "he": "התעשייה עוברת שינוי מהותי", "topic": "present_continuous"},
+        {"en": "Policymakers are grappling with the implications of automation", "he": "קובעי המדיניות מתמודדים עם ההשלכות של האוטומציה", "topic": "present_continuous"},
+        {"en": "The committee ultimately rejected the proposal despite strong support", "he": "הוועדה דחתה בסופו של דבר את ההצעה למרות תמיכה חזקה", "topic": "past_simple_statement"},
+        {"en": "The findings contradicted several long-held assumptions", "he": "הממצאים סתרו כמה הנחות ותיקות", "topic": "past_simple_statement"},
+        {"en": "The crisis exposed significant weaknesses in the system", "he": "המשבר חשף חולשות משמעותיות במערכת", "topic": "past_simple_statement"},
+        {"en": "What implications did the ruling have for future cases", "he": "אילו השלכות היו לפסיקה על מקרים עתידיים", "topic": "past_simple_question"},
+        {"en": "How did the researchers account for conflicting variables", "he": "איך החוקרים התייחסו למשתנים סותרים", "topic": "past_simple_question"},
+        {"en": "Why did the initiative fail to gain widespread support", "he": "למה היוזמה לא הצליחה לזכות בתמיכה נרחבת", "topic": "past_simple_question"},
+        {"en": "Should the trend continue, resources will become increasingly scarce", "he": "אם המגמה תימשך, המשאבים יהפכו למוגבלים יותר ויותר", "topic": "future"},
+        {"en": "The reform is expected to have far-reaching consequences", "he": "הרפורמה צפויה להיות בעלת השלכות מרחיקות לכת", "topic": "future"},
+        {"en": "Given current projections, demand will likely outpace supply", "he": "לאור התחזיות הנוכחיות, הביקוש כנראה יעלה על ההיצע", "topic": "future"},
+        {"en": "Weigh the evidence carefully before drawing conclusions", "he": "שקול את הראיות בקפידה לפני הסקת מסקנות", "topic": "imperative"},
+        {"en": "Refrain from oversimplifying a complex issue", "he": "הימנע מפישוט יתר של סוגיה מורכבת", "topic": "imperative"},
+        {"en": "Challenge your own assumptions whenever possible", "he": "אתגר את ההנחות שלך בכל הזדמנות", "topic": "imperative"},
     ],
     "C2": [
-        {"en": "Notwithstanding the setbacks, the initiative persevered", "he": "חרף הנסיגות, היוזמה התמידה"},
-        {"en": "The ambiguity of the clause warrants further scrutiny", "he": "העמימות של הסעיף מצריכה בחינה נוספת"},
-        {"en": "Her eloquence captivated the entire audience", "he": "הרהיטות שלה ריתקה את כל הקהל"},
-        {"en": "The findings corroborate the initial hypothesis", "he": "הממצאים מאששים את ההשערה הראשונית"},
-        {"en": "He remained impervious to criticism throughout the ordeal", "he": "הוא נותר חסין לביקורת לאורך כל המבחן"},
-        {"en": "The negotiations were fraught with unforeseen complications", "he": "המשא ומתן היה רווי בסיבוכים בלתי צפויים"},
-        {"en": "Such an egregious error cannot go unaddressed", "he": "טעות כה חמורה אינה יכולה להישאר ללא טיפול"},
-        {"en": "The author's prose is renowned for its subtlety and nuance", "he": "הפרוזה של הסופר ידועה בעדינותה וברבדיה"},
-        {"en": "The policy's ramifications are still being assessed", "he": "ההשלכות של המדיניות עדיין נבחנות"},
-        {"en": "Her tenacity in the face of adversity was inspiring", "he": "העקשנות שלה מול קשיים הייתה מעוררת השראה"},
-        {"en": "The evidence, albeit circumstantial, was compelling", "he": "הראיות, אף שהיו נסיבתיות, היו משכנעות"},
-        {"en": "The board's decision was met with unanimous approval", "he": "החלטת הדירקטוריון זכתה לאישור פה אחד"},
-        {"en": "His argument, though cogent, failed to sway the jury", "he": "הטיעון שלו, אף שהיה משכנע, לא הצליח לשכנע את חבר המושבעים"},
-        {"en": "The city's infrastructure is ill-equipped to handle the surge", "he": "התשתית של העיר אינה מצוידת כראוי להתמודד עם הזינוק"},
-        {"en": "It would be remiss of us not to acknowledge her contribution", "he": "זו תהיה רשלנות מצידנו לא להכיר בתרומתה"},
+        {"en": "Notwithstanding the setbacks, the initiative persevered", "he": "חרף הנסיגות, היוזמה התמידה", "topic": "general"},
+        {"en": "The ambiguity of the clause warrants further scrutiny", "he": "העמימות של הסעיף מצריכה בחינה נוספת", "topic": "general"},
+        {"en": "Her eloquence captivated the entire audience", "he": "הרהיטות שלה ריתקה את כל הקהל", "topic": "general"},
+        {"en": "The findings corroborate the initial hypothesis", "he": "הממצאים מאששים את ההשערה הראשונית", "topic": "general"},
+        {"en": "He remained impervious to criticism throughout the ordeal", "he": "הוא נותר חסין לביקורת לאורך כל המבחן", "topic": "general"},
+        {"en": "The negotiations were fraught with unforeseen complications", "he": "המשא ומתן היה רווי בסיבוכים בלתי צפויים", "topic": "general"},
+        {"en": "Such an egregious error cannot go unaddressed", "he": "טעות כה חמורה אינה יכולה להישאר ללא טיפול", "topic": "general"},
+        {"en": "The author's prose is renowned for its subtlety and nuance", "he": "הפרוזה של הסופר ידועה בעדינותה וברבדיה", "topic": "general"},
+        {"en": "The policy's ramifications are still being assessed", "he": "ההשלכות של המדיניות עדיין נבחנות", "topic": "general"},
+        {"en": "Her tenacity in the face of adversity was inspiring", "he": "העקשנות שלה מול קשיים הייתה מעוררת השראה", "topic": "general"},
+        {"en": "The evidence, albeit circumstantial, was compelling", "he": "הראיות, אף שהיו נסיבתיות, היו משכנעות", "topic": "general"},
+        {"en": "The board's decision was met with unanimous approval", "he": "החלטת הדירקטוריון זכתה לאישור פה אחד", "topic": "general"},
+        {"en": "His argument, though cogent, failed to sway the jury", "he": "הטיעון שלו, אף שהיה משכנע, לא הצליח לשכנע את חבר המושבעים", "topic": "general"},
+        {"en": "The city's infrastructure is ill-equipped to handle the surge", "he": "התשתית של העיר אינה מצוידת כראוי להתמודד עם הזינוק", "topic": "general"},
+        {"en": "It would be remiss of us not to acknowledge her contribution", "he": "זו תהיה רשלנות מצידנו לא להכיר בתרומתה", "topic": "general"},
+        {"en": "The nuances of the argument often elude casual observers", "he": "הניואנסים של הטענה חומקים לעתים קרובות ממתבוננים מזדמנים", "topic": "present_simple_statement"},
+        {"en": "Systemic inequities perpetuate themselves across generations", "he": "אי-שוויון מערכתי משמר את עצמו לאורך דורות", "topic": "present_simple_statement"},
+        {"en": "Rhetorical framing subtly shapes public perception of complex issues", "he": "מסגור רטורי מעצב בעדינות את התפיסה הציבורית של סוגיות מורכבות", "topic": "present_simple_statement"},
+        {"en": "What accounts for the persistent disparity despite decades of reform", "he": "מה מסביר את הפער המתמשך למרות עשורים של רפורמה", "topic": "present_simple_question"},
+        {"en": "To what degree can correlation be disentangled from causation here", "he": "עד כמה ניתן להפריד כאן בין מתאם לסיבתיות", "topic": "present_simple_question"},
+        {"en": "How does the interplay of incentives distort rational decision-making", "he": "איך המשחק ההדדי של תמריצים מעוות קבלת החלטות רציונלית", "topic": "present_simple_question"},
+        {"en": "Institutions are quietly recalibrating their strategies amid mounting scrutiny", "he": "מוסדות מכיילים מחדש בשקט את האסטרטגיות שלהם לנוכח ביקורת גוברת", "topic": "present_continuous"},
+        {"en": "The discourse is shifting toward a more nuanced understanding of risk", "he": "השיח נע לעבר הבנה מורכבת יותר של סיכון", "topic": "present_continuous"},
+        {"en": "Emerging evidence is complicating the prevailing consensus", "he": "ראיות מתהוות מסבכות את הקונצנזוס הרווח", "topic": "present_continuous"},
+        {"en": "The reform inadvertently entrenched the very disparities it sought to address", "he": "הרפורמה, בשוגג, ביססה את אותם פערים שביקשה לטפל בהם", "topic": "past_simple_statement"},
+        {"en": "Historians long overlooked the significance of this event", "he": "היסטוריונים התעלמו זמן רב מהמשמעות של האירוע הזה", "topic": "past_simple_statement"},
+        {"en": "The policy's unintended consequences outweighed its intended benefits", "he": "ההשלכות הבלתי מכוונות של המדיניות עלו על התועלות המכוונות שלה", "topic": "past_simple_statement"},
+        {"en": "What prompted such a dramatic reversal in policy", "he": "מה הניע היפוך כה דרמטי במדיניות", "topic": "past_simple_question"},
+        {"en": "How did the paradigm shift reshape the entire field", "he": "איך שינוי הפרדיגמה עיצב מחדש את התחום כולו", "topic": "past_simple_question"},
+        {"en": "Why did prevailing theories fail to anticipate the collapse", "he": "למה התיאוריות הרווחות לא הצליחו לצפות את הקריסה", "topic": "past_simple_question"},
+        {"en": "Absent decisive intervention, the disparity will only widen", "he": "בהיעדר התערבות נחרצת, הפער רק יתרחב", "topic": "future"},
+        {"en": "The ramifications will likely reverberate for decades to come", "he": "ההשלכות ככל הנראה יהדהדו במשך עשורים קדימה", "topic": "future"},
+        {"en": "Should current trends persist, the consensus will inevitably fracture", "he": "אם המגמות הנוכחיות יימשכו, הקונצנזוס בהכרח יתפורר", "topic": "future"},
+        {"en": "Resist the temptation to reduce a nuanced debate to simple slogans", "he": "התנגד לפיתוי לצמצם דיון מורכב לסיסמאות פשוטות", "topic": "imperative"},
+        {"en": "Scrutinize the underlying data before accepting any sweeping claim", "he": "בחן בקפידה את הנתונים הבסיסיים לפני קבלת כל טענה גורפת", "topic": "imperative"},
+        {"en": "Question the framing as rigorously as the content itself", "he": "הטל ספק במסגור באותה קפדנות כמו בתוכן עצמו", "topic": "imperative"},
     ],
 }
 
@@ -1802,7 +1989,7 @@ def _lookup_student_level_row(tid, email):
         for row in ws.get_all_values()[1:]:
             if len(row) >= 2 and row[0].strip().lower() == email:
                 candidate = row[1].strip().upper()
-                if candidate in CEFR_LEVELS:
+                if candidate in ALL_STUDENT_LEVELS:
                     found = candidate
                 break
     except Exception as e:
@@ -1830,7 +2017,7 @@ def has_saved_student_level(tid, email):
 def set_student_level(tid, email, level):
     """Persist a student's new CEFR level (e.g. after auto-advancement)."""
     email = (email or "").strip().lower()
-    if not email or level not in CEFR_LEVELS:
+    if not email or level not in ALL_STUDENT_LEVELS:
         return False
     try:
         ws = _student_levels_ws(tid)
@@ -2529,7 +2716,7 @@ def question():
         # graded attempt, instead of cold-opening straight into a recording.
         q = s["sentences"][s["current"]]
         return jsonify({
-            "done": False, "stage": "preview", "he": q["he"], "en": q["en"],
+            "done": False, "stage": "preview", "he": q["he"], "en": q["en"], "emoji": q.get("emoji", ""),
             "index": s["current"], "total": len(s["sentences"]),
             "exercise": s["exercise_name"], "voice_gender": s["voice_gender"],
             "can_go_back": s["current"] > 0,
@@ -2545,7 +2732,7 @@ def question():
         if s.get("in_review") and s["review_index"] < len(s["review_queue"]):
             q = s["review_queue"][s["review_index"]]
             return jsonify({
-                "done": False, "he": q["he"], "en": q["en"],
+                "done": False, "he": q["he"], "en": q["en"], "emoji": q.get("emoji", ""),
                 "index": s["review_index"], "total": len(s["review_queue"]),
                 "threshold": s["threshold"], "max_attempts": 1, "voice_gender": s["voice_gender"],
                 "exercise": s["exercise_name"], "review_round": True, **session_payload(s)
@@ -2576,7 +2763,7 @@ def question():
         )
     q = s["sentences"][s["current"]]
     return jsonify({
-        "done": False, "stage": s["stage"], "he": q["he"], "en": q["en"], "index": s["current"], "total": len(s["sentences"]),
+        "done": False, "stage": s["stage"], "he": q["he"], "en": q["en"], "emoji": q.get("emoji", ""), "index": s["current"], "total": len(s["sentences"]),
         "threshold": s["threshold"], "max_attempts": s["max_attempts"], "voice_gender": s["voice_gender"],
         "exercise": s["exercise_name"], "review_round": False,
         "content_mismatch": s.get("content_mismatch", False), **session_payload(s)
@@ -2705,10 +2892,12 @@ def placement_answer(s, spoken, metrics):
         return jsonify({**base, "placement_done": False})
 
     # Final level = the highest level the student actually passed. A student
-    # who never passed even the easiest sentence tested still starts at A1
-    # (the floor), rather than being placed "below" the curriculum.
+    # who never passed even a single sentence tested - including the easiest
+    # one, A1 - almost certainly isn't ready for the CEFR curriculum at all,
+    # so they're placed at A0 (short vocabulary/phrases with emoji support)
+    # instead of being floored at A1 and immediately struggling.
     passed_indices = [CEFR_LEVELS.index(h["level"]) for h in history if h["passed"]]
-    final_level = CEFR_LEVELS[max(passed_indices)] if passed_indices else CEFR_LEVELS[0]
+    final_level = CEFR_LEVELS[max(passed_indices)] if passed_indices else "A0"
     email = s.get("student_email", "")
     set_student_level(s["teacher_id"], email, final_level)
     real_sentences, _ = load_level_track_sentences(s["teacher_id"], email)
@@ -2722,6 +2911,11 @@ def placement_answer(s, spoken, metrics):
     return jsonify({
         **base, "placement_done": True, "placed_level": final_level,
         "placed_level_name": LEVEL_NAMES_HE.get(final_level, final_level),
+        # Full per-level pass/fail breakdown so the frontend can show a
+        # results summary (not just the final number) before the student
+        # confirms they're ready to start practicing at that level.
+        "history": [{"level": h["level"], "level_name": LEVEL_NAMES_HE.get(h["level"], h["level"]),
+                     "passed": h["passed"]} for h in history],
     })
 
 @app.post("/api/answer")
@@ -2925,7 +3119,7 @@ def exercise_sentences():
     if not s:
         return jsonify(error="session not found"), 404
     return jsonify(sentences=[
-        {"he": q.get("he", ""), "en": q.get("en", ""), "completion": q.get("completion", ""), "cloze_display": _blank_display_for(q)}
+        {"he": q.get("he", ""), "en": q.get("en", ""), "emoji": q.get("emoji", ""), "completion": q.get("completion", ""), "cloze_display": _blank_display_for(q)}
         for q in s.get("sentences", [])
     ])
 
