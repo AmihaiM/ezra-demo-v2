@@ -315,7 +315,11 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 .pv-qa-row.bad{border-inline-end:5px solid #ef4444}
 .pv-bubble.pv-listen-row{display:flex;align-items:center;gap:10px;cursor:default;align-self:stretch;max-width:100%}
 .pv-speed-btn{background:#fff3;border:1px solid #fff5;color:#fff;border-radius:8px;padding:4px 8px;font-size:13px;flex:0 0 auto}
+.splash-overlay{position:fixed;inset:0;background:#33119f;z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity .45s ease}
+.splash-overlay.hide{opacity:0;pointer-events:none}
+.splash-overlay video{width:100%;height:100%;object-fit:contain}
 </style></head><body>
+<div id="splash" class="splash-overlay" role="presentation" aria-hidden="true" onclick="dismissSplash()"><video id="splashVideo" src="/intro.mp4" autoplay muted playsinline></video></div>
 <div id="connBanner" role="alert"><span id="connBannerMsg">אין חיבור לשרת כרגע.</span><button onclick="connRetry()">🔄 נסה שוב</button></div>
 <div id="iosStandaloneBanner" role="alert"><span>🎤 באייפון, הקלטה לא עובדת כשהאפליקציה מותקנת על מסך הבית. פתחו את הקישור ב-Safari (לא כאפליקציה מותקנת) כדי שההקלטה תעבוד.</span><button onclick="document.getElementById('iosStandaloneBanner').style.display='none'">הבנתי</button></div>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards" id="teacherCards"></div></section>
@@ -377,6 +381,43 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 </div></div>
 <div id="appFooterEl" class="app-footer">🧠 מנוע למיומנות בשפה על פי שיטת פרופ' בלום ·  פותח על ידי עמיחי מייטליס ובהדרכת סולי תמרי · © כל הזכויות שמורות</div>
 <script>
+// --- Branded splash intro (plays once on every cold app load, before the
+// login screen) --------------------------------------------------------
+// Deliberately NOT gated on init()/the teacher-list fetch: it needs to
+// start painting the instant the DOM is ready, and must dismiss itself on
+// its own timer regardless of how that network call goes, or a slow/failed
+// fetch would leave the splash covering an already-broken "no connection"
+// banner. autoplay is muted (browsers block audio-on-load without a prior
+// user gesture) - the visual still plays every time, the chime is a bonus
+// on days the browser allows it.
+(function(){
+  var splash=document.getElementById('splash');
+  if(!splash)return;
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    splash.remove();
+    return;
+  }
+  var dismissed=false;
+  window.dismissSplash=function(){
+    if(dismissed)return;
+    dismissed=true;
+    splash.classList.add('hide');
+    var v=document.getElementById('splashVideo');
+    setTimeout(function(){
+      try{if(v){v.pause()}}catch(e){}
+      splash.remove();
+    },500);
+  };
+  var v=document.getElementById('splashVideo');
+  if(v){
+    v.addEventListener('ended',dismissSplash);
+    v.addEventListener('error',dismissSplash);
+  }
+  // Safety net: if autoplay is blocked entirely, the video is slow to load,
+  // or 'ended' never fires for any reason, the splash must never be allowed
+  // to permanently block the login screen.
+  setTimeout(dismissSplash,2900);
+})();
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',studentPassword='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200,studentPhotoDataUrl='',lastCompletedSentence=null,practiceMode=false,practiceModeFromExam=false;
 // "Private" mode: opt-in alternate chat-bubble skin, per-device (like the
 // mute/speed prefs above) - see the big block of pv* functions near the end

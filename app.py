@@ -2268,6 +2268,18 @@ def favicon_ico():
     # serve the 32px PNG for that path too rather than let it 404.
     return Response(open(os.path.join(BASE_DIR, "favicon-32.png"), "rb").read(), content_type="image/png")
 
+@app.route("/intro.mp4")
+def intro_video():
+    # Short branded splash clip played once on app load (see index.html) -
+    # served with Accept-Ranges so mobile Safari (which requests video with
+    # a Range header even for short clips) doesn't choke on it.
+    path = os.path.join(BASE_DIR, "intro.mp4")
+    data = open(path, "rb").read()
+    resp = Response(data, content_type="video/mp4")
+    resp.headers["Accept-Ranges"] = "bytes"
+    resp.headers["Cache-Control"] = "public, max-age=604800"
+    return resp
+
 @app.get("/api/teachers")
 def api_teachers():
     return jsonify({tid: teacher_public(tid) for tid in TEACHERS})
