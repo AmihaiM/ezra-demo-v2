@@ -25,7 +25,7 @@
 <header id="top" class="top"><b>SpeakMaster</b><span id="who"></span><button class="logout" onclick="logout()">יציאה</button></header>
 <main id="wrap" class="wrap"><div class="nav"><button class="active" onclick="showSection('settings',this)">הגדרות</button><button onclick="showSection('exercises',this)">תרגילים</button><button onclick="showSection('live',this)">תלמידים</button><button onclick="showSection('results',this)">תוצאות</button></div>
 <section id="settings" class="section active"><div class="card"><h2>הגדרות כיתה</h2><label>Threshold למבחן הסופי בלבד: <b id="thresholdVal">85</b></label><input id="threshold" type="range" min="80" max="100" value="85" oninput="thresholdVal.textContent=this.value"><p style="color:#9aa7b5;font-size:12px;margin:-4px 0 8px">בתחנות 1-3 תמיד נדרשת התאמה מלאה של 100% כדי לעבור. ה-Threshold הזה משפיע רק על ציון המבחן הסופי (תחנה 4).</p><label>מספר ניסיונות למשפט: <b id="attemptsVal">5</b></label><input id="attempts" type="range" min="4" max="7" value="5" oninput="attemptsVal.textContent=this.value"><label>זמן שתיקה לסיום הקלטה (שניות): <b id="silenceVal">1.2</b></label><input id="silence" type="range" min="400" max="3000" step="100" value="1200" oninput="silenceVal.textContent=(this.value/1000).toFixed(1)"><label style="display:flex;align-items:center;gap:8px;margin:10px 0 4px"><input id="defaultPrivateMode" type="checkbox"> מצב Private כברירת מחדל לתלמידים חדשים</label><p style="color:#9aa7b5;font-size:12px;margin:-4px 0 8px">כשמסומן, תלמיד שנכנס בפעם הראשונה במכשיר שלו יראה את מצב ה-Private (בועות שיחה, ללא מד שליטה) כברירת מחדל. תלמיד שכבר בחר בעבר במכשיר שלו (הפעיל/כיבה ידנית) ימשיך עם הבחירה שלו, ללא שינוי.</p><label style="display:block;margin:10px 0 4px">כתובת Gmail להתחברות עם Google (במקום סיסמה)</label><input id="googleEmail" type="email" placeholder="name@gmail.com" dir="ltr"><p style="color:#9aa7b5;font-size:12px;margin:-4px 0 8px">קישור/עדכון הכתובת כאן מאפשר לך להתחבר בפעם הבאה עם כפתור "Sign in with Google" במסך הכניסה, במקום הסיסמה.</p><button class="primary" onclick="saveSettings()">שמור</button><span id="saveMsg" class="badge" style="display:none">נשמר</span></div><div class="card"><h2>תלמידים מורשים</h2><p style="color:#9aa7b5;font-size:13px">רשימת שמות תלמידים מורשים להיכנס לתרגול — שם אחד בכל שורה (או מופרדים בפסיקים).</p><textarea id="allowedStudents" rows="6" placeholder="לדוגמה:&#10;דני כהן&#10;נועה לוי"></textarea><label style="display:flex;align-items:center;gap:8px;margin:8px 0"><input id="allowOutsideList" type="checkbox" checked> לאפשר כניסה גם לתלמידים שאינם ברשימה</label><button class="primary" onclick="saveAllowedStudents()">שמור רשימת תלמידים</button><span id="allowedMsg" class="badge" style="display:none">נשמר</span></div></section>
-<section id="exercises" class="section"><div class="card"><h2>בחירת תרגיל מ-Google Sheet</h2><input id="search" placeholder="חיפוש תרגיל" oninput="renderExercises()"><div class="row"><button class="ghost" onclick="loadCatalog()">רענן רשימה</button><button class="ghost" onclick="useDemoExercise()">🔄 חזרה לתרגול ברירת המחדל (רמות)</button><button class="primary" onclick="document.getElementById('addExerciseCard').scrollIntoView({behavior:'smooth',block:'start'})">⬇️ הוספת תרגיל חדש</button></div><div class="row" style="margin-top:6px"><button class="ghost" onclick="refreshCurrentExercise()">📥 טען מחדש מהגיליון (אם ערכת את ה-CSV)</button><span id="refreshMsg" class="badge" style="display:none"></span></div><p style="color:#9aa7b5;font-size:12px;margin:4px 0 0">אם ערכת את התוכן בגיליון של התרגיל הפעיל, לחיצה כאן טוענת אותו מחדש מיד - בלי לחכות. תלמידים שכבר באמצע התרגיל לא יושפעו; רק מי שמתחיל אחרי הרענון יקבל את התוכן המעודכן.</p><p id="exCount"></p><div id="exList" class="list"><div class="item">טוען...</div></div></div><div id="addExerciseCard" class="card"><h2>הוספת תרגיל חדש</h2><p style="color:#9aa7b5;font-size:13px">אפשר להדביק קישור CSV מפורסם של Google Sheets, קישור רגיל לגיליון (כמו שמעתיקים מסרגל הכתובת), או קישור SpeakMaster שיש בו ?link=CSV. חשוב: הגיליון חייב להיות משותף לפי "כל מי שיש לו את הקישור — צפייה" אחרת השרת לא יוכל לקרוא אותו. לאחר הוספה התרגיל נכתב ל-Google Sheet הראשי, נטען מחדש מהרשימה, ונבחר מיד למורה.</p><input id="newExName" placeholder="שם התרגיל למשל: Sandra Belinsky - 25 New words"><input id="newExCsv" placeholder="קישור CSV מפורסם"><button class="primary" onclick="addExercise()">הוסף ובחר תרגיל</button><span id="addMsg" class="badge" style="display:none"></span></div></section>
+<section id="exercises" class="section"><div class="card"><h2>בחירת תרגיל מ-Google Sheet</h2><input id="search" placeholder="חיפוש תרגיל" oninput="renderExercises()"><div class="row"><button class="ghost" onclick="loadCatalog()">רענן רשימה</button><button class="ghost" onclick="useDemoExercise()">🔄 חזרה לתרגול ברירת המחדל (רמות)</button><button class="primary" onclick="document.getElementById('addExerciseCard').scrollIntoView({behavior:'smooth',block:'start'})">⬇️ הוספת תרגיל חדש</button></div><div class="row" style="margin-top:6px"><button class="ghost" onclick="refreshCurrentExercise()">📥 טען מחדש מהגיליון (אם ערכת את ה-CSV)</button><span id="refreshMsg" class="badge" style="display:none"></span></div><p style="color:#9aa7b5;font-size:12px;margin:4px 0 0">אם ערכת את התוכן בגיליון של התרגיל הפעיל, לחיצה כאן טוענת אותו מחדש מיד - בלי לחכות. תלמידים שכבר באמצע התרגיל לא יושפעו; רק מי שמתחיל אחרי הרענון יקבל את התוכן המעודכן.</p><p id="exCount"></p><div id="exList" class="list"><div class="item">טוען...</div></div></div><div id="addExerciseCard" class="card"><h2>הוספת תרגיל חדש</h2><p style="color:#9aa7b5;font-size:13px">אפשר להדביק קישור CSV מפורסם של Google Sheets, קישור רגיל לגיליון (כמו שמעתיקים מסרגל הכתובת), או קישור SpeakMaster שיש בו ?link=CSV. חשוב: הגיליון חייב להיות משותף לפי "כל מי שיש לו את הקישור — צפייה" אחרת השרת לא יוכל לקרוא אותו. לאחר הוספה התרגיל נכתב ל-Google Sheet הראשי, נטען מחדש מהרשימה, ונבחר מיד למורה.</p><input id="newExName" placeholder="שם התרגיל למשל: Sandra Belinsky - 25 New words"><input id="newExCsv" placeholder="קישור CSV מפורסם"><button class="primary" onclick="addExercise()">הוסף ובחר תרגיל</button><span id="addMsg" class="badge" style="display:none"></span></div><div id="aiPhotoCard" class="card"><h2>🤖 יצירת תרגיל מתמונה (AI)</h2><p style="color:#9aa7b5;font-size:13px">צלם/י או העלה/י תמונה של עמוד טקסט באנגלית - ה-AI יחלץ עד 10 משפטים לתרגול דיבור, עם תרגום לעברית ותיוג נושא דקדוקי. אפשר לערוך או למחוק שורות לפני השמירה, ורק אחרי השמירה התרגיל נבחר בפועל לתלמידים.</p><input id="aiPhotoName" placeholder="שם לתרגיל, למשל: תרגיל מהעיתון"><input id="aiPhotoFile" type="file" accept="image/*" capture="environment"><button class="primary" onclick="generateFromPhoto()">📷 חלץ משפטים מהתמונה</button><span id="aiPhotoMsg" class="badge" style="display:none"></span><div id="aiPhotoDraft" style="margin-top:10px"></div></div><div id="aiBoosterCard" class="card"><h2>🎯 תרגיל ממוקד-נושא (AI)</h2><p style="color:#9aa7b5;font-size:13px">מייצר משפטים חדשים שמתמקדים בנושא דקדוקי אחד, לתרגול ממוקד מעבר לבנק הקיים. אפשר לבחור נושא ידנית, או להזין אימייל תלמיד/ה ולבחור "אוטומטי" - ואז ה-AI יבחר את הנושא שהכי חלש אצל/ה לפי היסטוריית התרגול.</p><input id="boosterEmail" placeholder="אימייל תלמיד/ה (רק לצורך בחירה אוטומטית)" dir="ltr"><select id="boosterTopic"><option value="auto">אוטומטי - הכי חלש אצל התלמיד/ה</option><option value="present_simple_statement">הווה פשוט — משפט חיווי</option><option value="present_simple_question">הווה פשוט — משפט שאלה</option><option value="present_continuous">הווה מתמשך</option><option value="past_simple_statement">עבר פשוט — משפט חיווי</option><option value="past_simple_question">עבר פשוט — משפט שאלה</option><option value="future">עתיד</option><option value="imperative">ציווי</option></select><select id="boosterLevel"><option value="A1">A1</option><option value="A2">A2</option><option value="B1" selected>B1</option><option value="B2">B2</option><option value="C1">C1</option><option value="C2">C2</option></select><input id="aiBoosterName" placeholder="שם לתרגיל, למשל: חיזוק - עבר פשוט B1"><button class="primary" onclick="generateBooster()">🎯 צור משפטים ממוקדים</button><span id="boosterMsg" class="badge" style="display:none"></span><div id="boosterDraft" style="margin-top:10px"></div></div></section>
 <section id="live" class="section"><div class="card"><h2>תלמידים פעילים</h2><button class="ghost" onclick="loadStudents()">רענן</button><p id="activeExercise"></p><div id="students"></div></div><div class="card" id="editStudentCard" style="display:none"><h2>✏️ עריכת תלמיד/ה: <span id="editStudentName"></span></h2><p style="color:#9aa7b5;font-size:13px">שדה ריק = לא משתנה.</p><input id="editStudentNameInput" placeholder="שם"><input id="editStudentEmail" placeholder="אימייל" dir="ltr"><div class="row" style="margin-top:10px"><button class="primary" onclick="saveEditStudent()">שמור שינויים</button><button class="ghost" onclick="closeEditStudent()">ביטול</button></div><div id="editStudentResult" style="margin-top:10px"></div></div></section>
 <section id="results" class="section"><div class="card"><h2>תוצאות אחרונות</h2><div class="row"><button class="ghost" onclick="loadResults()">רענן</button><a id="sheetLink" class="primary" style="display:none;text-decoration:none;padding:10px 16px;border-radius:12px" target="_blank" rel="noopener">📊 פתח את גיליון התוצאות ב-Google Sheet</a></div><p style="color:#9aa7b5;font-size:12px">הגיליון מתעדכן אוטומטית בזמן אמת — זה כבר ה"אקספורט" החי שלך, בלי צורך בכפתור ייצוא נפרד. עיצוב (צבעים, גופנים) נשלט מתוך Google Sheets עצמו דרך ה-Apps Script שהתקנת.</p><div class="row filters"><select id="filterStudent" onchange="renderResultsTable()"><option value="">כל התלמידים</option></select><select id="filterPhase" onchange="renderResultsTable()"><option value="">כל השלבים</option><option value="practice">תרגול</option><option value="review_retry">חזרה</option><option value="final_exam" selected>מבחן סופי</option></select><label style="display:flex;align-items:center;gap:6px;width:auto;margin:0;font-size:13px;color:#9aa7b5"><input id="filterLowConf" type="checkbox" onchange="renderResultsTable()" style="width:auto;margin:0"> ⚠️ רק תוצאות עם ביטחון זיהוי נמוך</label></div><p style="color:#9aa7b5;font-size:12px">הדפדפן לפעמים "מתקן" מילה שנאמרה לא נכון לכיוון המשפט הצפוי, כך שהתלמיד עלול לעבור בלי שבאמת נשמע נכון. שורה שעברה עם ביטחון זיהוי נמוך (מתחת ל-50%) מסומנת ב-⚠️ "בדוק שוב" - כדאי ללחוץ עליה ולבדוק את "מה נאמר" בפועל.</p><p style="color:#9aa7b5;font-size:12px">לחץ על שורה כדי לראות את המשפט המלא, מה נאמר, ומדדי הדיבור.</p><div id="resultsBody"></div></div></section></main>
 <script>
@@ -245,4 +245,104 @@ function toggleResultDetail(i){
   caret.textContent=open?'▸':'▾';
 }
 function logout(){location.reload()}function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+// --- AI feature 1: photo -> draft sentences -> teacher review -> save+select.
+// generateFromPhoto() downsizes the photo client-side (max 1600px, JPEG 0.85)
+// before sending - phone camera photos are routinely several MB, and the
+// server caps the incoming data URL size (see _MAX_PHOTO_DATA_URL_LEN in
+// app.py); shrinking here keeps a normal phone photo well under that cap
+// without the teacher having to think about it.
+var aiPhotoDraft=[];
+function generateFromPhoto(){
+  let f=document.getElementById('aiPhotoFile').files[0];
+  if(!f){alert('בחר/י תמונה קודם');return}
+  let msg=document.getElementById('aiPhotoMsg');
+  msg.style.display='inline-block';msg.textContent='מעבד תמונה...';
+  let img=new Image();
+  let reader=new FileReader();
+  reader.onload=function(){
+    img.onload=function(){
+      let maxDim=1600;
+      let scale=Math.min(1,maxDim/Math.max(img.width,img.height));
+      let w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      let canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      let dataUrl=canvas.toDataURL('image/jpeg',0.85);
+      msg.textContent='ה-AI מנתח את התמונה... (יכול לקחת עד כ-20 שניות)';
+      api('/api/teacher/photo-to-sentences',{image_data_url:dataUrl}).then(d=>{
+        if(!d.ok){msg.textContent=d.error||'שגיאה בניתוח התמונה';return}
+        aiPhotoDraft=d.sentences||[];
+        msg.style.display='none';
+        renderAiPhotoDraft();
+      }).catch(()=>{msg.textContent='שגיאה בניתוח התמונה'});
+    };
+    img.onerror=function(){msg.textContent='שגיאה בקריאת התמונה'};
+    img.src=reader.result;
+  };
+  reader.onerror=function(){msg.textContent='שגיאה בקריאת הקובץ'};
+  reader.readAsDataURL(f);
+}
+function renderAiPhotoDraft(){
+  let box=document.getElementById('aiPhotoDraft');
+  if(!aiPhotoDraft.length){box.innerHTML='';return}
+  box.innerHTML='<p style="color:#9aa7b5;font-size:13px">'+aiPhotoDraft.length+' משפטים - אפשר לערוך או למחוק לפני השמירה:</p>'
+    +aiPhotoDraft.map((s,i)=>'<div class="item" style="align-items:flex-start;flex-direction:column;gap:6px"><input dir="ltr" value="'+esc(s.en)+'" oninput="aiPhotoDraft['+i+'].en=this.value" placeholder="English sentence"><input value="'+esc(s.he)+'" oninput="aiPhotoDraft['+i+'].he=this.value" placeholder="תרגום"><div class="row" style="width:100%"><span class="badge">'+esc(s.topic||'general')+'</span><span class="badge">'+esc(s.level||'')+'</span><button class="ghost" style="margin-right:auto;color:#f87171;padding:5px 9px;font-size:12px" onclick="removeAiPhotoRow('+i+')">🗑️ מחק שורה</button></div></div>').join('')
+    +'<button class="primary" style="margin-top:8px" onclick="saveAiPhotoExercise()">💾 שמור והשתמש בתרגיל זה</button>';
+}
+function removeAiPhotoRow(i){aiPhotoDraft.splice(i,1);renderAiPhotoDraft()}
+function saveAiPhotoExercise(){
+  let name=document.getElementById('aiPhotoName').value.trim();
+  if(!name){alert('תן/י שם לתרגיל');return}
+  if(!aiPhotoDraft.length){alert('אין משפטים לשמירה');return}
+  let msg=document.getElementById('aiPhotoMsg');
+  msg.style.display='inline-block';msg.textContent='שומר...';
+  api('/api/teacher/save-ai-exercise',{name:name,sentences:aiPhotoDraft}).then(d=>{
+    if(!d.ok){msg.textContent=d.error||'שגיאה בשמירה';return}
+    msg.textContent='נשמר ונבחר: '+d.sentence_count+' משפטים';
+    activeName=name;aiPhotoDraft=[];document.getElementById('aiPhotoDraft').innerHTML='';document.getElementById('aiPhotoFile').value='';
+    loadStudents();
+    setTimeout(()=>msg.style.display='none',3000);
+  }).catch(()=>{msg.textContent='שגיאה בשמירה'});
+}
+// --- AI feature 2 (stage B): generate NEW sentences targeting one grammar
+// topic, either picked manually or auto-selected as the given student's
+// weakest topic (server-side get_weak_topics). Reuses the same
+// save-ai-exercise endpoint as the photo feature above - only the
+// generation step and its own draft array/UI are separate.
+var boosterDraft=[];
+function generateBooster(){
+  let topic=document.getElementById('boosterTopic').value;
+  let level=document.getElementById('boosterLevel').value;
+  let email=document.getElementById('boosterEmail').value.trim();
+  let msg=document.getElementById('boosterMsg');
+  msg.style.display='inline-block';msg.textContent='ה-AI מייצר משפטים... (יכול לקחת עד כ-15 שניות)';
+  api('/api/teacher/generate-topic-booster',{topic:topic,level:level,student_email:email}).then(d=>{
+    if(!d.ok){msg.textContent=d.error||'שגיאה ביצירת משפטים';return}
+    boosterDraft=d.sentences||[];
+    msg.style.display='none';
+    if(d.topic_he&&!document.getElementById('aiBoosterName').value)document.getElementById('aiBoosterName').value='חיזוק - '+d.topic_he+' '+d.level;
+    renderBoosterDraft();
+  }).catch(()=>{msg.textContent='שגיאה ביצירת משפטים'});
+}
+function renderBoosterDraft(){
+  let box=document.getElementById('boosterDraft');
+  if(!boosterDraft.length){box.innerHTML='';return}
+  box.innerHTML='<p style="color:#9aa7b5;font-size:13px">'+boosterDraft.length+' משפטים - אפשר לערוך או למחוק לפני השמירה:</p>'
+    +boosterDraft.map((s,i)=>'<div class="item" style="align-items:flex-start;flex-direction:column;gap:6px"><input dir="ltr" value="'+esc(s.en)+'" oninput="boosterDraft['+i+'].en=this.value"><input value="'+esc(s.he)+'" oninput="boosterDraft['+i+'].he=this.value"><div class="row" style="width:100%"><span class="badge">'+esc(s.topic||'')+'</span><span class="badge">'+esc(s.level||'')+'</span><button class="ghost" style="margin-right:auto;color:#f87171;padding:5px 9px;font-size:12px" onclick="removeBoosterRow('+i+')">🗑️ מחק שורה</button></div></div>').join('')
+    +'<button class="primary" style="margin-top:8px" onclick="saveBoosterExercise()">💾 שמור והשתמש בתרגיל זה</button>';
+}
+function removeBoosterRow(i){boosterDraft.splice(i,1);renderBoosterDraft()}
+function saveBoosterExercise(){
+  let name=document.getElementById('aiBoosterName').value.trim();
+  if(!name){alert('תן/י שם לתרגיל');return}
+  if(!boosterDraft.length){alert('אין משפטים לשמירה');return}
+  let msg=document.getElementById('boosterMsg');
+  msg.style.display='inline-block';msg.textContent='שומר...';
+  api('/api/teacher/save-ai-exercise',{name:name,sentences:boosterDraft}).then(d=>{
+    if(!d.ok){msg.textContent=d.error||'שגיאה בשמירה';return}
+    msg.textContent='נשמר ונבחר: '+d.sentence_count+' משפטים';
+    activeName=name;boosterDraft=[];document.getElementById('boosterDraft').innerHTML='';
+    loadStudents();
+    setTimeout(()=>msg.style.display='none',3000);
+  }).catch(()=>{msg.textContent='שגיאה בשמירה'});
+}
 </script></body></html>

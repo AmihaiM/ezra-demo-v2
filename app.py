@@ -22,6 +22,109 @@ CACHE_TTL = 300
 STATE_FILE = os.path.join(BASE_DIR, "teacher_state.json")
 IL_TZ = ZoneInfo("Asia/Jerusalem")
 
+# --- Shared Claude API infra, used by both AI features: photo -> exercise
+# (OCR + sentence selection + translation + topic tagging in one call) and
+# AI-generated personalized sentences for a student's weak grammar topics.
+# One key, one call site, one rate-limit story instead of duplicating this
+# per feature. Not configured (no ANTHROPIC_API_KEY) simply means both
+# features are unavailable - call_claude() fails closed with a clear error,
+# nothing else in the app depends on this being set.
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
+# Soft per-teacher daily cap on AI-feature calls, so a bug (or an
+# enthusiastic teacher generating exercise after exercise) can't run up an
+# unbounded API bill before there's paying revenue to cover it. In-memory
+# only - resets on restart too, which is fine, this is a cost safety net,
+# not a security control.
+AI_DAILY_LIMIT_PER_TEACHER = int(os.getenv("AI_DAILY_LIMIT_PER_TEACHER", "20"))
+_ai_usage = {}
+
+def check_and_bump_ai_quota(tid):
+    """Returns True (and counts the call) if this teacher is still under
+    today's AI-feature cap; False if they've hit it - callers must check
+    this BEFORE spending an API call, not after."""
+    day = datetime.now(IL_TZ).strftime("%Y-%m-%d")
+    key = (tid, day)
+    used = _ai_usage.get(key, 0)
+    if used >= AI_DAILY_LIMIT_PER_TEACHER:
+        return False
+    _ai_usage[key] = used + 1
+    return True
+
+def call_claude(messages, system=None, max_tokens=2000, model=None):
+    """Shared helper for both AI features - the one place that knows how to
+    call the Anthropic Messages API (text or vision), with one timeout and
+    error-handling policy. Returns (text, error): text is None and error is
+    a short Hebrew message on any failure (missing key, timeout, non-200,
+    malformed response), so callers always fail closed with something
+    sane to show a teacher instead of a raw exception or a silent hang.
+    `messages` follows the standard Anthropic Messages API shape, e.g.
+    [{"role": "user", "content": "..."}] for text, or
+    [{"role": "user", "content": [{"type": "image", "source": {...}},
+                                   {"type": "text", "text": "..."}]}]
+    for vision.
+    """
+    if not ANTHROPIC_API_KEY:
+        return None, "AI לא מוגדר בשרת (חסר ANTHROPIC_API_KEY)"
+    try:
+        payload = {"model": model or ANTHROPIC_MODEL, "max_tokens": max_tokens, "messages": messages}
+        if system:
+            payload["system"] = system
+        resp = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json=payload,
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            print("CLAUDE API ERROR", resp.status_code, resp.text[:500])
+            return None, f"שגיאת AI (קוד {resp.status_code})"
+        data = resp.json()
+        parts = data.get("content") or []
+        text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
+        if not text:
+            return None, "תשובת AI ריקה"
+        return text, None
+    except requests.exceptions.Timeout:
+        return None, "ה-AI לא הגיב בזמן, נסה שוב"
+    except Exception as e:
+        print("CLAUDE API CALL FAILED", e)
+        return None, "שגיאת AI"
+
+def extract_json_block(text):
+    """Best-effort extraction of a JSON array/object from a Claude text
+    response - the prompt always asks for JSON only, but models sometimes
+    wrap it in a ```json fence or add a stray sentence before/after despite
+    that instruction, so this strips down to the outermost [...] or {...}
+    before parsing rather than trusting the response to be bare JSON."""
+    text = (text or "").strip()
+    fence = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+    start_chars, end_chars = "[{", "]}"
+    start = None
+    for i, c in enumerate(text):
+        if c in start_chars:
+            start = i
+            break
+    if start is None:
+        raise ValueError("no JSON found in AI response")
+    opener = text[start]
+    closer = end_chars[start_chars.index(opener)]
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == opener:
+            depth += 1
+        elif text[i] == closer:
+            depth -= 1
+            if depth == 0:
+                return json.loads(text[start:i + 1])
+    raise ValueError("unbalanced JSON in AI response")
+
 def now_str():
     # Render's server clock runs in UTC. Every result timestamp shown to
     # teachers/students must be in Israel local time (including DST), not
@@ -270,6 +373,22 @@ def db_init():
                 "email TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'inactive', "
                 "plan TEXT, grow_transaction_id TEXT, "
                 "updated_at TIMESTAMPTZ NOT NULL DEFAULT now())"
+            )
+            # AI feature 1: exercises a teacher generated from a photo of a
+            # text page (see /api/teacher/photo-to-sentences and
+            # /api/teacher/save-ai-exercise). Deliberately NOT stored as a
+            # Google Sheet like every other exercise - that would require the
+            # sheet to be publicly "anyone with the link" shared (same as
+            # every teacher-authored CSV exercise), which is wrong for
+            # AI-generated content that hasn't been reviewed by anyone but
+            # its own teacher yet. Stored here instead and selected via a
+            # "ai://<id>" sentinel in the normal csv_url field - see
+            # load_ai_exercise_sentences() and new_session().
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS ai_exercises ("
+                "id BIGSERIAL PRIMARY KEY, teacher_id TEXT NOT NULL, "
+                "name TEXT NOT NULL, sentences JSONB NOT NULL, "
+                "created_at TIMESTAMPTZ NOT NULL DEFAULT now())"
             )
     except Exception as e:
         print("DB INIT FAILED", e)
@@ -793,6 +912,18 @@ LEVEL_SENTENCES = {
     ],
 }
 
+# Reverse lookup: English sentence text -> grammar topic, built once from the
+# built-in curriculum above. Used by get_weak_topics() to map a student's
+# past result rows (which only ever store the sentence TEXT, not its topic -
+# the results Google Sheet's column layout is deliberately left untouched,
+# see RESULT_HEADERS/the comment on _result_row_to_values) back to the topic
+# that sentence was practicing, without adding a new sheet column.
+SENTENCE_TOPIC_LOOKUP = {
+    sent["en"]: sent.get("topic", "general")
+    for level_sentences in LEVEL_SENTENCES.values()
+    for sent in level_sentences
+}
+
 def next_cefr_level(level):
     """Return the next CEFR level, or the same level if already at the top."""
     try:
@@ -1134,6 +1265,54 @@ def invalidate_sentence_cache(csv_url):
         return
     _cache.pop("sentences:" + csv_url, None)
 
+def save_ai_exercise(tid, name, sentences):
+    """Persist a teacher-reviewed, AI-generated exercise (see
+    /api/teacher/save-ai-exercise) and return its new id, or None on
+    failure (no DB configured, or the insert itself failed)."""
+    conn = _db_conn()
+    if not conn:
+        return None
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO ai_exercises (teacher_id, name, sentences) VALUES (%s, %s, %s) RETURNING id",
+                (tid, name, json.dumps(sentences)),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+    except Exception as e:
+        print("SAVE AI EXERCISE FAILED", tid, e)
+        return None
+    finally:
+        _db_release(conn)
+
+def load_ai_exercise_sentences(ai_id):
+    """Mirrors load_sentences_from_csv_ex's (sentences, used_fallback)
+    contract exactly, so new_session() can treat an "ai://<id>" csv_url
+    exactly like a real one - used_fallback=True (generic demo content) on
+    any failure (bad id, no DB, row deleted) rather than raising, so a
+    dangling reference never crashes a student's session."""
+    try:
+        conn = _db_conn()
+        if not conn:
+            return FALLBACK_SENTENCES[:], True
+        try:
+            with conn, conn.cursor() as cur:
+                cur.execute("SELECT sentences FROM ai_exercises WHERE id = %s", (int(ai_id),))
+                row = cur.fetchone()
+        finally:
+            _db_release(conn)
+        if not row or not row[0]:
+            return FALLBACK_SENTENCES[:], True
+        sentences = row[0] if isinstance(row[0], list) else json.loads(row[0])
+        sentences = [s for s in sentences if isinstance(s, dict) and s.get("en")]
+        if not sentences:
+            return FALLBACK_SENTENCES[:], True
+        return sentences, False
+    except Exception as e:
+        print("LOAD AI EXERCISE FAILED", ai_id, e)
+        return FALLBACK_SENTENCES[:], True
+
 _NUM_WORD_TO_DIGIT = {
     "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
     "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
@@ -1326,6 +1505,11 @@ def new_session(student_id, teacher_id, student_name, student_email=""):
             sentences, level_track = load_level_track_sentences(teacher_id, student_email)
             used_fallback = False
             level_exercise_name = LEVEL_NAMES_HE.get(level_track, "תרגול דמו")
+    elif csv_url.startswith("ai://"):
+        # AI-generated exercise (see save_ai_exercise/load_ai_exercise_sentences)
+        # - never fetched over HTTP like a real csv_url, so it works
+        # regardless of Google Sheets sharing settings.
+        sentences, used_fallback = load_ai_exercise_sentences(csv_url[len("ai://"):])
     else:
         sentences, used_fallback = load_sentences_from_csv_ex(csv_url)
     # content_mismatch=True means a real exercise was selected (csv_url is set)
@@ -2037,13 +2221,95 @@ def set_student_level(tid, email, level):
         print("SET STUDENT LEVEL FAILED", e)
         return False
 
+def _truthy(v):
+    """Normalize a value that may be a real Python bool (in-memory result,
+    still in _pending_results) or a Sheets cell string ("TRUE"/"FALSE"/"True"
+    - gspread round-trips booleans as text) into an actual bool."""
+    if isinstance(v, bool):
+        return v
+    return str(v).strip().lower() in ("true", "1", "yes")
+
+def get_weak_topics(tid, email, min_attempts=2):
+    """Return this student's grammar topics, weakest-first, based on their
+    past pass rate per topic in the built-in leveled curriculum (CSV-imported
+    teacher exercises aren't tagged with a topic, so they're simply not part
+    of this signal). Topics with fewer than min_attempts recorded attempts
+    are left out entirely - not enough signal yet to call a topic "weak"
+    rather than just "not practiced much". "vocab" (single-word flashcards,
+    A0 only) is excluded too since near-100% pass rates there aren't a
+    meaningful difficulty signal the way a grammar pattern is.
+
+    Reads the durable results Google Sheet (same source teacher/my-history
+    views use), not the in-memory-only _pending_results, so this reflects a
+    student's REAL history even across server restarts - merge_with_pending
+    then layers in anything written moments ago that hasn't flushed to the
+    sheet yet. That sheet read is relatively slow, so results are cached for
+    5 minutes per student (same TTL used elsewhere for Sheets-backed lookups
+    like _lookup_student_level_row).
+
+    Returns [] on any error, when there's no email, or when there's simply
+    not enough data yet - the caller (load_level_track_sentences) treats []
+    as "no adjustment, use the curriculum's normal built-in order," so this
+    function failing closed never breaks a session.
+    """
+    email = (email or "").strip().lower()
+    if not email:
+        return []
+    key = f"weaktopics:{tid}:{email}"
+    if key in _cache and time.time() - _cache[key][0] < 300:
+        return _cache[key][1]
+    weak = []
+    try:
+        sheet_rows, _ = read_results_sheet_rows(tid)
+        rows = merge_with_pending(sheet_rows, tid, email)
+        stats = {}
+        for r in rows:
+            if (r.get("student_email") or "").strip().lower() != email:
+                continue
+            if r.get("phase") != "practice" or _truthy(r.get("skipped")):
+                continue
+            # Prefer the topic carried directly on the row (only present for
+            # rows still in memory / the Postgres JSONB queue - see the
+            # comment on finalize_sentence's row dict); once a row has been
+            # flushed to the Sheet that key is silently dropped (not a real
+            # column), so fall back to deriving it from the sentence text.
+            topic = r.get("topic") or SENTENCE_TOPIC_LOOKUP.get(r.get("sentence") or "")
+            if not topic or topic in ("vocab", "general"):
+                continue
+            attempts, passes = stats.get(topic, (0, 0))
+            stats[topic] = (attempts + 1, passes + (1 if _truthy(r.get("passed")) else 0))
+        scored = [(topic, passes / attempts) for topic, (attempts, passes) in stats.items() if attempts >= min_attempts]
+        scored.sort(key=lambda pair: pair[1])
+        weak = [topic for topic, _ in scored]
+    except Exception as e:
+        print("GET WEAK TOPICS FAILED", tid, email, e)
+        weak = []
+    _cache[key] = (time.time(), weak)
+    return weak
+
 def load_level_track_sentences(tid, email):
     """Return (sentences, level) for the default built-in curriculum, based
-    on the student's current saved CEFR level for this teacher.
+    on the student's current saved CEFR level for this teacher. Within that
+    level, sentences are reordered (not filtered - every sentence in the
+    level still appears exactly once, same as before) so that grammar topics
+    this student has struggled with historically (see get_weak_topics) come
+    up EARLIER in the sweep than topics they've already shown they're solid
+    on. A student with no history yet, or too little history to call
+    anything "weak", gets the curriculum's original built-in order,
+    unchanged - this only ever re-prioritizes, it never invents or drops
+    content.
     """
     level = get_student_level(tid, email)
-    sentences = LEVEL_SENTENCES.get(level, LEVEL_SENTENCES[CEFR_LEVELS[0]])
-    return sentences[:], level
+    sentences = LEVEL_SENTENCES.get(level, LEVEL_SENTENCES[CEFR_LEVELS[0]])[:]
+    weak_topics = get_weak_topics(tid, email)
+    if weak_topics:
+        weak_rank = {topic: i for i, topic in enumerate(weak_topics)}
+        # Stable sort: sentences whose topic isn't in weak_rank at all (never
+        # attempted, or already solid) keep their original relative order and
+        # all sort after every weak topic; ties within the same weak topic
+        # also keep their original relative order.
+        sentences.sort(key=lambda sent: weak_rank.get(sent.get("topic", ""), len(weak_rank)))
+    return sentences, level
 
 def fluency_from_metrics(spoken, score, metrics=None):
     """Lightweight fluency estimate from browser timing, not acoustic analysis.
@@ -2151,6 +2417,12 @@ def finalize_sentence(s, correct, spoken, score, passed=True, skipped=False, met
         "mastery_score": best_score,
         "cloze_passed": bool(s.get("cloze_passed", False)),
         "completion": current_obj.get("completion", ""),
+        # Not a results-sheet column (RESULT_KEY_ALIASES/_result_row_to_values
+        # silently drop any key that isn't a known header) - this only ever
+        # lives in the JSONB pending_results queue / in-memory _pending_results,
+        # where get_weak_topics() reads it back directly instead of having to
+        # re-derive it from the sentence text via SENTENCE_TOPIC_LOOKUP.
+        "topic": current_obj.get("topic", ""),
         **fluency,
     }
     s["results"].append(row)
@@ -2981,6 +3253,7 @@ def answer():
             "mastery_reps": 0, "mastery_status": "review_pass" if r_passed else "needs_review",
             "mastery_score": r_score, "cloze_passed": "review",
             "completion": review_sentence.get("completion", ""),
+            "topic": review_sentence.get("topic", ""),
             **fluency,
         }
         s["results"].append(row)
@@ -3247,6 +3520,7 @@ def exam_result():
         "attempts": 1, "max_attempts": s.get("max_attempts", ""), "mastery_reps": 0,
         "mastery_status": "final_exam_pass" if data.get("passed", False) else "final_exam_fail",
         "mastery_score": data.get("score", 0), "cloze_passed": "final_exam",
+        "topic": SENTENCE_TOPIC_LOOKUP.get(data.get("sentence", ""), ""),
         **fluency,
     }
     s["exam_results"].append(row)
@@ -3456,6 +3730,223 @@ def add_exercise():
     save_state()
     _persist_teacher_exercise(tid)
     return jsonify(ok=True, exercise=item, sentence_count=len(sentences), teacher=teacher_public(tid))
+
+_MAX_PHOTO_DATA_URL_LEN = 7_000_000  # ~5MB raw image, base64-inflated
+
+def _parse_image_data_url(data_url):
+    """Split a data:image/...;base64,... URL into (media_type, base64_data),
+    or raise ValueError with a Hebrew message safe to show a teacher."""
+    data_url = (data_url or "").strip()
+    if not data_url.startswith("data:"):
+        raise ValueError("פורמט תמונה לא תקין")
+    if len(data_url) > _MAX_PHOTO_DATA_URL_LEN:
+        raise ValueError("התמונה גדולה מדי - נסה תמונה קטנה/דחוסה יותר")
+    m = re.match(r"^data:([^;]+);base64,(.+)$", data_url, re.DOTALL)
+    if not m:
+        raise ValueError("פורמט תמונה לא תקין")
+    media_type, b64 = m.group(1), m.group(2)
+    if media_type not in ("image/png", "image/jpeg", "image/webp", "image/gif"):
+        raise ValueError("סוג קובץ לא נתמך - צלם/י PNG, JPEG או WEBP")
+    return media_type, b64
+
+_PHOTO_TOPIC_LIST = ", ".join(GRAMMAR_TOPIC_ORDER + ["general", "vocab"])
+
+@app.post("/api/teacher/photo-to-sentences")
+def photo_to_sentences():
+    """Feature 1 step 1/2: teacher uploads a photo of a text page, Claude
+    vision extracts up to 10 standalone spoken-practice sentences with
+    Hebrew translations, a topic tag, and a CEFR level guess. Returns a DRAFT
+    only - nothing is saved or delivered to any student yet. The teacher
+    reviews/edits the draft client-side and calls save-ai-exercise below to
+    actually activate it."""
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if not _teacher_auth_ok(tid, data):
+        return jsonify(ok=False), 401
+    if not ANTHROPIC_API_KEY:
+        return jsonify(ok=False, error="פיצ'ר ה-AI לא מוגדר בשרת כרגע."), 501
+    if not check_and_bump_ai_quota(tid):
+        return jsonify(ok=False, error=f"הגעת למכסת ה-AI היומית ({AI_DAILY_LIMIT_PER_TEACHER} הפקות). נסה/י שוב מחר."), 429
+    try:
+        media_type, b64 = _parse_image_data_url(data.get("image_data_url", ""))
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e)), 400
+
+    prompt = (
+        "This is a photo of a page of English text. Extract up to 10 clear, "
+        "grammatically complete, standalone English sentences from it that "
+        "would work well for a student to practice speaking aloud (each "
+        "sentence should make sense on its own, without needing the rest of "
+        "the page for context - skip fragments, headings, and anything that "
+        "doesn't read as a full sentence). For each sentence, provide a "
+        "natural Hebrew translation, a rough CEFR level (A1, A2, B1, B2, C1, "
+        "or C2), and a topic tag chosen from EXACTLY this list: "
+        f"{_PHOTO_TOPIC_LIST}. Respond with ONLY a JSON array, no other "
+        "text, no markdown fence, in this exact shape: "
+        '[{"en": "...", "he": "...", "level": "A2", "topic": "..."}, ...]. '
+        "If the photo doesn't contain readable English text, respond with []."
+    )
+    messages = [{
+        "role": "user",
+        "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+            {"type": "text", "text": prompt},
+        ],
+    }]
+    text, err = call_claude(messages, max_tokens=2000)
+    if err:
+        return jsonify(ok=False, error=err), 502
+    try:
+        items = extract_json_block(text)
+    except Exception as e:
+        print("PHOTO-TO-SENTENCES PARSE FAILED", e, text[:500] if text else None)
+        return jsonify(ok=False, error="לא הצלחתי לפרש את תשובת ה-AI. נסה/י שוב עם תמונה ברורה יותר."), 502
+    if not isinstance(items, list):
+        return jsonify(ok=False, error="תשובת AI לא תקינה"), 502
+
+    valid_topics = set(GRAMMAR_TOPIC_ORDER) | {"general", "vocab"}
+    cleaned = []
+    for item in items[:10]:
+        if not isinstance(item, dict):
+            continue
+        en = clean_cell(str(item.get("en", "")))
+        he = clean_cell(str(item.get("he", "")))
+        if not en or not he or not looks_english(en):
+            continue
+        level = str(item.get("level", "")).strip().upper()
+        if level not in ALL_STUDENT_LEVELS:
+            level = ""
+        topic = str(item.get("topic", "")).strip()
+        if topic not in valid_topics:
+            topic = "general"
+        cleaned.append({"en": en, "he": he, "level": level, "topic": topic})
+    if not cleaned:
+        return jsonify(ok=False, error="לא נמצאו משפטים ברורים בתמונה. נסה/י תמונה חדה יותר, עם תאורה טובה."), 200
+    return jsonify(ok=True, sentences=cleaned)
+
+@app.post("/api/teacher/save-ai-exercise")
+def save_ai_exercise_endpoint():
+    """Feature 1 step 2/2: persist the teacher-reviewed (possibly edited)
+    sentence list from photo-to-sentences above, and immediately select it
+    as this teacher's active exercise - same "select immediately" behavior
+    as add-exercise for a normal CSV exercise."""
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if not _teacher_auth_ok(tid, data):
+        return jsonify(ok=False), 401
+    name = clean_cell(data.get("name", "")) or "תרגיל מתמונה"
+    raw_sentences = data.get("sentences") or []
+    if not isinstance(raw_sentences, list):
+        return jsonify(ok=False, error="פורמט משפטים לא תקין"), 400
+    sentences = []
+    for item in raw_sentences[:15]:
+        if not isinstance(item, dict):
+            continue
+        en = clean_cell(str(item.get("en", "")))
+        he = clean_cell(str(item.get("he", "")))
+        if not en:
+            continue
+        sentences.append({"en": en, "he": he or en, "topic": item.get("topic") or "general"})
+    if not sentences:
+        return jsonify(ok=False, error="אין משפטים תקינים לשמירה"), 400
+
+    ai_id = save_ai_exercise(tid, name, sentences)
+    if ai_id is None:
+        return jsonify(ok=False, error="שמירה נכשלה - ודא שמסד הנתונים מוגדר (DATABASE_URL)."), 500
+
+    csv_url = f"ai://{ai_id}"
+    _teacher_state[tid]["exercise_name"] = name
+    _teacher_state[tid]["csv_url"] = csv_url
+    save_state()
+    _persist_teacher_exercise(tid)
+    return jsonify(ok=True, ai_exercise_id=ai_id, sentence_count=len(sentences), teacher=teacher_public(tid))
+
+@app.post("/api/teacher/generate-topic-booster")
+def generate_topic_booster():
+    """AI feature 2, stage B: generate NEW sentences targeting one grammar
+    topic at one CEFR level, once the built-in curriculum bank for that
+    topic/level has been exhausted for a given student (or a teacher just
+    wants extra targeted drill material). Reuses the exact same shared
+    infra as photo-to-sentences (call_claude, quota, JSON extraction) and
+    returns a draft in the exact same shape, so the teacher.html review/edit
+    UI built for feature 1 (aiPhotoDraft/renderAiPhotoDraft/saveAiPhotoExercise)
+    works for this unchanged - saving still goes through
+    /api/teacher/save-ai-exercise. Nothing here is ever injected into a
+    student's LIVE session automatically; a teacher always reviews and
+    explicitly saves+selects it first, same safety model as feature 1.
+    """
+    data = request.get_json(force=True)
+    tid, password = data.get("teacher_id", ""), data.get("password", "")
+    if not _teacher_auth_ok(tid, data):
+        return jsonify(ok=False), 401
+    if not ANTHROPIC_API_KEY:
+        return jsonify(ok=False, error="פיצ'ר ה-AI לא מוגדר בשרת כרגע."), 501
+    if not check_and_bump_ai_quota(tid):
+        return jsonify(ok=False, error=f"הגעת למכסת ה-AI היומית ({AI_DAILY_LIMIT_PER_TEACHER} הפקות). נסה/י שוב מחר."), 429
+
+    level = str(data.get("level", "")).strip().upper()
+    if level not in CEFR_LEVELS:
+        return jsonify(ok=False, error="רמת CEFR לא תקינה"), 400
+    topic = str(data.get("topic", "")).strip()
+    student_email = (data.get("student_email") or "").strip().lower()
+    if topic == "auto":
+        if not student_email:
+            return jsonify(ok=False, error="כדי לבחור נושא אוטומטית צריך גם את האימייל של התלמיד/ה"), 400
+        weak = get_weak_topics(tid, student_email)
+        if not weak:
+            return jsonify(ok=False, error="אין עדיין מספיק נתוני תרגול לתלמיד/ה הזו כדי לזהות נושא חלש."), 200
+        topic = weak[0]
+    if topic not in GRAMMAR_TOPIC_ORDER:
+        return jsonify(ok=False, error="נושא דקדוקי לא תקין"), 400
+
+    # Few-shot examples straight from the real curriculum, so style/difficulty
+    # matches what the student already sees elsewhere - prefer this exact
+    # level, fall back to neighboring levels if this level+topic combo is thin.
+    examples = [s for s in LEVEL_SENTENCES.get(level, []) if s.get("topic") == topic]
+    if len(examples) < 3:
+        for other_level in CEFR_LEVELS:
+            if other_level == level:
+                continue
+            examples += [s for s in LEVEL_SENTENCES.get(other_level, []) if s.get("topic") == topic]
+            if len(examples) >= 3:
+                break
+    example_lines = "\n".join(f'- "{s["en"]}"' for s in examples[:5])
+    topic_he = GRAMMAR_TOPIC_NAMES_HE.get(topic, topic)
+
+    prompt = (
+        f"Generate 8 NEW English sentences for spoken-practice drilling, all "
+        f"at CEFR level {level}, all specifically drilling this grammar "
+        f'pattern: "{topic}" ({topic_he}). Do not reuse any of these existing '
+        f"example sentences (for style/difficulty reference only):\n{example_lines}\n\n"
+        "Each sentence must be natural to say aloud, grammatically complete, "
+        "and clearly exercise the target grammar pattern. Provide a natural "
+        "Hebrew translation for each. Respond with ONLY a JSON array, no "
+        "other text, no markdown fence, in this exact shape: "
+        '[{"en": "...", "he": "..."}, ...]'
+    )
+    text, err = call_claude([{"role": "user", "content": prompt}], max_tokens=2000)
+    if err:
+        return jsonify(ok=False, error=err), 502
+    try:
+        items = extract_json_block(text)
+    except Exception as e:
+        print("TOPIC BOOSTER PARSE FAILED", e, text[:500] if text else None)
+        return jsonify(ok=False, error="לא הצלחתי לפרש את תשובת ה-AI. נסה/י שוב."), 502
+    if not isinstance(items, list):
+        return jsonify(ok=False, error="תשובת AI לא תקינה"), 502
+
+    cleaned = []
+    for item in items[:10]:
+        if not isinstance(item, dict):
+            continue
+        en = clean_cell(str(item.get("en", "")))
+        he = clean_cell(str(item.get("he", "")))
+        if not en or not he or not looks_english(en):
+            continue
+        cleaned.append({"en": en, "he": he, "level": level, "topic": topic})
+    if not cleaned:
+        return jsonify(ok=False, error="ה-AI לא החזיר משפטים תקינים. נסה/י שוב."), 200
+    return jsonify(ok=True, sentences=cleaned, topic=topic, topic_he=topic_he, level=level)
 
 @app.post("/api/set-exercise")
 def set_exercise():
