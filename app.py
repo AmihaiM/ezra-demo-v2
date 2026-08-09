@@ -2277,7 +2277,14 @@ def intro_video():
     data = open(path, "rb").read()
     resp = Response(data, content_type="video/mp4")
     resp.headers["Accept-Ranges"] = "bytes"
-    resp.headers["Cache-Control"] = "public, max-age=604800"
+    # Short cache lifetime, not the week-long one this used to have: this file
+    # gets swapped during active branding iteration, and a long max-age means
+    # every browser that already loaded the app keeps serving its OLD cached
+    # copy of intro.mp4 for days after a new one is deployed - exactly what
+    # happened here (server had the new video; browsers kept playing the old
+    # one from cache). 5 minutes is enough to avoid re-downloading it on every
+    # single page reload without risking a stale video for very long.
+    resp.headers["Cache-Control"] = "public, max-age=300"
     return resp
 
 @app.get("/api/teachers")
