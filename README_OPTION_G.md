@@ -15,7 +15,7 @@ The service-account email must have **Editor** permission on:
 ## Optional environment variables
 - `CATALOG_SHEET_ID`
 - `RESULTS_SHEET_ID`
-- `EZRA_APP_BASE_URL` default: `https://app.ezra.clap.co.il`
+- `EZRA_APP_BASE_URL` default: `https://speakmaster.org`
 
 ## Catalog row format
 The backend appends:

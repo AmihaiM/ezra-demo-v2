@@ -79,7 +79,7 @@ RESULTS_SHEET_IDS = {
     "ben": RESULTS_SHEET_ID,
     "sara": os.getenv("SARA_RESULTS_SHEET_ID", "1JGWw_Jf8m3WF2-HS6sEohRmV6v2mmp29b6iSE3rgsOQ"),
 }
-EZRA_APP_BASE_URL = os.getenv("EZRA_APP_BASE_URL", "https://app.ezra.clap.co.il")
+EZRA_APP_BASE_URL = os.getenv("EZRA_APP_BASE_URL", "https://speakmaster.org")
 # Super-admin dashboard (/admin) - one shared password (not per-teacher), lets
 # whoever runs the pilot see every teacher/student at a glance and add new
 # teachers without a code change + redeploy. Admin-added teachers are stored
@@ -1458,7 +1458,7 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 def build_exercise_app_url(csv_url):
-    base = (EZRA_APP_BASE_URL or "https://app.ezra.clap.co.il").rstrip("/")
+    base = (EZRA_APP_BASE_URL or "https://speakmaster.org").rstrip("/")
     return f"{base}/?lang=en&link={quote(csv_url, safe=':/?&=%') }"
 
 def extract_sheet_id(value):

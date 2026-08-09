@@ -1,18 +1,18 @@
 <!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SpeakMaster — תרגול דיבור</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#4318D1">
+<meta name="theme-color" content="#c4952e">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
-*{box-sizing:border-box}html,body{overflow-x:hidden;max-width:100vw}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f5f4ff;color:#1a1033}button,input{font:inherit}button{border:0;border-radius:12px;padding:9px 14px;font-weight:700;cursor:pointer}
+*{box-sizing:border-box}html,body{overflow-x:hidden;max-width:100vw}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#0f151d;color:#eef2f6}button,input{font:inherit}button{border:0;border-radius:12px;padding:9px 14px;font-weight:700;cursor:pointer}
 /* Keyboard-focus visibility: nothing suppresses the browser default outline,
    but on these colored/rounded buttons the default can be hard to see -
    :focus-visible only shows for keyboard nav (not every mouse click), so
    this adds a clear themed ring without adding visual noise for touch/mouse use. */
 :focus-visible{outline:3px solid #FFC107;outline-offset:2px}
-.teacher:focus-visible{outline-color:#fff}input{width:100%;padding:12px;border:2px solid #ddd6fe;border-radius:12px;margin:8px 0}.screen{min-height:100vh;padding:16px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1033,#4318D1);color:#fff}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#fff;color:#1a1033;border-radius:18px;padding:14px;box-shadow:0 8px 28px #0002}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#4318D1);color:white}.ghost{background:#ede7ff;color:var(--tc,#4318D1)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#c62828;background:#ffebee;padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#4318D1);color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;row-gap:4px}.top b{white-space:nowrap}.student{background:#fff2;border-radius:20px;padding:6px 12px;cursor:pointer}.student:hover{background:#fff4}.student:focus-visible{outline:2px solid #fff;outline-offset:2px}.wrap{max-width:1050px;margin:0 auto;padding:10px}.progress{height:10px;background:#e0d9ff;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#4318D1);width:0;transition:.4s}.sentence{font-size:27px;font-weight:800;margin:8px 0;line-height:1.3}.en{direction:ltr;text-align:left;font-size:19px;color:#4318D1;opacity:0;transition:.25s}
+.teacher:focus-visible{outline-color:#fff}input{width:100%;padding:12px;border:2px solid #2c3947;border-radius:12px;margin:8px 0;background:#121a22;color:#eef2f6}.screen{min-height:100vh;padding:16px}#select{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a0e13,#1c2733);color:#eef2f6}.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}.card{background:#1a232e;color:#eef2f6;border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.45)}.teacher{width:190px;text-align:center;cursor:pointer;background:#ffffff22;color:#fff;border:2px solid #ffffff44}.teacher:hover{transform:translateY(-4px)}.avatar{width:90px;height:90px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#fff2}.overlay{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:10}.overlay.show{display:flex}.primary{background:var(--tc,#c4952e);color:#131a22}.ghost{background:rgba(196,149,46,.14);color:var(--tc,#c4952e);border:1px solid rgba(196,149,46,.3)}.danger{background:#ef5350;color:#fff}.err{display:none;color:#f87171;background:rgba(239,68,68,.14);padding:8px;border-radius:10px;margin:8px 0}.link{color:#fff;margin-top:20px}#app{display:none}.top{background:var(--tc,#c4952e);color:#131a22;padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;row-gap:4px}.top b{white-space:nowrap}.student{background:#fff2;border-radius:20px;padding:6px 12px;cursor:pointer}.student:hover{background:#fff4}.student:focus-visible{outline:2px solid #131a22;outline-offset:2px}.wrap{max-width:1050px;margin:0 auto;padding:10px}.progress{height:10px;background:#232e3a;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--tc,#c4952e);width:0;transition:.4s}.sentence{font-size:27px;font-weight:800;margin:8px 0;line-height:1.3}.en{direction:ltr;text-align:left;font-size:19px;color:#c4952e;opacity:0;transition:.25s}
 /* Wider workspace on desktop (was capped at 850px, leaving large empty side
    margins on anything wider than a small laptop) plus larger sentence/
    translation text to match - both scale down automatically on narrower
@@ -22,24 +22,24 @@
 /* De-emphasized secondary controls (listen again / show-hide / skip) so the
    mic stays the one visually dominant action, per UX review: "one dominant
    action at a time" instead of several equal-weight buttons competing with it. */
-.row .ghost{background:transparent;border:1.5px solid #ddd6fe;color:#6b5b95;font-size:13px;padding:7px 11px;font-weight:600;box-shadow:none}
-.row .danger{background:transparent;border:1.5px solid #f7b8b4;color:#c0392b;font-size:13px;padding:7px 11px;font-weight:600;box-shadow:none}
-.mic{width:64px;height:64px;border-radius:50%;font-size:26px;display:block;margin:12px auto;box-shadow:0 5px 16px #0003}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:12px;padding:9px 11px;margin:7px 0;font-size:14px}.result{background:#f8fafc;border:2px solid #e0d9ff}.pass{background:#e8f5e9;border-color:#4CAF50}.fail{background:#ffebee;border-color:#ef5350}.cloze{background:#e0f2fe;border:2px solid #0284c7}.mastery{background:#fff3e0;border:2px solid #FF9800}.exam{background:#fff7ed;border:2px solid #fed7aa}.words{direction:ltr;text-align:left;line-height:1.7;font-size:16px;font-weight:700}.w{display:inline}.w.correct{color:#1d4ed8}.w.wrong{color:#dc2626}.ok{color:#16a34a}.bad{color:#dc2626}.dots{display:flex;gap:5px}.dot{width:15px;height:15px;border-radius:50%;border:2px solid #FF9800;background:#ffe0b2}.dot.done{background:#FF9800}.small{font-size:13px;color:#666}
+.row .ghost{background:transparent;border:1.5px solid #2c3947;color:#9aa7b5;font-size:13px;padding:7px 11px;font-weight:600;box-shadow:none}
+.row .danger{background:transparent;border:1.5px solid rgba(239,68,68,.4);color:#f87171;font-size:13px;padding:7px 11px;font-weight:600;box-shadow:none}
+.mic{width:64px;height:64px;border-radius:50%;font-size:26px;display:block;margin:12px auto;box-shadow:0 5px 16px #0003}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:12px;padding:9px 11px;margin:7px 0;font-size:14px}.result{background:#161e27;border:2px solid #2c3947}.pass{background:rgba(34,197,94,.14);border-color:#4ade80}.fail{background:rgba(239,68,68,.14);border-color:#f87171}.cloze{background:rgba(2,132,199,.14);border:2px solid #38bdf8}.mastery{background:rgba(245,158,11,.14);border:2px solid #eab54c}.exam{background:rgba(251,146,60,.12);border:2px solid #fb923c}.words{direction:ltr;text-align:left;line-height:1.7;font-size:16px;font-weight:700}.w{display:inline}.w.correct{color:#60a5fa}.w.wrong{color:#f87171}.ok{color:#4ade80}.bad{color:#f87171}.dots{display:flex;gap:5px}.dot{width:15px;height:15px;border-radius:50%;border:2px solid #eab54c;background:rgba(245,158,11,.25)}.dot.done{background:#eab54c}.small{font-size:13px;color:#9aa7b5}
 
-.summary-hero{background:linear-gradient(135deg,#4318D1,#be185d);color:#fff;border-radius:24px;padding:26px;margin-bottom:20px;text-align:center;box-shadow:0 18px 44px #4318d133}.summary-hero h2{font-size:34px;margin:0 0 8px}.score-circle{width:140px;height:140px;border-radius:50%;background:conic-gradient(#22c55e var(--score-deg),rgba(255,255,255,.25) 0);display:grid;place-items:center;margin:18px auto;border:8px solid rgba(255,255,255,.25)}.score-circle b{font-size:34px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}.summary-card{background:#fff;border:1px solid #ede7ff;border-radius:18px;padding:16px;box-shadow:0 8px 24px #4318d112;text-align:center}.summary-card .num{font-size:28px;font-weight:900;color:var(--tc,#4318D1)}.summary-list{display:grid;gap:12px;margin-top:16px}.summary-row{background:#fff;border:1px solid #ede7ff;border-radius:16px;padding:14px;box-shadow:0 6px 18px #4318d10d;direction:ltr;text-align:left}.summary-row.pass{border-inline-start:7px solid #22c55e}.summary-row.fail{border-inline-start:7px solid #ef4444}.summary-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}.hidden-final{display:none!important}
+.summary-hero{background:linear-gradient(135deg,#4a3a1e,#8c6b2c);color:#f5ead0;border-radius:24px;padding:26px;margin-bottom:20px;text-align:center;box-shadow:0 18px 44px rgba(0,0,0,.5)}.summary-hero h2{font-size:34px;margin:0 0 8px}.score-circle{width:140px;height:140px;border-radius:50%;background:conic-gradient(#4ade80 var(--score-deg),rgba(255,255,255,.25) 0);display:grid;place-items:center;margin:18px auto;border:8px solid rgba(255,255,255,.25)}.score-circle b{font-size:34px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}.summary-card{background:#1a232e;border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);text-align:center}.summary-card .num{font-size:28px;font-weight:900;color:var(--tc,#c4952e)}.summary-list{display:grid;gap:12px;margin-top:16px}.summary-row{background:#1a232e;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:14px;box-shadow:0 6px 18px rgba(0,0,0,.3);direction:ltr;text-align:left}.summary-row.pass{border-inline-start:7px solid #4ade80}.summary-row.fail{border-inline-start:7px solid #f87171}.summary-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}.hidden-final{display:none!important}
 
 /* Gamification layer: XP/streak/mute pills, star ratings, badge toasts, confetti. */
 .stats-row{display:flex;gap:8px;align-items:center}
 .stat-pill{background:#fff2;border-radius:20px;padding:6px 12px;font-weight:800;font-size:14px;white-space:nowrap;transition:transform .25s}
 .stat-pill.pop{animation:statpop .35s ease}
 @keyframes statpop{0%{transform:scale(1)}45%{transform:scale(1.22)}100%{transform:scale(1)}}
-.mute-btn{background:#fff2;border-radius:50%;width:36px;height:36px;padding:0;font-size:15px;color:#fff;line-height:1}
-.xp-float{position:fixed;pointer-events:none;font-weight:900;color:#22c55e;font-size:19px;z-index:80;animation:xpfloat 1.1s ease forwards}
+.mute-btn{background:#fff2;border-radius:50%;width:36px;height:36px;padding:0;font-size:15px;color:#131a22;line-height:1}
+.xp-float{position:fixed;pointer-events:none;font-weight:900;color:#4ade80;font-size:19px;z-index:80;animation:xpfloat 1.1s ease forwards}
 @keyframes xpfloat{0%{opacity:0;transform:translateY(0) scale(.8)}18%{opacity:1;transform:translateY(-6px) scale(1)}100%{opacity:0;transform:translateY(-54px) scale(1)}}
 .stars-row{font-size:30px;letter-spacing:6px;text-align:center;margin:10px 0}
 .star{display:inline-block;filter:grayscale(1);opacity:.3;transform:scale(.75);transition:transform .3s,opacity .3s,filter .3s}
 .star.lit{filter:none;opacity:1;transform:scale(1)}
-.badge-toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-140%);background:#1a1033;color:#fff;border-radius:16px;padding:14px 22px;display:flex;align-items:center;gap:12px;box-shadow:0 14px 32px #0004;z-index:90;transition:transform .45s cubic-bezier(.34,1.56,.64,1);max-width:min(420px,90vw)}
+.badge-toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-140%);background:#242f3d;color:#eef2f6;border:1px solid rgba(196,149,46,.4);border-radius:16px;padding:14px 22px;display:flex;align-items:center;gap:12px;box-shadow:0 14px 32px rgba(0,0,0,.55);z-index:90;transition:transform .45s cubic-bezier(.34,1.56,.64,1);max-width:min(420px,90vw)}
 .badge-toast.show{transform:translateX(-50%) translateY(0)}
 .badge-toast .bicon{font-size:30px}
 .confetti-piece{position:fixed;top:-20px;width:9px;height:13px;z-index:85;pointer-events:none;animation:confetti-fall linear forwards}
@@ -49,12 +49,12 @@ button:active{transform:scale(.95)}
 .mic{transition:transform .15s,background .2s}
 #select .card.teacher{transition:transform .2s,box-shadow .2s}
 .progress{position:relative;overflow:hidden}
-.bar{background:linear-gradient(90deg,var(--tc,#4318D1),#be185d)}
-.gauge-card{display:none;background:#fff;border:2px solid #ede7ff;border-radius:14px;padding:7px 10px 4px;margin:7px 0;text-align:center;cursor:pointer}
-.gauge-title{font-weight:800;color:#4318D1;font-size:12px;margin-bottom:1px}
+.bar{background:linear-gradient(90deg,var(--tc,#c4952e),#8a6018)}
+.gauge-card{display:none;background:#1a232e;border:2px solid #2c3947;border-radius:14px;padding:7px 10px 4px;margin:7px 0;text-align:center;cursor:pointer}
+.gauge-title{font-weight:800;color:#c4952e;font-size:12px;margin-bottom:1px}
 .gauge-svg{width:130px;max-width:50%;height:auto}
 .gauge-label{font-weight:800;font-size:13px;margin-top:-4px}
-.gauge-breakdown{font-size:11px;color:#666;margin:2px 0 4px;line-height:1.4}
+.gauge-breakdown{font-size:11px;color:#9aa7b5;margin:2px 0 4px;line-height:1.4}
 .gauge-needle{transform-origin:100px 100px;transition:transform .6s cubic-bezier(.34,1.56,.64,1)}
 /* Collapsed by default (see toggleGaugeExpanded): the detailed SVG gauge and
    pace/hesitation breakdown are a "deep stat" per UX review feedback - they
@@ -63,7 +63,7 @@ button:active{transform:scale(.95)}
    summary either way. */
 .gauge-card:not(.expanded){padding:5px 10px}
 .gauge-card:not(.expanded) .gauge-svg,.gauge-card:not(.expanded) .gauge-breakdown{display:none}
-.gauge-toggle-hint{font-size:11px;color:#9d8fe0;font-weight:700;margin-top:1px}
+.gauge-toggle-hint{font-size:11px;color:#a8863c;font-weight:700;margin-top:1px}
 /* Practice screen layout: single column (mobile) by default so everything -
    sentence, mic, result, gauge - stacks in reading order and fits a phone
    viewport without excess height. On wide screens the same markup switches
@@ -138,21 +138,21 @@ button:active{transform:scale(.95)}
    non-negotiable request). Sits in its own fixed strip below the
    next/cap-choice bar so the two never overlap; the attribution footer
    yields this space entirely while the practice screen is active. */
-#stationBar{display:none;flex-direction:column;position:fixed;left:0;right:0;bottom:0;z-index:56;background:#fff;border-top:1px solid #e5e0f5;box-shadow:0 -4px 16px #0001;padding:6px 8px;gap:4px}
+#stationBar{display:none;flex-direction:column;position:fixed;left:0;right:0;bottom:0;z-index:56;background:#161e27;border-top:1px solid #2c3947;box-shadow:0 -4px 16px rgba(0,0,0,.4);padding:6px 8px;gap:4px}
 body.in-app #stationBar{display:flex}
 body.in-app .app-footer{display:none!important}
 .station-row{display:flex;gap:4px;justify-content:center}
 .station-step{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;background:transparent;border:0;padding:3px 6px;border-radius:10px;min-width:50px;flex:0 1 90px}
-.station-step .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;background:#ede7ff;color:#6b5b95;border:2px solid #ddd6fe;font-weight:800}
-.station-step.done .dot{background:#dcfce7;border-color:#86efac;color:#166534}
-.station-step.current .dot{background:#4318D1;border-color:#4318D1;color:#fff}
-.station-step .lbl{font-size:9px;color:#8a8a9a;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:74px}
-.station-step.current .lbl{color:#4318D1}
+.station-step .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;background:#232e3a;color:#9aa7b5;border:2px solid #2c3947;font-weight:800}
+.station-step.done .dot{background:rgba(34,197,94,.18);border-color:#4ade80;color:#4ade80}
+.station-step.current .dot{background:var(--tc,#c4952e);border-color:var(--tc,#c4952e);color:#131a22}
+.station-step .lbl{font-size:9px;color:#9aa3ad;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:74px}
+.station-step.current .lbl{color:var(--tc,#c4952e)}
 /* Recurring student request: a way to browse/listen to every sentence in the
    exercise at any time, from any station - pure passive listening exposure,
    explicitly decoupled from scoring/progress (see openListenAll). Sits right
    under the 4 station circles in the same fixed strip. */
-.listen-all-btn{width:100%;background:#ede7ff;color:#4318D1;border:1.5px solid #ddd6fe;border-radius:10px;padding:6px;font-weight:700;font-size:12.5px;cursor:pointer}
+.listen-all-btn{width:100%;background:rgba(196,149,46,.14);color:#c4952e;border:1.5px solid rgba(196,149,46,.3);border-radius:10px;padding:6px;font-weight:700;font-size:12.5px;cursor:pointer}
 /* Desktop: some students found the button pinned to the very bottom of the
    viewport awkward, far from the mic it follows - and desktop never had the
    "have to scroll to reach it" problem the mobile fixed bar solves (the whole
@@ -162,7 +162,7 @@ body.in-app .app-footer{display:none!important}
    instead - kept because it looks good, repurposed to carry attribution. */
 .app-footer{
   display:none;position:fixed;left:0;right:0;bottom:0;z-index:50;
-  background:#1a1033;color:#ffffffb3;text-align:center;
+  background:#0a0e13;color:rgba(238,242,246,.7);text-align:center;
   font-size:11.5px;padding:6px 10px;
 }
 /* Mobile: the fixed bottom strip is shared between the next/continue button
@@ -203,11 +203,11 @@ body.in-app .app-footer{display:none!important}
    These rules loosen the vertical rhythm around the sentence card and swap in
    a lighter, airier cyan/blue backdrop, layered on top of (not replacing) the
    mobile bottom-bar spacing and two-column desktop layout rules above. */
-body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),radial-gradient(circle at 88% 90%,#c7d2fe77 0%,transparent 46%),linear-gradient(165deg,#e3f7fb 0%,#f2f7ff 55%,#eef2ff 100%)}
+body{background:radial-gradient(circle at 12% 8%,rgba(45,58,74,.55) 0%,transparent 42%),radial-gradient(circle at 88% 90%,rgba(35,44,58,.5) 0%,transparent 46%),linear-gradient(165deg,#0c1119 0%,#0f151d 55%,#11171f 100%)}
 .wrap{padding-top:18px;padding-left:14px;padding-right:14px}
 .card{padding:20px;border-radius:20px}
-#phase{display:inline-block;font-weight:800;font-size:13px;color:var(--tc,#4318D1);background:#eaf6ff;padding:7px 15px;border-radius:999px;margin-bottom:12px}
-#prog{font-size:13px;color:#666;font-weight:600;margin:12px 0 8px}
+#phase{display:inline-block;font-weight:800;font-size:13px;color:var(--tc,#c4952e);background:rgba(196,149,46,.14);padding:7px 15px;border-radius:999px;margin-bottom:12px}
+#prog{font-size:13px;color:#9aa7b5;font-weight:600;margin:12px 0 8px}
 .sentence{margin:6px 0 12px;line-height:1.4}
 .en{margin:2px 0 14px}
 .row{gap:10px;margin-bottom:6px}
@@ -218,7 +218,7 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
    that pair makes it read as the clear visual focus instead of blending into
    the rest of the white card, and both lines are bold so they're legible at
    a glance. */
-.sentence-box{background:linear-gradient(160deg,#ffffff,#eef8ff);border:1px solid #dbeeff;border-radius:16px;padding:14px 16px;margin-bottom:12px;box-shadow:0 3px 12px #0284c710}
+.sentence-box{background:linear-gradient(160deg,#1c2733,#161e27);border:1px solid #2c3947;border-radius:16px;padding:14px 16px;margin-bottom:12px;box-shadow:0 3px 12px rgba(0,0,0,.3)}
 .sentence-box .sentence{margin-top:0}
 .emoji-display{font-size:54px;line-height:1.1;text-align:center;margin:2px 0 8px}
 .en{font-weight:800}
@@ -239,7 +239,7 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
    render as plain gray text easy to skim past. Turned into a bold, colored,
    pill-shaped callout right under the mic so it reads as a clear next-step
    prompt instead of fine print. */
-.hint-cta{text-align:center;color:var(--tc,#4318D1);font-weight:800;font-size:15px;line-height:1.4;background:#f0ecff;border:1.5px solid #ddd6fe;border-radius:14px;padding:9px 16px;margin:10px auto 6px;max-width:360px}
+.hint-cta{text-align:center;color:var(--tc,#c4952e);font-weight:800;font-size:15px;line-height:1.4;background:rgba(196,149,46,.12);border:1.5px solid rgba(196,149,46,.3);border-radius:14px;padding:9px 16px;margin:10px auto 6px;max-width:360px}
 @media (max-width:759px){.hint-cta{font-size:13.5px;padding:7px 12px;margin:8px auto 4px}}
 
 /* ---------------------------------------------------------------------
@@ -258,10 +258,10 @@ body{background:radial-gradient(circle at 12% 8%,#b2ebf299 0%,transparent 42%),r
 .pv-toggle{background:#9ca3af;color:#fff}
 .pv-toggle .dot{background:#9ca3af;border-color:#9ca3af;color:#fff}
 .pv-toggle .lbl{color:#fff!important;font-weight:900}
-.pv-toggle[aria-pressed="true"]{background:#16a34a;box-shadow:0 0 0 2px #16a34a55}
-.pv-toggle[aria-pressed="true"] .dot{background:#16a34a;border-color:#16a34a}
+.pv-toggle[aria-pressed="true"]{background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.4)}
+.pv-toggle[aria-pressed="true"] .dot{background:#22c55e;border-color:#22c55e}
 #pvHeader,#pvTimer,#pvChat,#pvActions{display:none}
-body.private-mode #pvHeader{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:var(--tc,#4318D1);font-size:13px;margin-bottom:10px;direction:ltr;text-align:left}
+body.private-mode #pvHeader{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:var(--tc,#c4952e);font-size:13px;margin-bottom:10px;direction:ltr;text-align:left}
 body.private-mode #pvChat{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;max-height:56vh;overflow-y:auto;padding:2px}
 /* #pvActions' visibility is gated on BOTH the body class AND this .show
    class (toggled via classList, never inline style) - if only inline style
@@ -296,26 +296,26 @@ body.private-mode #previewNav,
 body.private-mode #nextBtn,
 body.private-mode #capChoice,
 body.private-mode #practiceAgainBtn{display:none!important}
-.pv-counter{background:#ede7ff;color:#6b5b95;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
+.pv-counter{background:rgba(196,149,46,.16);color:#c4952e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
 .pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
-.pv-bubble.pv-prompt{background:var(--tc,#4318D1);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
-.pv-bubble.pv-listen-cta{background:#ede7ff;color:var(--tc,#4318D1);align-self:flex-start;font-weight:800;cursor:pointer;border:1.5px solid #ddd6fe}
-.pv-bubble.pv-transcript{background:#eef0f4;color:#333;align-self:flex-start;border-bottom-left-radius:4px;display:flex;gap:8px;align-items:flex-start}
+.pv-bubble.pv-prompt{background:var(--tc,#c4952e);color:#131a22;align-self:flex-end;border-bottom-right-radius:4px}
+.pv-bubble.pv-listen-cta{background:rgba(196,149,46,.14);color:var(--tc,#c4952e);align-self:flex-start;font-weight:800;cursor:pointer;border:1.5px solid rgba(196,149,46,.3)}
+.pv-bubble.pv-transcript{background:#232e3a;color:#eef2f6;align-self:flex-start;border-bottom-left-radius:4px;display:flex;gap:8px;align-items:flex-start}
 .pv-bubble.pv-transcript .pv-avatar{font-size:17px;flex:0 0 auto}
 .pv-bubble.pv-feedback{align-self:flex-start;font-weight:800;display:flex;align-items:center;gap:8px}
-.pv-bubble.pv-feedback.ok{background:#e8f5e9;color:#1b5e20}
-.pv-bubble.pv-feedback.bad{background:#ffebee;color:#b71c1c}
-.pv-word-wrong{color:#dc2626;font-weight:800}
-#pvActions button{flex:1;background:#fff;border:2px solid var(--tc,#4318D1);color:var(--tc,#4318D1)}
-body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-size:20px;background:var(--tc,#4318D1);color:#fff;border-radius:12px;padding:6px 14px;margin:0 auto 12px;width:fit-content}
+.pv-bubble.pv-feedback.ok{background:rgba(34,197,94,.16);color:#4ade80}
+.pv-bubble.pv-feedback.bad{background:rgba(239,68,68,.16);color:#f87171}
+.pv-word-wrong{color:#f87171;font-weight:800}
+#pvActions button{flex:1;background:#1a232e;border:2px solid var(--tc,#c4952e);color:var(--tc,#c4952e)}
+body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-size:20px;background:var(--tc,#c4952e);color:#131a22;border-radius:12px;padding:6px 14px;margin:0 auto 12px;width:fit-content}
 #pvTimer:empty{display:none!important}
-.pv-qa-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border:1px solid #ede7ff;border-radius:12px;padding:10px 12px;direction:ltr;text-align:left}
-.pv-qa-row.ok{border-inline-end:5px solid #22c55e}
-.pv-qa-row.bad{border-inline-end:5px solid #ef4444}
+.pv-qa-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#1a232e;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;direction:ltr;text-align:left}
+.pv-qa-row.ok{border-inline-end:5px solid #4ade80}
+.pv-qa-row.bad{border-inline-end:5px solid #f87171}
 .pv-bubble.pv-listen-row{display:flex;align-items:center;gap:10px;cursor:default;align-self:stretch;max-width:100%}
 .pv-speed-btn{background:#fff3;border:1px solid #fff5;color:#fff;border-radius:8px;padding:4px 8px;font-size:13px;flex:0 0 auto}
-.splash-overlay{position:fixed;inset:0;background:#33119f;z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity .45s ease}
+.splash-overlay{position:fixed;inset:0;background:#151b23;z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity .45s ease}
 .splash-overlay.hide{opacity:0;pointer-events:none}
 .splash-overlay video{width:100%;height:100%;object-fit:contain}
 </style></head><body>
@@ -323,7 +323,7 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 <div id="connBanner" role="alert"><span id="connBannerMsg">אין חיבור לשרת כרגע.</span><button onclick="connRetry()">🔄 נסה שוב</button></div>
 <div id="iosStandaloneBanner" role="alert"><span>🎤 באייפון, הקלטה לא עובדת כשהאפליקציה מותקנת על מסך הבית. פתחו את הקישור ב-Safari (לא כאפליקציה מותקנת) כדי שההקלטה תעבוד.</span><button onclick="document.getElementById('iosStandaloneBanner').style.display='none'">הבנתי</button></div>
 <section id="select" class="screen"><div style="font-size:56px">🎙️</div><h1>SpeakMaster — תרגול דיבור</h1><p>בחר את המורה שלך</p><div class="cards" id="teacherCards"></div></section>
-<div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#ede7ff;display:none"><label style="flex:1;font-size:12.5px;color:#666">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><div id="studentGoogleSignInWrap" style="display:none;margin-top:10px;text-align:center"><p class="small" style="margin:0 0 6px">או</p><div id="gSignInBtnStudent" style="display:flex;justify-content:center"></div></div><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
+<div id="login" class="overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><div class="card" style="width:min(390px,92vw)"><h2 id="loginTitle">כניסה</h2><p id="exerciseHint" class="small"></p><div id="loginErr" class="err">שם/סיסמה לא תקינים</div><input id="name" placeholder="שם תלמיד" autocomplete="name"><input id="email" placeholder="אימייל (למשל: name@example.com)" type="email" autocomplete="email" dir="ltr"><input id="pass" placeholder="סיסמת כיתה" type="password" autocomplete="current-password"><div class="row" style="align-items:center;gap:10px;margin:8px 0"><img id="loginPhotoPreview" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#2c3947;display:none"><label style="flex:1;font-size:12.5px;color:#9aa7b5">📷 תמונה אישית (אופציונלי)<input type="file" id="loginPhotoFile" accept="image/*" style="width:100%;margin-top:2px" onchange="handleStudentPhotoFile(this)"></label></div><button class="primary" style="width:100%" onclick="submitLogin()">התחל תרגול</button><div id="studentGoogleSignInWrap" style="display:none;margin-top:10px;text-align:center"><p class="small" style="margin:0 0 6px">או</p><div id="gSignInBtnStudent" style="display:flex;justify-content:center"></div></div><button class="ghost" style="width:100%;margin-top:8px" onclick="viewMyHistory()">📊 התוצאות שלי</button><button class="ghost" onclick="closeLogin()" style="width:100%;margin-top:8px">ביטול</button></div></div>
 <div id="history" class="overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle"><div class="card" style="width:min(560px,94vw);max-height:86vh;overflow:auto"><h2 id="historyTitle">📊 התוצאות שלי</h2><div id="historyErr" class="err"></div><div id="historyBody"></div><button class="ghost" style="width:100%;margin-top:14px" onclick="document.getElementById('history').classList.remove('show')">סגור</button></div></div>
 <div id="resumePrompt" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resumePromptTitle"><div class="card" style="width:min(380px,92vw)"><h2 id="resumePromptTitle">🔖 המשך תרגול?</h2><p id="resumePromptText" class="small"></p><button class="primary" style="width:100%" onclick="resumeChoice('continue')">➡️ המשך מאיפה שהפסקתי</button><button class="ghost" style="width:100%;margin-top:8px" onclick="resumeChoice('restart')">🔄 התחל מחדש</button></div></div>
 <section id="app"><div class="top"><b>SpeakMaster</b><img id="teacherAvatarImg" alt="" style="display:none;width:26px;height:26px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:2px"><span id="teacherName"></span><div class="stats-row" style="margin-right:auto"><span id="xpPill" class="stat-pill" title="נקודות ניסיון">⚡ <span id="xpVal">0</span></span><span id="streakPill" class="stat-pill" title="רצף ימי תרגול">🔥 <span id="streakVal">0</span></span><button id="muteBtn" class="mute-btn" onclick="toggleMute()" title="השתק/הפעל צלילים" aria-label="השתק צלילים">🔊</button><button id="logoutBtn" class="mute-btn" onclick="if(confirm('להתנתק ולהחליף תלמיד/ה? (יידרש להזין שם/אימייל/סיסמה מחדש בפעם הבאה)'))logoutStudent()" title="התנתק / החלף תלמיד (למחשב משותף)" aria-label="התנתק">🚪</button></div><span id="studentTag" class="student" role="button" tabindex="0" aria-label="הצג את התוצאות שלי" title="הצג את התוצאות שלי" onclick="showMyResultsFromApp()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyResultsFromApp()}"><img id="studentAvatarImg" alt="" style="display:none;width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-inline-end:4px"><span id="studentTagText"></span></span></div><div class="wrap"><div class="progress"><div id="bar" class="bar"></div></div><p id="prog"></p><div id="mismatchWarn" class="err"></div><div class="card"><div class="practice-grid"><div class="col-a"><div class="sentence-box" id="sentenceBox"><div id="phase"></div><div id="emojiDisplay" class="emoji-display" style="display:none"></div><div id="he" class="sentence"></div><div id="en" class="en"></div></div><div id="cloze" class="banner cloze"></div>
@@ -331,18 +331,18 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 <div id="pvTimer" class="pv-timer"></div>
 <div id="pvChat" class="pv-chat"></div>
 <div id="pvActions" class="pv-actions"></div>
-<div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#4318D1);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #ddd6fe;font-size:12px;background:#fff"></select></span></div></details><div id="recTimer" style="display:none;text-align:center;font-weight:800;color:var(--tc,#4318D1);font-size:14px;margin-top:4px" aria-live="off">0:00</div><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" class="hint-cta" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><button id="practiceAgainBtn" class="ghost" style="display:none;width:100%;margin-top:8px" onclick="practiceAgainNow()">🔁 תרגל שוב את המשפט הזה (לא משפיע על הציון)</button><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
+<div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#c4952e);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #2c3947;font-size:12px;background:#121a22;color:#eef2f6"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #2c3947;font-size:12px;background:#121a22;color:#eef2f6"></select></span></div></details><div id="recTimer" style="display:none;text-align:center;font-weight:800;color:var(--tc,#c4952e);font-size:14px;margin-top:4px" aria-live="off">0:00</div><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" class="hint-cta" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><button id="practiceAgainBtn" class="ghost" style="display:none;width:100%;margin-top:8px" onclick="practiceAgainNow()">🔁 תרגל שוב את המשפט הזה (לא משפיע על הציון)</button><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
 <div id="result" class="result" aria-live="polite"></div>
 <div id="masteryGauge" class="gauge-card" role="button" tabindex="0" aria-label="מד שטף - הרחב לפירוט" onclick="toggleGaugeExpanded()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGaugeExpanded()}">
   <div class="gauge-title">🎯 מד שטף חי — קצב ורציפות דיבור</div>
   <svg viewBox="0 0 200 115" class="gauge-svg">
-    <path d="M180,100 A80,80 0 0,1 164.7,53" stroke="#166534" stroke-width="18" fill="none" stroke-linecap="round"/>
+    <path d="M180,100 A80,80 0 0,1 164.7,53" stroke="#15803d" stroke-width="18" fill="none" stroke-linecap="round"/>
     <path d="M164.7,53 A80,80 0 0,1 124.7,23.9" stroke="#22c55e" stroke-width="18" fill="none" stroke-linecap="round"/>
     <path d="M124.7,23.9 A80,80 0 0,1 75.3,23.9" stroke="#eab308" stroke-width="18" fill="none" stroke-linecap="round"/>
     <path d="M75.3,23.9 A80,80 0 0,1 35.3,53" stroke="#f97316" stroke-width="18" fill="none" stroke-linecap="round"/>
     <path d="M35.3,53 A80,80 0 0,1 20,100" stroke="#ef4444" stroke-width="18" fill="none" stroke-linecap="round"/>
-    <line id="gaugeNeedle" class="gauge-needle" x1="100" y1="100" x2="100" y2="24" stroke="#1a1033" stroke-width="4" stroke-linecap="round" style="transform:rotate(-90deg)"/>
-    <circle cx="100" cy="100" r="7" fill="#1a1033"/>
+    <line id="gaugeNeedle" class="gauge-needle" x1="100" y1="100" x2="100" y2="24" stroke="#eef2f6" stroke-width="4" stroke-linecap="round" style="transform:rotate(-90deg)"/>
+    <circle cx="100" cy="100" r="7" fill="#eef2f6"/>
   </svg>
   <div id="gaugeLabel" class="gauge-label">—</div>
   <div id="gaugeBreakdown" class="gauge-breakdown"></div>
@@ -412,11 +412,22 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
   if(v){
     v.addEventListener('ended',dismissSplash);
     v.addEventListener('error',dismissSplash);
+    // The <video> starts muted (guaranteed to autoplay everywhere - see tag
+    // attributes below). Immediately try to upgrade to real sound: many
+    // browsers do allow unmuted autoplay once the user has engaged with the
+    // site before, or on desktop generally. If the browser blocks it
+    // (NotAllowedError), fall back to the muted playback that's already
+    // running, so this never risks breaking autoplay - it can only improve it.
+    try{
+      v.muted=false;
+      var p=v.play();
+      if(p&&p.catch)p.catch(function(){v.muted=true;v.play().catch(function(){})});
+    }catch(e){}
   }
   // Safety net: if autoplay is blocked entirely, the video is slow to load,
   // or 'ended' never fires for any reason, the splash must never be allowed
   // to permanently block the login screen.
-  setTimeout(dismissSplash,2900);
+  setTimeout(dismissSplash,4300);
 })();
 var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail='',studentPassword='',currentQ=null,recognition=null,practiceResults=[],examMode=false,examSentences=[],examIndex=0,examResults=[],busy=false,voiceGender='female',nextAction=null,silenceTimeoutMs=1200,studentPhotoDataUrl='',lastCompletedSentence=null,practiceMode=false,practiceModeFromExam=false;
 // "Private" mode: opt-in alternate chat-bubble skin, per-device (like the
@@ -721,7 +732,7 @@ function starsForAttempts(n){if(n<=0)return 3;if(n<=2)return 2;return 1}
 function starsHtml(n){let s=starsForAttempts(n);return [1,2,3].map(i=>'<span class="star'+(i<=s?' lit':'')+'">⭐</span>').join('')}
 
 function fireConfetti(count){
-  let colors=['#4318D1','#be185d','#22c55e','#f59e0b','#0284c7'];
+  let colors=['#c4952e','#d4a83f','#22c55e','#f59e0b','#60a5fa'];
   for(let i=0;i<(count||30);i++){
     let p=document.createElement('div'); p.className='confetti-piece';
     p.style.left=(Math.random()*100)+'vw';
@@ -924,7 +935,7 @@ function init(){
   };
   if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();populateAudioSettingsUI()};
 }
-function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#4318D1');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | נדרשת התאמה מלאה (100%) בכל משפט | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';initGoogleStudentSignIn(0);setTimeout(()=>document.getElementById('name').focus(),100)}
+function selectTeacher(id){currentTeacher=id;let t=teacherData[id]||{};voiceGender=t.voice_gender||'female';document.documentElement.style.setProperty('--tc',t.color||'#c4952e');document.getElementById('loginTitle').textContent='כניסה לכיתה של '+(t.name||id);document.getElementById('exerciseHint').textContent='תרגיל נוכחי: '+(t.exercise_name||'תרגול דמו')+' | נדרשת התאמה מלאה (100%) בכל משפט | ניסיונות: '+(t.max_attempts||5);document.getElementById('login').classList.add('show');document.getElementById('loginErr').style.display='none';initGoogleStudentSignIn(0);setTimeout(()=>document.getElementById('name').focus(),100)}
 function closeLogin(){document.getElementById('login').classList.remove('show')}
 // Escape closes whichever overlay/dialog is currently open - keyboard and
 // screen-reader users have no mouse "click outside" affordance to fall back
@@ -1007,7 +1018,7 @@ function autoResumeLogin(){
   currentTeacher=saved.teacherId;
   let t=teacherData[currentTeacher]||{};
   voiceGender=t.voice_gender||'female';
-  document.documentElement.style.setProperty('--tc',t.color||'#4318D1');
+  document.documentElement.style.setProperty('--tc',t.color||'#c4952e');
   let _isConnErr=false;
   apiFetch('/api/verify-student',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teacher_id:currentTeacher,name:saved.name,email:saved.email,password:saved.password})},autoResumeLogin)
     .then(r=>r.json().then(d=>({ok:r.ok,d})),e=>{_isConnErr=true;throw e})
@@ -1264,7 +1275,7 @@ function showPlacementResult(spoken,res){
 function openPlacementResult(res){
   document.getElementById('placementResultLevel').textContent='🎯 שובצת לרמה: '+(res.placed_level_name||res.placed_level||'');
   let hist=res.history||[];
-  let rows=hist.map(h=>'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd,#e5e5e5)"><span>'+esc(h.level_name||h.level)+'</span><span>'+(h.passed?'✅ עבר':'💪 עוד לא')+'</span></div>').join('');
+  let rows=hist.map(h=>'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd,#2c3947)"><span>'+esc(h.level_name||h.level)+'</span><span>'+(h.passed?'✅ עבר':'💪 עוד לא')+'</span></div>').join('');
   document.getElementById('placementResultBody').innerHTML=(rows?('<div style="margin-bottom:8px">כך התקדם המבחן, רמה אחר רמה:</div>'+rows):'')+'<p style="margin-top:12px">מתחילים לתרגל ברמה הזו - כשתהיו מוכנים, לחצו על הכפתור.</p>';
   document.getElementById('placementResult').classList.add('show');
 }
@@ -2021,7 +2032,7 @@ function openStationPicker(target){
   apiFetch('/api/exercise-sentences?student='+encodeURIComponent(studentId),{},()=>openStationPicker(target)).then(r=>r.json()).then(d=>{
     let list=d.sentences||[];
     if(!list.length){body.innerHTML='<p class="small">אין משפטים להצגה.</p>';return}
-    body.innerHTML=list.map((s,i)=>'<button type="button" class="ghost" style="width:100%;text-align:right;margin-top:6px" onclick="pickPracticeSentence('+i+')"><div style="font-weight:700">'+esc(s.he||'')+'</div><div dir="ltr" style="font-size:13px;color:#666">'+esc(s.en||'')+'</div></button>').join('');
+    body.innerHTML=list.map((s,i)=>'<button type="button" class="ghost" style="width:100%;text-align:right;margin-top:6px" onclick="pickPracticeSentence('+i+')"><div style="font-weight:700">'+esc(s.he||'')+'</div><div dir="ltr" style="font-size:13px;color:#9aa7b5">'+esc(s.en||'')+'</div></button>').join('');
     window._stationPickerSentences=list;
   }).catch(()=>{body.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
 }
@@ -2046,7 +2057,7 @@ function openListenAll(){
     let list=d.sentences||[];
     if(!list.length){body.innerHTML='<p class="small">אין משפטים להצגה.</p>';return}
     window._listenAllSentences=list;
-    body.innerHTML=list.map((s,i)=>'<button type="button" class="ghost" style="width:100%;text-align:right;margin-top:6px;display:flex;align-items:center;gap:8px" onclick="playListenAllSentence('+i+',this)"><span style="font-size:17px">🔊</span><span style="flex:1;min-width:0"><div style="font-weight:700">'+esc(s.he||'')+'</div><div dir="ltr" style="font-size:13px;color:#666">'+esc(s.en||'')+'</div></span></button>').join('');
+    body.innerHTML=list.map((s,i)=>'<button type="button" class="ghost" style="width:100%;text-align:right;margin-top:6px;display:flex;align-items:center;gap:8px" onclick="playListenAllSentence('+i+',this)"><span style="font-size:17px">🔊</span><span style="flex:1;min-width:0"><div style="font-weight:700">'+esc(s.he||'')+'</div><div dir="ltr" style="font-size:13px;color:#9aa7b5">'+esc(s.en||'')+'</div></span></button>').join('');
   }).catch(()=>{body.innerHTML='<p class="small">שגיאה בטעינה.</p>'});
 }
 function playListenAllSentence(i,btn){
