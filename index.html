@@ -376,6 +376,12 @@ body.private-mode .col-a{flex:1;display:flex;flex-direction:column}
 body.private-mode .station-row{position:relative}
 body.private-mode .station-nums{width:100%;max-width:320px;margin:0 auto;justify-content:center}
 body.private-mode .pv-toggle{position:absolute;top:50%;left:2px;transform:translateY(-50%)}
+/* Explicit request: the header above the sentence bubble only needs the
+   "1/10" progress counter - drop the greeting ("Hello X") and the step
+   label ("Step 2 - Practice") entirely. Hiding rather than removing the
+   elements/JS: they're still populated harmlessly under the hood, just
+   not shown, which is lower-risk than touching the JS that sets them. */
+#pvHello,#pvStepLabel{display:none}
 .pv-counter{background:rgba(196,149,46,.16);color:#c4952e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
 .pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
