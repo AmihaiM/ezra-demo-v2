@@ -349,15 +349,22 @@ body.private-mode .card{flex:1;display:flex;flex-direction:column}
 body.private-mode .practice-grid{flex:1;display:flex;flex-direction:column}
 body.private-mode .col-a{flex:1;display:flex;flex-direction:column}
 /* Explicit correction: the station-number row must sit ONLY directly under
-   the boxed live screen, within the SAME left/right boundaries as it - not
-   spill out to the full window edge-to-edge like a normal fixed bottom nav
-   (exactly what #stationBar does normally: left:0;right:0). On mobile that
-   difference is invisible (the box already fills the screen width), but on
-   tablet/desktop, where the box is capped at 480px, the station row was
-   still stretching across the ENTIRE browser width underneath it - visually
-   detached from the box it belongs to, unlike the Ezra reference where the
-   step circles stay confined under the narrow box itself. */
-body.private-mode #stationBar{max-width:480px;margin:0 auto;border-radius:20px 20px 0 0}
+   the boxed live screen (.card), within the SAME left/right edges as it -
+   not spill out to the full window edge-to-edge like a normal fixed bottom
+   nav (exactly what #stationBar does normally: left:0;right:0). This is
+   NOT just a desktop/tablet issue: .card's visible edges are inset inside
+   .wrap by .wrap's own left/right padding (14px normally, 12px under the
+   759px breakpoint below) even on mobile, where .wrap itself spans the
+   full screen - so #stationBar needs that SAME inset on every screen size,
+   not only a max-width cap that only bites above 480px viewports. Using
+   left/right (instead of width) plus a max-width and auto margins makes
+   the browser center a capped box the same way on wide screens while
+   still applying the plain inset on narrow ones - confirmed against the
+   .wrap/.card math live. */
+body.private-mode #stationBar{left:14px;right:14px;max-width:452px;margin:0 auto;border-radius:20px 20px 0 0}
+@media (max-width:759px){
+  body.private-mode #stationBar{left:12px;right:12px;max-width:456px}
+}
 .pv-counter{background:rgba(196,149,46,.16);color:#c4952e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
 .pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
