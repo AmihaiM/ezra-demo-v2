@@ -312,6 +312,22 @@ body.private-mode #practiceAgainBtn{display:none!important}
 body.private-mode .wrap{max-width:480px}
 body.private-mode .practice-grid{display:block}
 body.private-mode .col-b{display:none!important}
+/* Follow-up: the boxed live screen above was leaving a visible gap of plain
+   page background between itself and the fixed bottom station-bar once it
+   no longer had to stretch across the wide desktop layout. Explicit
+   request: that leftover space is fine to stay empty/unused, but it should
+   read as a CONTINUATION of the same card - one unbroken panel from just
+   under the progress bar down to the buttons - not a floating box with a
+   gap before the next element. Stretched via flexbox instead of a fixed
+   pixel height so it adapts to any viewport/font-size without guessing an
+   exact number. 96px bottom padding roughly matches the fixed station-bar's
+   own height (previously 184px/128px, sized for the mobile next/cap-choice
+   bar - which Private mode never shows - so that much reserved space here
+   would have been its own dead gap). */
+body.private-mode .wrap{padding-bottom:96px;display:flex;flex-direction:column;min-height:calc(100vh - 60px);min-height:calc(100dvh - 60px)}
+body.private-mode .card{flex:1;display:flex;flex-direction:column}
+body.private-mode .practice-grid{flex:1;display:flex;flex-direction:column}
+body.private-mode .col-a{flex:1;display:flex;flex-direction:column}
 .pv-counter{background:rgba(196,149,46,.16);color:#c4952e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
 .pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
