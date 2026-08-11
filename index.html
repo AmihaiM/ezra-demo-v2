@@ -318,13 +318,24 @@ body.private-mode .col-b{display:none!important}
    request: that leftover space is fine to stay empty/unused, but it should
    read as a CONTINUATION of the same card - one unbroken panel from just
    under the progress bar down to the buttons - not a floating box with a
-   gap before the next element. Stretched via flexbox instead of a fixed
-   pixel height so it adapts to any viewport/font-size without guessing an
-   exact number. 96px bottom padding roughly matches the fixed station-bar's
-   own height (previously 184px/128px, sized for the mobile next/cap-choice
-   bar - which Private mode never shows - so that much reserved space here
-   would have been its own dead gap). */
-body.private-mode .wrap{padding-bottom:96px;display:flex;flex-direction:column;min-height:calc(100vh - 60px);min-height:calc(100dvh - 60px)}
+   gap before the next element.
+   First attempt used a guessed min-height (100vh - 60px) on .wrap alone,
+   which UNDERSHOT badly: .wrap's own padding (18px top + 96px bottom =
+   114px) is INSIDE that min-height box, so the flex children only ever got
+   (guessed height - 114px) to fill, not the full viewport - confirmed via
+   live devtools measurement (card stopped at 401px high on a 585px-tall
+   screen, nowhere near the bottom). Fixed by making #app itself the exact-
+   height flex column (real height, not a guess - 100dvh) with .top sized
+   naturally and .wrap taking flex:1 for everything else automatically, so
+   no pixel math is needed at any level. #app's display is normally set to
+   'block' via an inline style in JS (see startApp()) - inline styles beat
+   any stylesheet rule regardless of specificity, so this needs !important
+   to actually take effect. padding-bottom is trimmed to match the real
+   measured station-bar height (60px) + a small buffer, not the old 96px
+   (leftover from a different, now-hidden mobile button bar) which was
+   itself creating an extra, needless gap on top of the min-height bug. */
+body.private-mode #app{display:flex!important;flex-direction:column;min-height:100vh;min-height:100dvh}
+body.private-mode .wrap{flex:1;display:flex;flex-direction:column;padding-bottom:70px}
 body.private-mode .card{flex:1;display:flex;flex-direction:column}
 body.private-mode .practice-grid{flex:1;display:flex;flex-direction:column}
 body.private-mode .col-a{flex:1;display:flex;flex-direction:column}
