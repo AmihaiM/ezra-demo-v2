@@ -310,7 +310,21 @@ body.private-mode #practiceAgainBtn{display:none!important}
    regardless of screen size, so the chat bubbles + mic + buttons form one
    continuous narrow column with the controls right under the sentences,
    on any device.*/
-body.private-mode .wrap{max-width:480px}
+/* Explicit follow-up: narrow the whole live-screen column down to the exact
+   natural width of the 4 round station buttons (measured live: 220px -
+   4 buttons at ~52px + 3x4px gaps), not just an arbitrary phone-width guess
+   like 480px. Chosen deliberately even though it's tight for the sentence
+   text/mic controls - narrower than 480 was the explicit ask. Target is the
+   CARD's visible width, not .wrap's own box - .wrap has 14px side padding
+   (12px under the 759px breakpoint) around the card, so .wrap's max-width
+   has to be 220 + that padding, or the card itself renders narrower than
+   220 (confirmed live: capping .wrap straight at 220 produced a 192px
+   card - the same padding-double-counting mistake as the earlier
+   min-height bug, just in the width dimension this time). */
+body.private-mode .wrap{max-width:248px}
+@media (max-width:759px){
+  body.private-mode .wrap{max-width:244px}
+}
 body.private-mode .practice-grid{display:block}
 body.private-mode .col-b{display:none!important}
 /* Follow-up: the boxed live screen above was leaving a visible gap of plain
@@ -341,10 +355,9 @@ body.private-mode #app{display:flex!important;flex-direction:column;min-height:1
    item to size itself to its CONTENT's natural width and center that via
    the auto margins, instead of stretching to fill the cross-axis via
    align-items - confirmed live (wrap collapsed to 138px without this,
-   despite max-width:480px being set, since nothing forced it to actually
-   USE that width). width:100% gives it a definite width to fill first
-   (capped by max-width:480px right below), then margin:auto centers that
-   480px box normally. */
+   despite a max-width being set, since nothing forced it to actually USE
+   that width). width:100% gives it a definite width to fill first (capped
+   by max-width right below), then margin:auto centers that box normally. */
 body.private-mode .wrap{flex:1;display:flex;flex-direction:column;padding-bottom:62px;width:100%}
 body.private-mode .card{flex:1;display:flex;flex-direction:column}
 body.private-mode .practice-grid{flex:1;display:flex;flex-direction:column}
@@ -352,37 +365,16 @@ body.private-mode .col-a{flex:1;display:flex;flex-direction:column}
 /* Explicit correction: ONLY the 4 round station-number buttons must sit
    directly under the boxed live screen (.card), within its SAME left/right
    edges - the Private toggle is explicitly EXCLUDED from that boundary and
-   is allowed to sit outside it (confirmed OK by the user). Constraining
-   the whole #stationBar (including Private) to the card's width was wrong:
-   with all 5 buttons squeezed into one ~450px box the row read as a bigger
-   boxed panel than before, not a tight match to the card - the opposite of
-   what was wanted. Fix: wrap only the 4 numbered buttons in .station-nums
-   and size/center THAT to match the card, while the Private button stays
-   outside it via position:absolute (removed from the width calculation
-   entirely, same as it effectively was before - flush to the bar's own
-   edge). This mirrors the .wrap/.card math from the fix above: .station-nums
-   sits inside .station-row, which itself sits inside #stationBar's own
-   6px/8px padding, so the extra inset needed here is (target 14px or 12px)
-   minus that 8px already-consumed padding. */
+   is allowed to sit outside it (confirmed OK by the user). .card/.wrap are
+   now capped at exactly the buttons' own natural width (220px, measured
+   live: 4 buttons at ~52px + 3x4px gaps) rather than a wider phone-width
+   guess, so .station-nums just targets that same fixed 220px - no more
+   per-breakpoint math needed, since 220px comfortably fits inside even the
+   narrowest real phone (leaves ~85px clear on each side, plenty of room
+   for the Private pill beside it without any overlap, confirmed live). */
 body.private-mode .station-row{position:relative}
-body.private-mode .station-nums{width:calc(100% - 12px);max-width:452px;margin:0 auto}
+body.private-mode .station-nums{width:100%;max-width:220px;margin:0 auto}
 body.private-mode .pv-toggle{position:absolute;top:50%;left:2px;transform:translateY(-50%)}
-/* On real phone widths the frame is only inset ~12px from the screen edge -
-   there just isn't room for the Private pill to sit beside it without
-   sitting ON TOP of button "1" (confirmed live: a same-row placement
-   overlapped by ~28px at 386px wide, covering a third of that button).
-   So on narrow screens Private drops to its own small row below the 4
-   numbered buttons instead of sharing a row with them - still clearly
-   "outside" the numbered frame (no shared space at all now), just
-   stacked rather than side-by-side. This makes #stationBar taller
-   (2 rows instead of 1), so .wrap's padding-bottom is bumped to match -
-   measured live at 386px: bar height ~95px (was ~60px single-row). */
-@media (max-width:759px){
-  body.private-mode .wrap{padding-bottom:111px}
-  body.private-mode .station-row{flex-direction:column;align-items:center;gap:4px}
-  body.private-mode .station-nums{width:calc(100% - 8px);max-width:456px}
-  body.private-mode .pv-toggle{position:static;top:auto;left:auto;transform:none;padding:3px 10px;min-width:0}
-}
 .pv-counter{background:rgba(196,149,46,.16);color:#c4952e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
 .pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
