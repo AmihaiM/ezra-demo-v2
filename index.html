@@ -262,7 +262,13 @@ body{background:radial-gradient(circle at 12% 8%,rgba(45,58,74,.55) 0%,transpare
 .pv-toggle[aria-pressed="true"]{background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.4)}
 .pv-toggle[aria-pressed="true"] .dot{background:#22c55e;border-color:#22c55e}
 #pvHeader,#pvTimer,#pvChat,#pvActions{display:none}
-body.private-mode #pvHeader{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:var(--tc,#c4952e);font-size:13px;margin-bottom:10px;direction:ltr;text-align:left}
+/* justify-content:center (was space-between): #pvHeader is a flex row, and
+   space-between only made sense when it held 3 items (hello/counter/step).
+   Now that hello + step are hidden (see #pvHello,#pvStepLabel further down),
+   space-between puts the one remaining item at the flex start instead of
+   centering it - confirmed live, the counter sat flush left instead of
+   centered under the sentence bubble. */
+body.private-mode #pvHeader{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;color:var(--tc,#c4952e);font-size:13px;margin-bottom:10px;direction:ltr;text-align:left}
 body.private-mode #pvChat{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;max-height:56vh;overflow-y:auto;padding:2px}
 /* #pvActions' visibility is gated on BOTH the body class AND this .show
    class (toggled via classList, never inline style) - if only inline style
@@ -359,7 +365,16 @@ body.private-mode #app{display:flex!important;flex-direction:column;min-height:1
    by max-width right below), then margin:auto centers that box normally. */
 body.private-mode .wrap{flex:1;display:flex;flex-direction:column;padding-bottom:62px;width:100%}
 body.private-mode .card{flex:1;display:flex;flex-direction:column}
-body.private-mode .practice-grid{flex:1;display:flex;flex-direction:column}
+/* align-items:stretch is required here: .practice-grid's desktop-only 2-col
+   rule (grid-template-columns + align-items:start, further up) leaves
+   align-items:start active even after being switched to a single-column
+   flex layout here, since it's never re-declared - that stopped .col-a
+   from stretching to the card's width, shrinking it instead to hug its
+   narrowest child (the 64px mic button). Confirmed live: .col-a rendered
+   at exactly 64px wide, with the sentence counter and mic both squeezed
+   into that sliver on one side instead of centered across the real
+   320px-wide card. */
+body.private-mode .practice-grid{flex:1;display:flex;flex-direction:column;align-items:stretch}
 body.private-mode .col-a{flex:1;display:flex;flex-direction:column}
 /* Explicit correction: ONLY the 4 round station-number buttons must sit
    directly under the boxed live screen (.card), within its SAME left/right
@@ -511,6 +526,26 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
       var p=v.play();
       if(p&&p.catch)p.catch(function(){v.muted=true;v.play().catch(function(){})});
     }catch(e){}
+    // Explicit request: sound should always play, not just when the browser
+    // happens to allow unmuted autoplay with zero interaction. That specific
+    // case (no interaction at all) is a hard platform policy no site can
+    // override - every browser blocks it everywhere, on purpose, or every
+    // site would blast audio on load. What IS reliably allowed everywhere:
+    // unmuting an already-playing video the instant the user's very first
+    // interaction with the page happens, even if that interaction isn't on
+    // the video itself. So if the unmuted attempt above got blocked, listen
+    // once for the first tap/click/key anywhere and unmute right then - in
+    // practice this means sound starts within a fraction of a second of any
+    // interaction, covering "always" for everyone except someone who never
+    // touches the screen before the splash ends on its own.
+    var enableSoundOnFirstInteraction=function(){
+      if(!v.muted)return;
+      v.muted=false;
+      v.play().catch(function(){});
+    };
+    ['pointerdown','keydown','touchstart'].forEach(function(evt){
+      document.addEventListener(evt,enableSoundOnFirstInteraction,{once:true,capture:true});
+    });
   }
   // Safety net: if autoplay is blocked entirely, the video is slow to load,
   // or 'ended' never fires for any reason, the splash must never be allowed
