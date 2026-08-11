@@ -142,6 +142,7 @@ button:active{transform:scale(.95)}
 body.in-app #stationBar{display:flex}
 body.in-app .app-footer{display:none!important}
 .station-row{display:flex;gap:4px;justify-content:center}
+.station-nums{display:flex;gap:4px}
 .station-step{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;background:transparent;border:0;padding:3px 6px;border-radius:10px;min-width:50px;flex:0 1 90px}
 .station-step .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;background:#232e3a;color:#9aa7b5;border:2px solid #2c3947;font-weight:800}
 .station-step.done .dot{background:rgba(34,197,94,.18);border-color:#4ade80;color:#4ade80}
@@ -348,22 +349,39 @@ body.private-mode .wrap{flex:1;display:flex;flex-direction:column;padding-bottom
 body.private-mode .card{flex:1;display:flex;flex-direction:column}
 body.private-mode .practice-grid{flex:1;display:flex;flex-direction:column}
 body.private-mode .col-a{flex:1;display:flex;flex-direction:column}
-/* Explicit correction: the station-number row must sit ONLY directly under
-   the boxed live screen (.card), within the SAME left/right edges as it -
-   not spill out to the full window edge-to-edge like a normal fixed bottom
-   nav (exactly what #stationBar does normally: left:0;right:0). This is
-   NOT just a desktop/tablet issue: .card's visible edges are inset inside
-   .wrap by .wrap's own left/right padding (14px normally, 12px under the
-   759px breakpoint below) even on mobile, where .wrap itself spans the
-   full screen - so #stationBar needs that SAME inset on every screen size,
-   not only a max-width cap that only bites above 480px viewports. Using
-   left/right (instead of width) plus a max-width and auto margins makes
-   the browser center a capped box the same way on wide screens while
-   still applying the plain inset on narrow ones - confirmed against the
-   .wrap/.card math live. */
-body.private-mode #stationBar{left:14px;right:14px;max-width:452px;margin:0 auto;border-radius:20px 20px 0 0}
+/* Explicit correction: ONLY the 4 round station-number buttons must sit
+   directly under the boxed live screen (.card), within its SAME left/right
+   edges - the Private toggle is explicitly EXCLUDED from that boundary and
+   is allowed to sit outside it (confirmed OK by the user). Constraining
+   the whole #stationBar (including Private) to the card's width was wrong:
+   with all 5 buttons squeezed into one ~450px box the row read as a bigger
+   boxed panel than before, not a tight match to the card - the opposite of
+   what was wanted. Fix: wrap only the 4 numbered buttons in .station-nums
+   and size/center THAT to match the card, while the Private button stays
+   outside it via position:absolute (removed from the width calculation
+   entirely, same as it effectively was before - flush to the bar's own
+   edge). This mirrors the .wrap/.card math from the fix above: .station-nums
+   sits inside .station-row, which itself sits inside #stationBar's own
+   6px/8px padding, so the extra inset needed here is (target 14px or 12px)
+   minus that 8px already-consumed padding. */
+body.private-mode .station-row{position:relative}
+body.private-mode .station-nums{width:calc(100% - 12px);max-width:452px;margin:0 auto}
+body.private-mode .pv-toggle{position:absolute;top:50%;left:2px;transform:translateY(-50%)}
+/* On real phone widths the frame is only inset ~12px from the screen edge -
+   there just isn't room for the Private pill to sit beside it without
+   sitting ON TOP of button "1" (confirmed live: a same-row placement
+   overlapped by ~28px at 386px wide, covering a third of that button).
+   So on narrow screens Private drops to its own small row below the 4
+   numbered buttons instead of sharing a row with them - still clearly
+   "outside" the numbered frame (no shared space at all now), just
+   stacked rather than side-by-side. This makes #stationBar taller
+   (2 rows instead of 1), so .wrap's padding-bottom is bumped to match -
+   measured live at 386px: bar height ~95px (was ~60px single-row). */
 @media (max-width:759px){
-  body.private-mode #stationBar{left:12px;right:12px;max-width:456px}
+  body.private-mode .wrap{padding-bottom:111px}
+  body.private-mode .station-row{flex-direction:column;align-items:center;gap:4px}
+  body.private-mode .station-nums{width:calc(100% - 8px);max-width:456px}
+  body.private-mode .pv-toggle{position:static;top:auto;left:auto;transform:none;padding:3px 10px;min-width:0}
 }
 .pv-counter{background:rgba(196,149,46,.16);color:#c4952e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
@@ -421,10 +439,12 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 </div></div></div>
 <div id="stationBar" role="navigation" aria-label="ניווט בין תחנות">
   <div class="station-row">
-    <button type="button" class="station-step" data-station="1" onclick="jumpToStation(1)" aria-label="תחנה 1 — Listening"><span class="dot">1</span><span class="lbl">Listening</span></button>
-    <button type="button" class="station-step" data-station="2" onclick="jumpToStation(2)" aria-label="תחנה 2 — Practice"><span class="dot">2</span><span class="lbl">Practice</span></button>
-    <button type="button" class="station-step" data-station="3" onclick="jumpToStation(3)" aria-label="תחנה 3 — Exercise"><span class="dot">3</span><span class="lbl">Exercise</span></button>
-    <button type="button" class="station-step" data-station="4" onclick="jumpToStation(4)" aria-label="תחנה 4 — Speed Test"><span class="dot">4</span><span class="lbl">Speed Test</span></button>
+    <div class="station-nums">
+      <button type="button" class="station-step" data-station="1" onclick="jumpToStation(1)" aria-label="תחנה 1 — Listening"><span class="dot">1</span><span class="lbl">Listening</span></button>
+      <button type="button" class="station-step" data-station="2" onclick="jumpToStation(2)" aria-label="תחנה 2 — Practice"><span class="dot">2</span><span class="lbl">Practice</span></button>
+      <button type="button" class="station-step" data-station="3" onclick="jumpToStation(3)" aria-label="תחנה 3 — Exercise"><span class="dot">3</span><span class="lbl">Exercise</span></button>
+      <button type="button" class="station-step" data-station="4" onclick="jumpToStation(4)" aria-label="תחנה 4 — Speed Test"><span class="dot">4</span><span class="lbl">Speed Test</span></button>
+    </div>
     <button type="button" id="privateModeBtn" class="station-step pv-toggle" onclick="togglePrivateMode()" aria-pressed="false" aria-label="הפעל/כבה מצב Private"><span class="dot">🕶️</span><span class="lbl" id="privateModeBtnLbl">PRIVATE OFF</span></button>
   </div>
   <button type="button" id="listenAllBtn" class="listen-all-btn" onclick="openListenAll()" aria-label="הצג ושמע את כל משפטי התרגיל">🔊 הצג</button>
