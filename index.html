@@ -296,6 +296,22 @@ body.private-mode #previewNav,
 body.private-mode #nextBtn,
 body.private-mode #capChoice,
 body.private-mode #practiceAgainBtn{display:none!important}
+/* Explicit request: Private mode's "live" screen should stay a tight,
+   bounded, mobile-app-like column - the eye shouldn't have to travel across
+   a wide desktop layout - matching how the original Ezra app looked
+   (narrow box with the sentence(s) and the controls attached right below
+   it), instead of the normal theme's wide 2-column desktop workspace (see
+   the "Widen desktop workspace" change, which is right for the richer
+   normal-mode content but works against Private mode's deliberately
+   minimal presentation). col-b (mastery/gauge/result) is already empty in
+   Private mode - display:none it outright instead of leaving its column
+   width reserved, and cap .wrap back down to a phone/small-tablet width
+   regardless of screen size, so the chat bubbles + mic + buttons form one
+   continuous narrow column with the controls right under the sentences,
+   on any device.*/
+body.private-mode .wrap{max-width:480px}
+body.private-mode .practice-grid{display:block}
+body.private-mode .col-b{display:none!important}
 .pv-counter{background:rgba(196,149,46,.16);color:#c4952e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
 .pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
