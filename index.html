@@ -335,10 +335,29 @@ body.private-mode .col-b{display:none!important}
    (leftover from a different, now-hidden mobile button bar) which was
    itself creating an extra, needless gap on top of the min-height bug. */
 body.private-mode #app{display:flex!important;flex-direction:column;min-height:100vh;min-height:100dvh}
-body.private-mode .wrap{flex:1;display:flex;flex-direction:column;padding-bottom:70px}
+/* width:100% is required here, not just cosmetic: .wrap's pre-existing
+   margin:0 auto (from the normal, non-private .wrap rule) causes a flex
+   item to size itself to its CONTENT's natural width and center that via
+   the auto margins, instead of stretching to fill the cross-axis via
+   align-items - confirmed live (wrap collapsed to 138px without this,
+   despite max-width:480px being set, since nothing forced it to actually
+   USE that width). width:100% gives it a definite width to fill first
+   (capped by max-width:480px right below), then margin:auto centers that
+   480px box normally. */
+body.private-mode .wrap{flex:1;display:flex;flex-direction:column;padding-bottom:62px;width:100%}
 body.private-mode .card{flex:1;display:flex;flex-direction:column}
 body.private-mode .practice-grid{flex:1;display:flex;flex-direction:column}
 body.private-mode .col-a{flex:1;display:flex;flex-direction:column}
+/* Explicit correction: the station-number row must sit ONLY directly under
+   the boxed live screen, within the SAME left/right boundaries as it - not
+   spill out to the full window edge-to-edge like a normal fixed bottom nav
+   (exactly what #stationBar does normally: left:0;right:0). On mobile that
+   difference is invisible (the box already fills the screen width), but on
+   tablet/desktop, where the box is capped at 480px, the station row was
+   still stretching across the ENTIRE browser width underneath it - visually
+   detached from the box it belongs to, unlike the Ezra reference where the
+   step circles stay confined under the narrow box itself. */
+body.private-mode #stationBar{max-width:480px;margin:0 auto;border-radius:20px 20px 0 0}
 .pv-counter{background:rgba(196,149,46,.16);color:#c4952e;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700}
 .pv-step{font-weight:800}
 .pv-bubble{max-width:84%;padding:10px 14px;border-radius:16px;font-size:16px;line-height:1.4;direction:ltr;text-align:left;word-break:break-word}
