@@ -146,7 +146,6 @@ body.in-app .app-footer{display:none!important}
 .station-step{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;background:transparent;border:0;padding:3px 6px;border-radius:10px;min-width:50px;flex:0 1 90px;transition:transform .08s ease}
 .station-step .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;background:#232e3a;color:#9aa7b5;border:2px solid #2c3947;font-weight:800;transition:background .12s ease,border-color .12s ease}
 .station-step:active{transform:scale(.88)}
-.station-step.jumping{pointer-events:none}
 .station-step.jumping .dot{animation:stationPulse .6s ease-in-out infinite}
 @keyframes stationPulse{0%,100%{opacity:1}50%{opacity:.45}}
 .station-step.done .dot{background:rgba(34,197,94,.18);border-color:#4ade80;color:#4ade80}
@@ -587,15 +586,15 @@ var _pvRate=null, pvExamStartTime=null, pvTimerInterval=null;
 // elapsed exam time, treat it as abandoned and close it with a message
 // rather than letting the timer run forever - see pvExamTimedOut() below.
 var PV_EXAM_TIMEOUT_SEC=3600;
-// Guards jumpToStation() against overlapping/rapid-fire taps. Distinct from
-// `busy` (which guards the mic-recording/answer-submission flow only, not
-// station navigation) - without this, quickly tapping between station
-// buttons (e.g. 2 then 3) could fire a second /api/jump-station call before
-// the first one's chain (jump -> loadQuestion, two sequential round-trips)
-// finished, letting responses resolve out of order and land on the wrong
-// station. Set the instant a tap is accepted, cleared exactly once via
-// .finally() no matter which branch jumpToStation resolves through.
-var pvJumpBusy=false;
+// Station-button taps are intentionally NOT rate-limited or blocked - the
+// student can tap 1/2/3/4 as fast and as often as they like. Correctness
+// against out-of-order network responses (tap 2 then 3 quickly; 2's
+// response arrives after 3's) is handled instead with a "latest tap wins"
+// token: every jumpToStation() call grabs the next number, and a response
+// only gets applied to the screen if its token is still the most recent one
+// issued - any older, now-superseded response is silently discarded instead
+// of momentarily flashing the wrong station.
+var pvJumpSeq=0;
 // True only while the one-time placement test (see showPlacementQuestion)
 // is on screen - guards togglePrivateMode() against trying to switch views
 // mid-test, when there's no real station to jump to yet.
@@ -2091,22 +2090,24 @@ function pvSyncListenAllVisibility(current){
   btn.style.display=show?'':'none';
 }
 function jumpToStation(target){
-  if(!studentId||busy||pvJumpBusy)return;
+  if(!studentId||busy)return;
+  // This call becomes the new "latest tap" the instant it's accepted - any
+  // still-in-flight earlier call's response will see myJump!==pvJumpSeq
+  // below and discard itself instead of applying to the screen.
+  let myJump=++pvJumpSeq;
   // Private mode is a standalone mechanism, explicit requirement: stations
   // 2/3 always show exactly ONE sentence, never a browsable list - only
   // station 1 ("Listening") is list-based, since it's a restyled version of
   // the pre-existing read-only listen-all feature, not a graded station.
   if(target===1&&privateMode){examMode=false;practiceMode=false;hideNextButton();hideCapChoice();pvShowListening();return}
   // Instant feedback the moment the tap registers, before either network
-  // round-trip starts - the ":active" CSS handles the press itself, this
-  // adds a pulsing/disabled state on the tapped button so a second tap
-  // (e.g. an impatient re-tap on the same or another station button while
-  // the first jump is still resolving) can't queue up a race.
-  pvJumpBusy=true;
+  // round-trip starts - purely cosmetic (a pulsing dot), never blocks
+  // further taps.
   let _jumpBtn=document.querySelector('#stationBar .station-step[data-station="'+target+'"]');
   if(_jumpBtn)_jumpBtn.classList.add('jumping');
-  let _clearJumpUi=()=>{pvJumpBusy=false;if(_jumpBtn)_jumpBtn.classList.remove('jumping')};
+  let _clearJumpUi=()=>{if(_jumpBtn)_jumpBtn.classList.remove('jumping')};
   apiFetch('/api/jump-station',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,target:target})},()=>jumpToStation(target)).then(r=>r.json()).then(res=>{
+    if(myJump!==pvJumpSeq)return; // a later tap has already superseded this response
     if(!res.ok)return;
     if(res.mode==='free_practice'){
       // Private mode never opens the old plain-list modal dialog. It also
