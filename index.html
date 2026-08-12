@@ -575,6 +575,14 @@ try{
   // else: nothing saved on this device yet - keep the default above.
 }catch(e){}
 var _pvRate=null, pvExamStartTime=null, pvTimerInterval=null;
+// Explicit request: Station 4 (Speed Test) previously had NO cap on the
+// running timer at all - a student who opened it and never answered (or
+// just left the tab open) would sit there indefinitely, seen live as a
+// stuck "1131:10" (almost 19 hours) timer with no way for the app to
+// recognize the session as abandoned. After this many seconds of total
+// elapsed exam time, treat it as abandoned and close it with a message
+// rather than letting the timer run forever - see pvExamTimedOut() below.
+var PV_EXAM_TIMEOUT_SEC=3600;
 // True only while the one-time placement test (see showPlacementQuestion)
 // is on screen - guards togglePrivateMode() against trying to switch views
 // mid-test, when there's no real station to jump to yet.
@@ -2604,10 +2612,32 @@ function pvStartExamTimer(){
   if(el)el.textContent='00:00';
   pvTimerInterval=setInterval(()=>{
     let sec=Math.floor((performance.now()-pvExamStartTime)/1000);
+    if(sec>=PV_EXAM_TIMEOUT_SEC){ pvExamTimedOut(); return; }
     if(el)el.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
   },250);
 }
 function pvStopExamTimer(){ if(pvTimerInterval){clearInterval(pvTimerInterval);pvTimerInterval=null} }
+// Explicit request: after PV_EXAM_TIMEOUT_SEC of total exam time with no
+// completion, stop the timer and tell the student plainly rather than
+// leaving them looking at a mic and a timer that will never end on its
+// own. Mirrors the existing "connection expired" pattern elsewhere in the
+// app (a clear message + one obvious way forward) rather than inventing a
+// new UI convention.
+function pvExamTimedOut(){
+  pvStopExamTimer();
+  pvAbortRecording();
+  pvHideMic();
+  pvClearActions();
+  let timerEl=document.getElementById('pvTimer'); if(timerEl)timerEl.textContent='';
+  pvSetHeader('Step 4 - Speed Test','');
+  let chat=document.getElementById('pvChat');
+  if(chat){
+    let old=chat.querySelector('.pv-current-prompt'); if(old)old.remove();
+    chat.insertAdjacentHTML('beforeend','<div class="pv-bubble pv-feedback bad">⏱️ הסשן נסגר עקב חוסר פעילות. רעננו את הדף כדי להתחיל את המבחן מחדש.</div>');
+    chat.scrollTop=chat.scrollHeight;
+  }
+  examMode=false;
+}
 function pvAppendExamRow(row){
   let chat=document.getElementById('pvChat');
   if(!chat)return;
