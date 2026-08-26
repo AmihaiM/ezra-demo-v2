@@ -95,6 +95,114 @@ def call_claude(messages, system=None, max_tokens=2000, model=None):
         print("CLAUDE API CALL FAILED", e)
         return None, "שגיאת AI"
 
+# --- Azure Speech (Pronunciation Assessment) infra ---
+# SHADOW MODE ONLY as of this writing: /api/pronunciation-assess below is
+# called by the front-end in PARALLEL with the existing browser
+# SpeechRecognition-based flow, purely to collect real per-word pronunciation
+# scores for evaluation. It does NOT feed into /api/answer's scoring, the
+# mastery gauge, cloze, or the exam - failing or being unset here has zero
+# effect on a student's actual progress. This is deliberate: cutting the
+# whole scoring engine over in one step would be a large, hard-to-verify
+# change; running the real API in parallel first lets us validate quality/
+# latency/format-compatibility across real devices before anything depends
+# on it. Not configured (no AZURE_SPEECH_KEY) simply disables the endpoint.
+AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "")
+AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
+
+# Content-Types MediaRecorder can realistically hand us, mapped to what
+# Azure's short-audio REST endpoint accepts directly (no server-side
+# transcoding needed for either of these - see the code comment on
+# /api/pronunciation-assess for the Safari/iOS gap this does NOT cover yet).
+_AZURE_AUDIO_CONTENT_TYPES = {
+    "audio/webm": "audio/webm; codecs=opus",
+    "audio/webm;codecs=opus": "audio/webm; codecs=opus",
+    "audio/ogg": "audio/ogg; codecs=opus",
+    "audio/ogg;codecs=opus": "audio/ogg; codecs=opus",
+    "audio/wav": "audio/wav; codecs=audio/pcm; samplerate=16000",
+}
+
+_MAX_AUDIO_DATA_URL_LEN = 4_000_000  # a few seconds of spoken audio, base64-inflated
+
+def _parse_audio_data_url(data_url):
+    """Split a data:audio/...;base64,... URL into (azure_content_type, raw_bytes),
+    or raise ValueError with a message safe to log/return. Mirrors
+    _parse_image_data_url's shape below for the teacher photo feature."""
+    data_url = (data_url or "").strip()
+    if not data_url.startswith("data:"):
+        raise ValueError("invalid audio format")
+    if len(data_url) > _MAX_AUDIO_DATA_URL_LEN:
+        raise ValueError("audio too long")
+    m = re.match(r"^data:([^;,]+(?:;codecs=[^;,]+)?);base64,(.+)$", data_url, re.DOTALL)
+    if not m:
+        raise ValueError("invalid audio format")
+    media_type, b64 = m.group(1), m.group(2)
+    azure_content_type = _AZURE_AUDIO_CONTENT_TYPES.get(media_type.replace(" ", ""))
+    if not azure_content_type:
+        raise ValueError(f"unsupported audio type: {media_type}")
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        raise ValueError("could not decode audio")
+    return azure_content_type, raw
+
+def call_azure_pronunciation(raw_audio, azure_content_type, reference_text, language="en-US"):
+    """Calls Azure's short-audio Pronunciation Assessment REST API. Returns
+    (result_dict, error): result_dict is None and error is a short message
+    on any failure (missing key, timeout, non-200, malformed response) -
+    same fail-closed shape as call_claude() above."""
+    if not AZURE_SPEECH_KEY:
+        return None, "Azure Speech not configured (missing AZURE_SPEECH_KEY)"
+    pron_config = {
+        "ReferenceText": reference_text,
+        "GradingSystem": "HundredMark",
+        "Granularity": "Phoneme",
+        "Dimension": "Comprehensive",
+        "EnableMiscue": True,
+        "EnableProsodyAssessment": True,
+    }
+    pron_header = base64.b64encode(json.dumps(pron_config).encode("utf-8")).decode("utf-8")
+    url = f"https://{AZURE_SPEECH_REGION}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1"
+    headers = {
+        "Accept": "application/json;text/xml",
+        "Content-Type": azure_content_type,
+        "Ocp-Apim-Subscription-Key": AZURE_SPEECH_KEY,
+        "Pronunciation-Assessment": pron_header,
+    }
+    try:
+        resp = requests.post(
+            url, params={"language": language, "format": "detailed"},
+            headers=headers, data=raw_audio, timeout=20,
+        )
+        if resp.status_code != 200:
+            print("AZURE SPEECH API ERROR", resp.status_code, resp.text[:500])
+            return None, f"Azure API error ({resp.status_code})"
+        return resp.json(), None
+    except requests.exceptions.Timeout:
+        return None, "Azure API timed out"
+    except Exception as e:
+        print("AZURE SPEECH API CALL FAILED", e)
+        return None, "Azure API call failed"
+
+def extract_azure_pronunciation_summary(result):
+    """Flattens Azure's response down to just what the front-end shadow
+    panel needs - the scores live directly on the NBest[0] item and each
+    word (NOT nested under a "PronunciationAssessment" sub-key, despite
+    that being the header's own name - confirmed against a real response
+    during the POC, this tripped up the first draft of this code too)."""
+    nbest = (result.get("NBest") or [{}])[0]
+    return {
+        "recognized_text": result.get("DisplayText", ""),
+        "accuracy_score": nbest.get("AccuracyScore"),
+        "fluency_score": nbest.get("FluencyScore"),
+        "prosody_score": nbest.get("ProsodyScore"),
+        "completeness_score": nbest.get("CompletenessScore"),
+        "pron_score": nbest.get("PronScore"),
+        "words": [
+            {"word": w.get("Word"), "accuracy_score": w.get("AccuracyScore"), "error_type": w.get("ErrorType")}
+            for w in nbest.get("Words", [])
+        ],
+    }
+
 def extract_json_block(text):
     """Best-effort extraction of a JSON array/object from a Claude text
     response - the prompt always asks for JSON only, but models sometimes
@@ -3208,6 +3316,35 @@ def placement_answer(s, spoken, metrics):
         "history": [{"level": h["level"], "level_name": LEVEL_NAMES_HE.get(h["level"], h["level"]),
                      "passed": h["passed"]} for h in history],
     })
+
+@app.post("/api/pronunciation-assess")
+def pronunciation_assess():
+    """SHADOW MODE (see the comment on call_azure_pronunciation above): sends
+    a real recording to Azure's Pronunciation Assessment API and returns real
+    per-word accuracy/fluency scores. Called by the front-end alongside the
+    normal /api/answer flow, purely for evaluation - the result here is NOT
+    stored, NOT written to the results sheet, and has NO effect on a
+    student's score, mastery progress, or pass/fail. Requires a valid,
+    already-started student session (same as /api/answer) so this can't be
+    hit by an anonymous caller to run up the Azure bill."""
+    data = request.get_json(force=True)
+    sid = data.get("student", "")
+    s = get_session(sid)
+    if not s:
+        return jsonify(ok=False, error="session not found"), 404
+    if not AZURE_SPEECH_KEY:
+        return jsonify(ok=False, error="Azure Speech not configured"), 501
+    reference_text = (data.get("reference_text") or "").strip()
+    if not reference_text:
+        return jsonify(ok=False, error="missing reference_text"), 400
+    try:
+        azure_content_type, raw_audio = _parse_audio_data_url(data.get("audio_data_url", ""))
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e)), 400
+    result, err = call_azure_pronunciation(raw_audio, azure_content_type, reference_text)
+    if err:
+        return jsonify(ok=False, error=err), 502
+    return jsonify(ok=True, **extract_azure_pronunciation_summary(result))
 
 @app.post("/api/answer")
 def answer():
