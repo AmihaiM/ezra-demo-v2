@@ -2162,11 +2162,25 @@ function jumpToStation(target){
   // the pre-existing read-only listen-all feature, not a graded station.
   if(target===1&&privateMode){examMode=false;practiceMode=false;hideNextButton();hideCapChoice();pvShowListening();return}
   // Instant feedback the moment the tap registers, before either network
-  // round-trip starts - purely cosmetic (a pulsing dot), never blocks
-  // further taps.
+  // round-trip starts - never blocks further taps. The small pulsing dot on
+  // the button itself is easy to miss; measured live this round trip
+  // (jump-station + question, two sequential requests) can genuinely take
+  // 2-3+ seconds even when the server isn't cold - with nothing else on
+  // screen changing in Private mode's single-sentence bubble view, that
+  // reads as "the button doesn't work" rather than "still loading" (reported
+  // bug: "can't move to station 2" - traced live and confirmed the jump DOES
+  // complete correctly, just slowly, with no visible sign of progress in the
+  // meantime). A loading bubble in the chat area itself is unmissable, and
+  // gets naturally overwritten the instant the real content renders
+  // (pvSyncQuestion/pvShowListening/pvOpenFirstSentence all rebuild #pvChat
+  // from scratch), so no separate cleanup is needed here.
   let _jumpBtn=document.querySelector('#stationBar .station-step[data-station="'+target+'"]');
   if(_jumpBtn)_jumpBtn.classList.add('jumping');
   let _clearJumpUi=()=>{if(_jumpBtn)_jumpBtn.classList.remove('jumping')};
+  if(privateMode){
+    let chat=document.getElementById('pvChat');
+    if(chat)chat.innerHTML='<p class="small">טוען…</p>';
+  }
   apiFetch('/api/jump-station',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:studentId,target:target})},()=>jumpToStation(target)).then(r=>r.json()).then(res=>{
     if(myJump!==pvJumpSeq)return; // a later tap has already superseded this response
     if(!res.ok)return;
@@ -2207,7 +2221,21 @@ function jumpToStation(target){
       startExamOverAllSentences();
       return;
     }
-    if(res.mode==='same')return;
+    if(res.mode==='same'){
+      // Private mode's station "1" (Listening) is a pure client-side overlay
+      // over whatever the real server stage is (see the target===1 shortcut
+      // above) - it never actually changes s["stage"]. So a student who
+      // visits Listening and then taps back to their real current station
+      // (e.g. "2") gets mode="same" here, since the server never left that
+      // stage in the first place - a plain "return" left them stuck looking
+      // at Listening forever with no way back via the station bar (found
+      // live: reported as "can't move to station 2"). Re-syncing the real
+      // display here fixes it; in normal (non-Private) mode "same" already
+      // reflects what's on screen, so this only actually does anything when
+      // Private mode's client-side view has drifted from server truth.
+      if(privateMode)loadQuestion();
+      return;
+    }
     examMode=false;practiceMode=false;hideNextButton();hideCapChoice();
     loadQuestion();
   }).catch(()=>{}).finally(_clearJumpUi);
