@@ -25,6 +25,20 @@
 .row .ghost{background:transparent;border:1.5px solid #2c3947;color:#9aa7b5;font-size:13px;padding:7px 11px;font-weight:600;box-shadow:none}
 .row .danger{background:transparent;border:1.5px solid rgba(239,68,68,.4);color:#f87171;font-size:13px;padding:7px 11px;font-weight:600;box-shadow:none}
 .mic{width:64px;height:64px;border-radius:50%;font-size:26px;display:block;margin:12px auto;box-shadow:0 5px 16px #0003}.mic.on{background:#ef5350}.result,.banner{display:none;border-radius:12px;padding:9px 11px;margin:7px 0;font-size:14px}.result{background:#161e27;border:2px solid #2c3947}.pass{background:rgba(34,197,94,.14);border-color:#4ade80}.fail{background:rgba(239,68,68,.14);border-color:#f87171}.cloze{background:rgba(2,132,199,.14);border:2px solid #38bdf8}.mastery{background:rgba(245,158,11,.14);border:2px solid #eab54c}.exam{background:rgba(251,146,60,.12);border:2px solid #fb923c}.words{direction:ltr;text-align:left;line-height:1.7;font-size:16px;font-weight:700}.w{display:inline}.w.correct{color:#60a5fa}.w.wrong{color:#f87171}.ok{color:#4ade80}.bad{color:#f87171}.dots{display:flex;gap:5px}.dot{width:15px;height:15px;border-radius:50%;border:2px solid #eab54c;background:rgba(245,158,11,.25)}.dot.done{background:#eab54c}.small{font-size:13px;color:#9aa7b5}
+/* Azure pronunciation supplementary panel (Phase A of the Azure integration -
+   informational only, never touches score/passed/mastery). Deliberately
+   styled distinct from .result (amber/insight tone, like .mastery) so it
+   reads as "extra detail", not as a second competing verdict, and always
+   carries an explicit "ניסיוני - לא משפיע על הציון" label so a student never
+   wonders why this number differs from the real score above it. */
+.azure-pron{background:rgba(245,158,11,.08);border:1.5px dashed rgba(234,181,76,.5);border-radius:12px;padding:9px 11px;margin:7px 0;font-size:13px}
+.azure-pron .ap-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800;color:#eab54c;margin-bottom:4px}
+.azure-pron .ap-badge{font-size:11px;font-weight:700;color:#9aa7b5;background:#161e27;border:1px solid #2c3947;border-radius:20px;padding:2px 8px;white-space:nowrap}
+.azure-pron .ap-words{direction:ltr;text-align:left;line-height:1.8;font-size:16px;font-weight:700;margin-top:4px}
+.azure-pron .apw{display:inline;border-bottom:3px solid transparent;padding-bottom:1px}
+.azure-pron .apw.good{color:#4ade80;border-color:#4ade80}
+.azure-pron .apw.mid{color:#eab54c;border-color:#eab54c}
+.azure-pron .apw.bad{color:#f87171;border-color:#f87171}
 
 .summary-hero{background:linear-gradient(135deg,#4a3a1e,#8c6b2c);color:#f5ead0;border-radius:24px;padding:26px;margin-bottom:20px;text-align:center;box-shadow:0 18px 44px rgba(0,0,0,.5)}.summary-hero h2{font-size:34px;margin:0 0 8px}.score-circle{width:140px;height:140px;border-radius:50%;background:conic-gradient(#4ade80 var(--score-deg),rgba(255,255,255,.25) 0);display:grid;place-items:center;margin:18px auto;border:8px solid rgba(255,255,255,.25)}.score-circle b{font-size:34px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:18px 0}.summary-card{background:#1a232e;border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35);text-align:center}.summary-card .num{font-size:28px;font-weight:900;color:var(--tc,#c4952e)}.summary-list{display:grid;gap:12px;margin-top:16px}.summary-row{background:#1a232e;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:14px;box-shadow:0 6px 18px rgba(0,0,0,.3);direction:ltr;text-align:left}.summary-row.pass{border-inline-start:7px solid #4ade80}.summary-row.fail{border-inline-start:7px solid #f87171}.summary-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}.hidden-final{display:none!important}
 
@@ -437,6 +451,7 @@ body.private-mode #pvTimer{display:block;text-align:center;font-weight:900;font-
 <div id="pvActions" class="pv-actions"></div>
 <div id="previewNav" style="display:none;gap:8px;margin:8px 0"><button id="previewBack" class="ghost" style="flex:1" onclick="previewNavGo('back')">❮ הקודם</button><button id="previewNext" class="primary" style="flex:1" onclick="previewNavGo('next')">הבא ❯</button></div><div class="row"><button id="play" class="ghost" onclick="playSentence()">🔊 שמע שוב</button><button id="show" class="ghost" onclick="toggleEnglish()" aria-pressed="false">👁️ הצג/הסתר אנגלית</button><button id="skip" class="danger" onclick="skipSentence()">דלג</button></div><details id="audioSettings" style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--tc,#c4952e);font-weight:700">⚙️ הגדרות שמע (מהירות/קול)</summary><div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:15px" title="מהירות השמעה">🎚️⏱️</span><select id="speedSel" onchange="setSpeechRate(this.value)" title="מהירות השמעה" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #2c3947;font-size:12px;background:#121a22;color:#eef2f6"></select><span id="voiceSelWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0"><span style="font-size:15px" title="בחירת קול">🗣️</span><select id="voiceSel" onchange="setSpeechVoice(this.value)" title="בחירת קול (פעם אחת בתחילת התרגול)" style="flex:1;min-width:0;padding:6px 4px;border-radius:10px;border:2px solid #2c3947;font-size:12px;background:#121a22;color:#eef2f6"></select></span></div></details><div id="recTimer" style="display:none;text-align:center;font-weight:800;color:var(--tc,#c4952e);font-size:14px;margin-top:4px" aria-live="off">0:00</div><button id="mic" class="primary mic" onclick="startRecognition()" aria-label="התחל הקלטה — אמור את המשפט באנגלית">🎤</button><button id="stopRec" class="danger" style="display:none;width:100%;margin-top:8px" onclick="stopRecording()">⏹️ סיים הקלטה</button><p id="hint" class="hint-cta" aria-live="polite">לחץ על המיקרופון ואמור את המשפט באנגלית</p><button id="practiceAgainBtn" class="ghost" style="display:none;width:100%;margin-top:8px" onclick="practiceAgainNow()">🔁 תרגל שוב את המשפט הזה (לא משפיע על הציון)</button><button id="nextBtn" class="primary" style="display:none;width:100%;margin-top:14px;font-size:18px;padding:14px" onclick="goNext()">▶️ הבא</button><div id="capChoice" style="display:none;gap:8px;margin-top:10px"><button class="ghost" style="flex:1" onclick="capContinue()">➡️ המשך למשפט הבא</button><button class="primary" style="flex:1" onclick="capRetry()">🔁 עוד סיבוב</button></div></div><div class="col-b">
 <div id="result" class="result" aria-live="polite"></div>
+<div id="azurePron" class="azure-pron" style="display:none" aria-live="polite"></div>
 <div id="masteryGauge" class="gauge-card" role="button" tabindex="0" aria-label="מד שטף - הרחב לפירוט" onclick="toggleGaugeExpanded()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGaugeExpanded()}">
   <div class="gauge-title">🎯 מד שטף חי — קצב ורציפות דיבור</div>
   <svg viewBox="0 0 200 115" class="gauge-svg">
@@ -572,6 +587,15 @@ var azureShadowMimeType=(function(){
   return null;
 })();
 var azureShadowRecorder=null,azureShadowChunks=[],azureShadowStream=null;
+// Bumped once per recording attempt (see startRecognition). Azure's result
+// for an attempt arrives well after the main browser-based score already
+// rendered (audio upload + Azure round trip vs. near-instant local speech
+// recognition) - by the time it comes back the student may already have
+// moved to the next sentence/question. Capturing the token's value at
+// send-time and comparing it when the response arrives is how
+// renderAzurePron() below knows to silently drop a stale result instead of
+// popping supplementary feedback for a sentence that's no longer on screen.
+var azureFeedbackToken=0;
 // "Private" mode: opt-in alternate chat-bubble skin, per-device (like the
 // mute/speed prefs above) - see the big block of pv* functions near the end
 // of this script, and the body.private-mode CSS rules.
@@ -1262,6 +1286,14 @@ function startApp(){
   loadQuestion();
 }
 function loadQuestion(){busy=false;sentenceAttemptCount=0;
+  // A new sentence/question is loading - any Azure supplementary panel still
+  // showing belongs to whatever was on screen before (e.g. student skipped
+  // instead of recording again), so it must not carry over. Bumping the
+  // token also makes sure a slow-to-arrive Azure response from the sentence
+  // just left behind gets silently dropped instead of popping in here.
+  azureFeedbackToken++;
+  let _apEl=document.getElementById('azurePron');
+  if(_apEl)_apEl.style.display='none';
   // Snapshot pvGen before this fetch goes out - if the student navigates to
   // a different Private-mode view (Listening, the free-practice list, ...)
   // while this request is still in flight, those views bump pvGen, and the
@@ -1751,6 +1783,12 @@ function stopAzureShadowCaptureAndSend(referenceText){
   let rec=azureShadowRecorder, stream=azureShadowStream;
   azureShadowRecorder=null; azureShadowStream=null;
   if(!rec||!referenceText)return;
+  // Snapshot which attempt this is RIGHT NOW - startRecognition already
+  // bumped azureFeedbackToken for this attempt before recording began, so
+  // this value is stable for as long as this specific attempt is the
+  // current one. Compared against the live value once Azure's response
+  // finally arrives, further down.
+  let myAzureToken=azureFeedbackToken;
   try{
     rec.onstop=()=>{
       try{
@@ -1769,7 +1807,10 @@ function stopAzureShadowCaptureAndSend(referenceText){
           fetch('/api/pronunciation-assess',{method:'POST',headers:{'Content-Type':'application/json'},
             body:JSON.stringify({student:studentId,reference_text:referenceText,audio_data_url:dataUrl})
           }).then(r=>r.json()).then(res=>{
-            if(res&&res.ok)console.log('[azure-shadow]',referenceText,res);
+            if(res&&res.ok){
+              console.log('[azure-shadow]',referenceText,res);
+              if(myAzureToken===azureFeedbackToken)renderAzurePron(res);
+            }
           }).catch(()=>{});
         };
         // Re-encode to WAV/PCM before upload - see _azureShadowBlobToWavDataUrl
@@ -1791,6 +1832,37 @@ function stopAzureShadowCaptureAndSend(referenceText){
     };
     rec.stop();
   }catch(e){}
+}
+// Renders Azure's per-word pronunciation feedback as a SUPPLEMENTARY panel
+// under the real result box - Phase A of the Azure integration plan.
+// Deliberately informational-only: never touches score/passed/mastery/exam
+// logic (those still come entirely from the existing browser-recognition
+// flow, unchanged). The explicit "ניסיוני - לא משפיע על הציון" badge exists
+// so a student who notices this number differs from their real score above
+// it isn't confused or alarmed - it's a second opinion, not a contradiction.
+function renderAzurePron(res){
+  let el=document.getElementById('azurePron');
+  if(!el)return;
+  let words=res.words||[];
+  // Nothing useful to show - e.g. no reference words came back, or this
+  // request itself failed server-side in a way that still resolved ok:true.
+  // Stay silent rather than show an empty/confusing box.
+  if(!words.length||typeof res.pron_score!=='number')return;
+  let wordClass=w=>{
+    if(w.error_type&&w.error_type!=='None')return 'bad';
+    let a=typeof w.accuracy_score==='number'?w.accuracy_score:0;
+    if(a>=80)return 'good';
+    if(a>=50)return 'mid';
+    return 'bad';
+  };
+  let wordsHtml=words.map(w=>'<span class="apw '+wordClass(w)+'">'+esc(w.word||'')+'</span>').join(' ');
+  el.innerHTML=
+    '<div class="ap-head"><span>🔬 בדיקת הגייה (Azure)</span><span class="ap-badge">ניסיוני · לא משפיע על הציון</span></div>'+
+    '<div class="small">דיוק הגייה: <b>'+Math.round(res.pron_score)+'%</b>'+
+      (typeof res.fluency_score==='number'?' · שטף: <b>'+Math.round(res.fluency_score)+'%</b>':'')+
+    '</div>'+
+    '<div class="ap-words">'+wordsHtml+'</div>';
+  el.style.display='block';
 }
 function startRecognition(){
   if(busy||(!currentQ&&!examMode))return;
@@ -1930,6 +2002,13 @@ function startRecognition(){
       document.getElementById('hint').textContent='שגיאה — נסה שוב';
     }
   };
+  // New attempt starting: any Azure result still in flight for a PREVIOUS
+  // attempt is now stale - bump the token so it gets silently dropped when
+  // it arrives (see azureFeedbackToken above), and clear last attempt's
+  // supplementary panel so it doesn't linger under the new recording.
+  azureFeedbackToken++;
+  let azureFeedbackEl=document.getElementById('azurePron');
+  if(azureFeedbackEl)azureFeedbackEl.style.display='none';
   startAzureShadowCapture();
   rec.start();
 }
