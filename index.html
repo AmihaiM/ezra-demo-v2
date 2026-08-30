@@ -1670,6 +1670,70 @@ function stopRecording(){
 // permission for a second stream, unsupported browser, network error,
 // Azure not configured) is caught and swallowed silently - a student's
 // actual recognition/scoring flow above must never notice this exists.
+// Converts a recorded webm/opus (or ogg/opus) Blob into a 16kHz mono 16-bit
+// PCM WAV data: URL. WHY: debugging showed Azure's short-audio REST endpoint
+// accepting our webm/opus upload (HTTP 200, RecognitionStatus:"Success",
+// Duration matching the real clip length) but extracting zero actual speech
+// content (recognized_text ".", every reference word Omission, NBest
+// confidence 0) - even though playing that exact same blob back locally in
+// the browser sounds perfectly clear. That combination (right container/
+// right duration, wrong phonetic content) points at Azure's own webm/opus
+// decoder mishandling something about Chrome's specific encoder output,
+// not a real capture problem. WAV/PCM is what Microsoft's own SDKs send and
+// has none of that ambiguity, so we decode the recording ourselves (Web
+// Audio API, which uses the browser's OWN trusted decoder - the same one
+// that made the played-back audio sound clear) and re-encode as WAV before
+// upload, instead of trusting Azure to decode the compressed original.
+async function _azureShadowBlobToWavDataUrl(blob){
+  let AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)throw new Error('no AudioContext');
+  let arrayBuf=await blob.arrayBuffer();
+  let ctx=new AC();
+  let decoded;
+  try{ decoded=await ctx.decodeAudioData(arrayBuf); }
+  finally{ try{ctx.close()}catch(e){} }
+  let targetRate=16000;
+  let offlineCtx=new OfflineAudioContext(1, Math.max(1,Math.ceil(decoded.duration*targetRate)), targetRate);
+  let src=offlineCtx.createBufferSource();
+  src.buffer=decoded;
+  if(decoded.numberOfChannels>1){
+    // Explicit downmix to mono: connecting a multi-channel source straight
+    // into a 1-channel OfflineAudioContext destination lets the browser
+    // silently drop every channel but the first instead of averaging them.
+    let splitter=offlineCtx.createChannelSplitter(decoded.numberOfChannels);
+    let mixGain=offlineCtx.createGain();
+    mixGain.gain.value=1/decoded.numberOfChannels;
+    src.connect(splitter);
+    for(let ch=0;ch<decoded.numberOfChannels;ch++)splitter.connect(mixGain,ch);
+    mixGain.connect(offlineCtx.destination);
+  } else {
+    src.connect(offlineCtx.destination);
+  }
+  src.start(0);
+  let rendered=await offlineCtx.startRendering();
+  let samples=rendered.getChannelData(0);
+  let buf=new ArrayBuffer(44+samples.length*2);
+  let view=new DataView(buf);
+  let writeStr=(off,str)=>{for(let i=0;i<str.length;i++)view.setUint8(off+i,str.charCodeAt(i))};
+  writeStr(0,'RIFF'); view.setUint32(4,36+samples.length*2,true); writeStr(8,'WAVE');
+  writeStr(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,1,true);
+  view.setUint32(24,targetRate,true); view.setUint32(28,targetRate*2,true);
+  view.setUint16(32,2,true); view.setUint16(34,16,true);
+  writeStr(36,'data'); view.setUint32(40,samples.length*2,true);
+  let off=44;
+  for(let i=0;i<samples.length;i++){
+    let s=Math.max(-1,Math.min(1,samples[i]));
+    view.setInt16(off, s<0?s*0x8000:s*0x7FFF, true);
+    off+=2;
+  }
+  let wavBlob=new Blob([buf],{type:'audio/wav'});
+  return new Promise((resolve,reject)=>{
+    let reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=reject;
+    reader.readAsDataURL(wavBlob);
+  });
+}
 function startAzureShadowCapture(){
   azureShadowChunks=[];
   if(!azureShadowMimeType)return;
@@ -1701,15 +1765,28 @@ function stopAzureShadowCaptureAndSend(referenceText){
         window.lastAzureShadowBlob=blob;
         console.log('[azure-shadow] captured blob:',blob.size,'bytes, type',blob.type,
           '- play it with: new Audio(URL.createObjectURL(window.lastAzureShadowBlob)).play()');
-        let reader=new FileReader();
-        reader.onload=()=>{
+        let sendDataUrl=(dataUrl)=>{
           fetch('/api/pronunciation-assess',{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({student:studentId,reference_text:referenceText,audio_data_url:reader.result})
+            body:JSON.stringify({student:studentId,reference_text:referenceText,audio_data_url:dataUrl})
           }).then(r=>r.json()).then(res=>{
             if(res&&res.ok)console.log('[azure-shadow]',referenceText,res);
           }).catch(()=>{});
         };
-        reader.readAsDataURL(blob);
+        // Re-encode to WAV/PCM before upload - see _azureShadowBlobToWavDataUrl
+        // for why (Azure's webm/opus decoding was silently producing zero
+        // recognized speech despite a perfectly clear recording). Falls back
+        // to sending the original webm/ogg blob if WAV conversion fails for
+        // any reason (e.g. an older browser without decodeAudioData), so
+        // shadow mode never breaks outright over this.
+        _azureShadowBlobToWavDataUrl(blob).then(wavDataUrl=>{
+          console.log('[azure-shadow] converted to WAV, sending that instead of', blob.type);
+          sendDataUrl(wavDataUrl);
+        }).catch(e=>{
+          console.log('[azure-shadow] WAV conversion failed, falling back to original blob', e);
+          let reader=new FileReader();
+          reader.onload=()=>sendDataUrl(reader.result);
+          reader.readAsDataURL(blob);
+        });
       }catch(e){}
     };
     rec.stop();
