@@ -362,14 +362,22 @@ def _get_db_pool():
             return None
         try:
             from psycopg_pool import ConnectionPool
-            # min_size=1 so a cold worker doesn't hold idle connections it may
-            # never need; max_size is generous relative to a single worker's
-            # request concurrency but still bounded, so a burst of traffic
-            # can't open unbounded connections against Postgres's own
-            # connection limit. kwargs=connect_timeout mirrors the old
-            # one-off psycopg.connect(..., connect_timeout=5) behavior.
+            # min_size=0: do NOT hold an idle connection open when nothing is
+            # using the DB. This used to be min_size=1, which meant this
+            # worker permanently kept one live Postgres connection open from
+            # the moment it first touched the DB - on a serverless Postgres
+            # host (e.g. Neon) that never lets the compute endpoint suspend,
+            # so "compute time" is billed/quota'd 24/7 regardless of actual
+            # traffic. Combined with the 4-second results-flush loop below,
+            # this silently burned through a free-tier monthly compute quota
+            # in days rather than the whole month. max_size is generous
+            # relative to a single worker's request concurrency but still
+            # bounded, so a burst of traffic can't open unbounded connections
+            # against Postgres's own connection limit. kwargs=connect_timeout
+            # mirrors the old one-off psycopg.connect(..., connect_timeout=5)
+            # behavior.
             pool = ConnectionPool(
-                DATABASE_URL, min_size=1, max_size=10, timeout=5,
+                DATABASE_URL, min_size=0, max_size=10, timeout=5,
                 kwargs={"connect_timeout": 5}, open=False,
             )
             # Explicit open() (rather than open=True in the constructor) is
@@ -2119,6 +2127,10 @@ def _enqueue_pending_result(row):
     try:
         with conn, conn.cursor() as cur:
             cur.execute("INSERT INTO pending_results (row_data) VALUES (%s)", (json.dumps(row),))
+        # Wake the flush loop immediately instead of making it wait for its
+        # next timer tick - see _pending_results_event below for why the loop
+        # no longer just polls on a short fixed timer.
+        _pending_results_event.set()
         return True
     except Exception as e:
         print("ENQUEUE PENDING RESULT FAILED", e)
@@ -2158,7 +2170,22 @@ def write_result(row):
 # on top of the explicit unlock call.
 _RESULTS_FLUSH_LOCK_KEY = 918273645
 _RESULTS_FLUSH_BATCH_SIZE = 200
-RESULTS_FLUSH_INTERVAL_SEC = float(os.getenv("RESULTS_FLUSH_INTERVAL_SEC", "4"))
+# Safety-net poll interval ONLY - not the normal trigger anymore. The loop
+# below wakes immediately via _pending_results_event whenever a result is
+# actually queued, so in normal operation this number barely matters. It used
+# to be the sole trigger at 4 seconds, which meant this loop opened a fresh
+# Postgres connection every 4 seconds forever, 24/7, whether or not there was
+# anything to flush. On a serverless Postgres host (Neon) that auto-suspends
+# its compute after a few minutes of no activity to save "compute time"
+# quota, a connection every 4 seconds never let it suspend - so the free
+# monthly compute-hour quota was being burned around the clock regardless of
+# real student traffic, and ran out days into the month instead of lasting
+# the whole month. Now this is just a fallback in case an event is ever
+# missed (e.g. a row inserted by another process/restart) - it's set well
+# above Neon's default ~5-minute auto-suspend window so idle periods (nights,
+# weekends) actually let the DB go to sleep and stop counting against quota.
+RESULTS_FLUSH_INTERVAL_SEC = float(os.getenv("RESULTS_FLUSH_INTERVAL_SEC", "900"))
+_pending_results_event = threading.Event()
 
 def _flush_pending_results():
     if not DATABASE_URL:
@@ -2235,7 +2262,12 @@ def _start_results_flush_thread():
         _results_flush_thread_started = True
         def _loop():
             while True:
-                time.sleep(RESULTS_FLUSH_INTERVAL_SEC)
+                # Blocks here doing NOTHING (no DB connection held) until
+                # either _enqueue_pending_result() signals real work, or the
+                # safety-net timeout elapses - see RESULTS_FLUSH_INTERVAL_SEC
+                # above for why this replaced a dumb fixed-interval poll.
+                _pending_results_event.wait(timeout=RESULTS_FLUSH_INTERVAL_SEC)
+                _pending_results_event.clear()
                 try:
                     _flush_pending_results()
                 except Exception as e:
