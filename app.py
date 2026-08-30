@@ -233,6 +233,19 @@ def extract_azure_pronunciation_summary(result):
             {"word": w.get("Word"), "accuracy_score": w.get("AccuracyScore"), "error_type": w.get("ErrorType")}
             for w in nbest.get("Words", [])
         ],
+        # TEMP DEBUG (remove once Azure shadow scoring is verified): surface
+        # the fields our summary normally drops, straight into the same JSON
+        # the browser console already shows - RecognitionStatus in
+        # particular tells us WHY recognized_text is "." (e.g. "Success"
+        # with genuinely no speech matched vs. "InitialSilenceTimeout" vs.
+        # some decode failure), without needing to fight Render's log viewer
+        # at all. debug_nbest_confidence is Azure's own confidence that this
+        # NBest alternative is correct - near 0 there would point at a
+        # decode/format problem rather than a real pronunciation issue.
+        "debug_recognition_status": result.get("RecognitionStatus"),
+        "debug_offset": result.get("Offset"),
+        "debug_duration": result.get("Duration"),
+        "debug_nbest_confidence": nbest.get("Confidence"),
     }
 
 def extract_json_block(text):
