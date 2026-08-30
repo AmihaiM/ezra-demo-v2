@@ -1838,14 +1838,34 @@ def load_extra_teachers():
     so their env-var-configured defaults keep applying untouched.
     """
     extra = {}
-    try:
-        import gspread
-        gc = get_gspread_client()
-        sh = gc.open_by_key(ADMIN_SHEET_ID)
+    import gspread
+    # Retry transient Google API errors (503 "service unavailable", 429 rate
+    # limit) a few times with a short backoff before giving up. This used to
+    # have zero retries, and since this whole function only ever ran ONCE at
+    # process startup (see _extra_teachers = load_extra_teachers() below), a
+    # single transient hiccup at exactly that moment meant every admin-added
+    # teacher (anyone beyond the two hardcoded ones) silently vanished from
+    # the student login screen for the rest of that worker's lifetime - no
+    # error shown to anyone, no automatic recovery short of a redeploy. That
+    # is exactly what happened in production (APIError 503 at boot).
+    last_err = None
+    for attempt in range(3):
         try:
-            ws = sh.worksheet(TEACHERS_TAB)
-        except gspread.WorksheetNotFound:
-            return extra
+            gc = get_gspread_client()
+            sh = gc.open_by_key(ADMIN_SHEET_ID)
+            try:
+                ws = sh.worksheet(TEACHERS_TAB)
+            except gspread.WorksheetNotFound:
+                return extra
+            break
+        except Exception as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+    else:
+        print("LOAD EXTRA TEACHERS FAILED (all retries exhausted)", last_err)
+        return extra
+    try:
         for r in ws.get_all_records():
             tid = re.sub(r"[^a-z0-9]", "", clean_cell(r.get("teacher_id", "")).strip().lower())
             if not tid:
@@ -1991,20 +2011,59 @@ _persisted_teacher_ids = set(TEACHERS.keys())
 # or their score history would silently look empty (wrong tab name). Every
 # other field DOES take the sheet's value when an edit was saved for them.
 _hardcoded_results_tabs = {tid: t["results_tab"] for tid, t in TEACHERS.items()}
-_extra_teachers = load_extra_teachers()
-TEACHERS.update(_extra_teachers)
-for _tid, _tab in _hardcoded_results_tabs.items():
-    if _tid in TEACHERS:
-        TEACHERS[_tid]["results_tab"] = _tab
-_persisted_teacher_ids.update(_extra_teachers.keys())
-for _tid, _t in _extra_teachers.items():
-    if _tid not in _teacher_state:
-        _teacher_state[_tid] = {
-            "threshold": _t["default_threshold"], "max_attempts": _t["default_max_attempts"],
-            "exercise_name": _t.get("_saved_exercise_name") or "תרגול דמו",
-            "csv_url": _t.get("_saved_csv_url") or "", "custom_exercises": [],
-            "allowed_students": [], "restrict_to_list": False, "silence_timeout_ms": 1200,
-        }
+
+def _apply_extra_teachers(extra):
+    """Merges a freshly-loaded extra-teachers dict into the live TEACHERS/
+    _teacher_state globals - the same logic that used to run exactly once at
+    import time, now shared with the periodic refresh below so a transient
+    Google API failure at boot isn't permanent for the rest of that worker's
+    life (see load_extra_teachers' own retry-loop comment for the incident
+    this fixes). A no-op (extra={}) safely changes nothing - it does NOT
+    remove any teacher already in TEACHERS, so a transient failure on a
+    LATER refresh can't un-load a teacher that loaded fine earlier."""
+    if not extra:
+        return
+    TEACHERS.update(extra)
+    for _tid, _tab in _hardcoded_results_tabs.items():
+        if _tid in TEACHERS:
+            TEACHERS[_tid]["results_tab"] = _tab
+    _persisted_teacher_ids.update(extra.keys())
+    for _tid, _t in extra.items():
+        if _tid not in _teacher_state:
+            _teacher_state[_tid] = {
+                "threshold": _t["default_threshold"], "max_attempts": _t["default_max_attempts"],
+                "exercise_name": _t.get("_saved_exercise_name") or "תרגול דמו",
+                "csv_url": _t.get("_saved_csv_url") or "", "custom_exercises": [],
+                "allowed_students": [], "restrict_to_list": False, "silence_timeout_ms": 1200,
+            }
+
+_apply_extra_teachers(load_extra_teachers())
+
+_EXTRA_TEACHERS_REFRESH_SEC = 600
+_extra_teachers_refresh_started = False
+_extra_teachers_refresh_lock = threading.Lock()
+
+def _start_extra_teachers_refresh_thread():
+    """Defense in depth on top of load_extra_teachers' own retries: even if
+    every retry at boot fails (Google having a genuinely bad few minutes),
+    this recovers on its own within _EXTRA_TEACHERS_REFRESH_SEC instead of
+    needing someone to notice and trigger a redeploy. Also picks up a
+    teacher added/edited via /admin without waiting for the next restart."""
+    global _extra_teachers_refresh_started
+    with _extra_teachers_refresh_lock:
+        if _extra_teachers_refresh_started:
+            return
+        _extra_teachers_refresh_started = True
+        def _loop():
+            while True:
+                time.sleep(_EXTRA_TEACHERS_REFRESH_SEC)
+                try:
+                    _apply_extra_teachers(load_extra_teachers())
+                except Exception as e:
+                    print("EXTRA TEACHERS REFRESH LOOP ERROR", e)
+        threading.Thread(target=_loop, name="extra-teachers-refresh", daemon=True).start()
+
+_start_extra_teachers_refresh_thread()
 
 def append_exercise_to_catalog_sheet(name, csv_url):
     """Option G: Teacher UI writes the new exercise into the master Google Sheet.
