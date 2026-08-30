@@ -169,6 +169,18 @@ def call_azure_pronunciation(raw_audio, azure_content_type, reference_text, lang
         "Pronunciation-Assessment": pron_header,
     }
     try:
+        # TEMP DEBUG (remove once Azure shadow scoring is verified): the
+        # front-end confirmed the captured audio itself sounds clear on
+        # playback, but Azure keeps returning recognized_text "." with every
+        # reference word marked Omission - i.e. Azure isn't reading the audio
+        # as speech at all. That could be a real decode failure OR just us
+        # not seeing enough of Azure's own response to tell. Logging the
+        # exact bytes we send (length + magic header, to confirm it's a
+        # valid, non-truncated container) and Azure's FULL raw JSON (not just
+        # our extracted summary, which drops RecognitionStatus/Offset/
+        # Duration/NBest confidence) should show which side is at fault.
+        print(f"AZURE SPEECH REQUEST: content_type={azure_content_type!r} "
+              f"bytes={len(raw_audio)} header_hex={raw_audio[:16].hex()}")
         resp = requests.post(
             url, params={"language": language, "format": "detailed"},
             headers=headers, data=raw_audio, timeout=20,
@@ -176,7 +188,9 @@ def call_azure_pronunciation(raw_audio, azure_content_type, reference_text, lang
         if resp.status_code != 200:
             print("AZURE SPEECH API ERROR", resp.status_code, resp.text[:500])
             return None, f"Azure API error ({resp.status_code})"
-        return resp.json(), None
+        result = resp.json()
+        print("AZURE SPEECH RAW RESPONSE:", json.dumps(result)[:2000])
+        return result, None
     except requests.exceptions.Timeout:
         return None, "Azure API timed out"
     except Exception as e:
