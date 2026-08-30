@@ -1,10 +1,23 @@
-import os, json, time, re, csv, io, random, threading, hmac, hashlib, base64
+import os, sys, json, time, re, csv, io, random, threading, hmac, hashlib, base64
 from urllib.parse import urlparse, parse_qs, quote
 from difflib import SequenceMatcher
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Flask, request, jsonify, Response, g
 import requests
+
+# Force stdout/stderr to be line-buffered (flush on every newline) instead of
+# whatever gunicorn's sync worker leaves them as by default. Without this,
+# print() debug output across the whole app can sit in an internal buffer and
+# never show up in Render's log viewer in any reasonable time - it looks
+# exactly like "nothing was logged" even though the code ran fine. Bit us
+# investigating the Azure pronunciation debug output below; fixing it here
+# once, globally, instead of adding flush=True to every individual print().
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except Exception:
+    pass
 
 app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -179,17 +192,22 @@ def call_azure_pronunciation(raw_audio, azure_content_type, reference_text, lang
         # valid, non-truncated container) and Azure's FULL raw JSON (not just
         # our extracted summary, which drops RecognitionStatus/Offset/
         # Duration/NBest confidence) should show which side is at fault.
+        # flush=True on every debug print here: gunicorn's sync worker
+        # doesn't guarantee stdout is line-buffered, so without this these
+        # can sit in Python's internal buffer and never reach Render's log
+        # viewer at all (looks identical to "nothing happened" from the log
+        # UI, even though the request went through fine).
         print(f"AZURE SPEECH REQUEST: content_type={azure_content_type!r} "
-              f"bytes={len(raw_audio)} header_hex={raw_audio[:16].hex()}")
+              f"bytes={len(raw_audio)} header_hex={raw_audio[:16].hex()}", flush=True)
         resp = requests.post(
             url, params={"language": language, "format": "detailed"},
             headers=headers, data=raw_audio, timeout=20,
         )
         if resp.status_code != 200:
-            print("AZURE SPEECH API ERROR", resp.status_code, resp.text[:500])
+            print("AZURE SPEECH API ERROR", resp.status_code, resp.text[:500], flush=True)
             return None, f"Azure API error ({resp.status_code})"
         result = resp.json()
-        print("AZURE SPEECH RAW RESPONSE:", json.dumps(result)[:2000])
+        print("AZURE SPEECH RAW RESPONSE:", json.dumps(result)[:2000], flush=True)
         return result, None
     except requests.exceptions.Timeout:
         return None, "Azure API timed out"
