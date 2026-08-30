@@ -1693,6 +1693,14 @@ function stopAzureShadowCaptureAndSend(referenceText){
         if(stream)stream.getTracks().forEach(t=>t.stop());
         let blob=new Blob(azureShadowChunks,{type:azureShadowMimeType});
         if(!blob.size)return;
+        // TEMP DEBUG (remove once Azure shadow scoring is verified): expose the
+        // exact audio blob that was sent to Azure so we can listen back and
+        // confirm whether real speech was captured, vs. a silent/corrupt clip -
+        // recognized_text:"." with every word as Omission means Azure heard no
+        // speech at all, which could be a capture bug rather than a real score.
+        window.lastAzureShadowBlob=blob;
+        console.log('[azure-shadow] captured blob:',blob.size,'bytes, type',blob.type,
+          '- play it with: new Audio(URL.createObjectURL(window.lastAzureShadowBlob)).play()');
         let reader=new FileReader();
         reader.onload=()=>{
           fetch('/api/pronunciation-assess',{method:'POST',headers:{'Content-Type':'application/json'},
