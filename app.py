@@ -122,10 +122,14 @@ def call_claude(messages, system=None, max_tokens=2000, model=None):
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
 
-# Content-Types MediaRecorder can realistically hand us, mapped to what
+# Content-Types the front-end can realistically hand us, mapped to what
 # Azure's short-audio REST endpoint accepts directly (no server-side
-# transcoding needed for either of these - see the code comment on
-# /api/pronunciation-assess for the Safari/iOS gap this does NOT cover yet).
+# transcoding needed for any of these). In practice the front-end now
+# converts every capture to audio/wav client-side before upload (see
+# _azureShadowBlobToWavDataUrl in index.html) - including on Safari/iOS,
+# which records audio/mp4 rather than webm/ogg - so audio/wav covers that
+# gap too. webm/ogg entries stay here only as the front-end's own fallback
+# path if that client-side conversion ever fails.
 _AZURE_AUDIO_CONTENT_TYPES = {
     "audio/webm": "audio/webm; codecs=opus",
     "audio/webm;codecs=opus": "audio/webm; codecs=opus",

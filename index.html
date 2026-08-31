@@ -577,12 +577,20 @@ var teacherData={},currentTeacher=null,studentId='',studentName='',studentEmail=
 // student attempts, live. It never blocks, delays, or changes anything in
 // the existing recognition/scoring/mastery/exam flow - see the matching
 // comment on /api/pronunciation-assess in app.py. azureShadowMimeType is
-// resolved once (there's no supported audio/webm on Safari/iOS, so this
-// silently stays null there and the whole feature no-ops - see task notes
-// on Safari/iOS format support, not yet handled).
+// resolved once, from whichever of these MediaRecorder actually supports on
+// this device (checked via isTypeSupported, in preference order) - not every
+// candidate exists everywhere. 'audio/mp4' is what covers Safari/iOS: Safari
+// 14.1-18.3 supports ONLY audio/mp4 for MediaRecorder (webm/ogg both report
+// unsupported there), and only Safari 18.4+ added webm/opus support - so
+// without this fallback, azureShadowMimeType silently stayed null and Shadow
+// Mode never ran at all on most real iPhones. Whichever format actually gets
+// captured, _azureShadowBlobToWavDataUrl (below) decodes it with the
+// browser's OWN built-in decoder and re-encodes to WAV before upload, so the
+// format Azure ultimately receives is the same either way - this list only
+// affects whether CAPTURE can start in the first place, not what's sent.
 var azureShadowMimeType=(function(){
   if(typeof MediaRecorder==='undefined')return null;
-  var candidates=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus'];
+  var candidates=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
   for(var i=0;i<candidates.length;i++){ if(MediaRecorder.isTypeSupported(candidates[i]))return candidates[i]; }
   return null;
 })();
